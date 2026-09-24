@@ -1,5 +1,7 @@
 import { memo } from 'react';
 import { Button, Col, Empty, Row, Tooltip } from 'antd';
+import { Space } from 'antd';
+import { SectionLogActions } from '../SectionLogActions';
 import { useSocketMessageStore } from '@/store/socket-message';
 import SystemContent from '@/components/SystemContent';
 import { ReloadOutlined } from '@ant-design/icons';
@@ -13,25 +15,29 @@ const SystemPanel = memo(() => {
 
   const { t } = useTranslation();
 
-  if (systemMsg.length === 0) {
-    return <Empty description={false} />;
-  }
   return (
     <div className="system-panel">
       <Row justify="end">
         <Col>
-          <Tooltip title={t('common.refresh')}>
-            <Button
-              onClick={() => {
-                refresh('system');
-              }}
-            >
-              <ReloadOutlined />
-            </Button>
-          </Tooltip>
+          <Space>
+            <SectionLogActions section="system" />
+            <Tooltip title={t('common.refresh')}>
+              <Button
+                onClick={() => {
+                  refresh('system');
+                }}
+              >
+                <ReloadOutlined />
+              </Button>
+            </Tooltip>
+          </Space>
         </Col>
       </Row>
-      <SystemContent data={systemMsg} />
+      {systemMsg.length === 0 ? (
+        <Empty description={false} />
+      ) : (
+        <SystemContent data={systemMsg} />
+      )}
     </div>
   );
 });

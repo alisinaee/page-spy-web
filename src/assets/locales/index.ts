@@ -1,34 +1,22 @@
 import { initReactI18next } from 'react-i18next';
-import i18next, { InitOptions } from 'i18next';
-import languageDetector from 'i18next-browser-languagedetector';
+import i18next from 'i18next';
+import en from './en.json';
 
-const data = import.meta.glob('./*.json', { eager: true }) as Record<
-  string,
-  object
->;
+const resources = {
+  en: {
+    translation: en,
+  },
+} as const;
 
-const resources = Object.entries(data).reduce((acc, cur) => {
-  const [key, value] = cur;
-  const result = key.match(/^\.\/(.*)\.json$/);
-  if (!result) return acc;
-  acc[result[1]] = {
-    translation: {
-      ...value,
-    },
-  };
-  return acc;
-}, {} as NonNullable<InitOptions['resources']>);
-
-i18next
-  .use(initReactI18next)
-  .use(languageDetector)
-  .init({
-    resources,
-    fallbackLng: 'en',
-    interpolation: {
-      escapeValue: false,
-    },
-  });
+i18next.use(initReactI18next).init({
+  resources,
+  lng: 'en',
+  fallbackLng: 'en',
+  supportedLngs: ['en'],
+  interpolation: {
+    escapeValue: false,
+  },
+});
 
 export const getTranslation = (key: string) => {
   const lang = i18next.resolvedLanguage || 'en';
@@ -36,11 +24,6 @@ export const getTranslation = (key: string) => {
   return res || key;
 };
 
-export const isCN = () => {
-  const lang = i18next.resolvedLanguage;
-  return ['zh', 'zh-CN', 'zh-Hans-CN'].some((l) => {
-    return lang === l;
-  });
-};
+export const isCN = () => false;
 
 export default i18next;

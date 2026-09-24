@@ -1,43 +1,25 @@
-import { isClient, isDoc } from '@/utils/constants';
-import { langType, useLanguage } from '@/utils/useLanguage';
+import { isClient } from '@/utils/constants';
 import Icon from '@ant-design/icons';
-import { Divider, MenuProps, Dropdown, ConfigProvider, Flex } from 'antd';
+import { Divider, Dropdown, ConfigProvider, Flex } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import DocsSvg from '@/assets/image/docs.svg?react';
-import I18nSvg from '@/assets/image/i18n.svg?react';
 import BugSvg from '@/assets/image/bug.svg?react';
 import OnlineSvg from '@/assets/image/online.svg?react';
 import ReplaySvg from '@/assets/image/replay.svg?react';
-import RunSvg from '@/assets/image/run-right.svg?react';
-import i18n, { isCN } from '@/assets/locales';
-import { useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import clsx from 'clsx';
 import './index.less';
 import { CSSTransition } from 'react-transition-group';
 import { createPortal } from 'react-dom';
 import { useWhere } from '@/utils/useWhere';
-import { CN_MIRROR_SITE } from '@/components/CNUserModal';
 import { OpenDocSearch } from '@/components/DocSearch/OpenDocSearch';
 
-const ALL_LANGS: MenuProps['items'] = [
-  {
-    key: 'zh',
-    label: <span>简体中文</span>,
-  },
-  {
-    key: 'en',
-    label: <span>English</span>,
-  },
-  {
-    key: 'ja',
-    label: <span>日本語</span>,
-  },
-  {
-    key: 'ko',
-    label: <span>한국어</span>,
-  },
-];
+const githubRepo = import.meta.env.VITE_GITHUB_REPO.replace(
+  /^https?:\/\/github\.com\//,
+  '',
+).replace(/\/$/, '');
+const githubStarsUrl = `https://img.shields.io/github/stars/${githubRepo}?style=social`;
 
 const navDropdownConfig = {
   components: {
@@ -49,12 +31,8 @@ const navDropdownConfig = {
 };
 
 export const NavMenuOnPc = () => {
-  const [lang, setLang] = useLanguage();
   const { isOSpy } = useWhere();
   const { t } = useTranslation();
-  const langMenus = useMemo(() => {
-    return ALL_LANGS.filter((i) => i?.key !== lang);
-  }, [lang]);
 
   return (
     <div className="nav-menu pc">
@@ -116,49 +94,13 @@ export const NavMenuOnPc = () => {
           <Divider type="vertical" className="divider-bg" />
         </>
       )}
-      {/* i18n */}
-      <div className="menu-item lang">
-        <ConfigProvider theme={navDropdownConfig}>
-          <Dropdown
-            arrow
-            menu={{
-              items: langMenus,
-              onClick: ({ key }) => {
-                setLang(key as langType);
-                i18n.changeLanguage(key);
-              },
-            }}
-          >
-            <Flex align="center" gap={8}>
-              <Icon component={I18nSvg} style={{ fontSize: 18 }} />
-              <span>{t('common.lang')}</span>
-            </Flex>
-          </Dropdown>
-        </ConfigProvider>
-      </div>
-      <Divider type="vertical" className="divider-bg" />
-      {/* Mirror */}
-      {isDoc && isCN() && (
-        <>
-          <a href={CN_MIRROR_SITE} target="_blank" className="menu-item doc">
-            <Flex align="center" gap={8}>
-              <Icon component={RunSvg} style={{ fontSize: 16 }} />
-              <span>国内镜像</span>
-            </Flex>
-          </a>
-          <Divider type="vertical" className="divider-bg" />
-        </>
-      )}
       <a
         href={import.meta.env.VITE_GITHUB_REPO}
         target="_blank"
         className="menu-item"
         style={{ fontSize: 0 }}
       >
-        <img
-          src="https://img.shields.io/github/stars/HuolalaTech/page-spy-web?style=social"
-          alt=""
-        />
+        <img src={githubStarsUrl} alt="" />
       </a>
     </div>
   );
@@ -166,7 +108,6 @@ export const NavMenuOnPc = () => {
 
 export const NavMenuOnMobile = () => {
   const { isOSpy } = useWhere();
-  const [lang, setLang] = useLanguage();
   const { t } = useTranslation();
   const [expand, setExpand] = useState(false);
   const fixedMenuRef = useRef<HTMLDivElement | null>(null);
@@ -230,44 +171,10 @@ export const NavMenuOnMobile = () => {
                 </Link>
               </>
             )}
-            {/* i18n */}
-            <div
-              className="menu-item lang"
-              onClick={() => {
-                const newLang = lang === 'en' ? 'zh' : 'en';
-                setLang(newLang);
-                i18n.changeLanguage(newLang);
-                setExpand(false);
-              }}
-            >
-              <Flex align="center" gap={8}>
-                <Icon component={I18nSvg} style={{ fontSize: 18 }} />
-                <span>{t('common.lang')}</span>
-              </Flex>
-            </div>
-            {/* Mirror */}
-            {isDoc && isCN() && (
-              <a
-                href={CN_MIRROR_SITE}
-                target="_blank"
-                className="menu-item doc"
-                onClick={() => {
-                  setExpand(false);
-                }}
-              >
-                <Flex align="center" gap={8}>
-                  <Icon component={RunSvg} style={{ fontSize: 16 }} />
-                  <span>国内镜像</span>
-                </Flex>
-              </a>
-            )}
             {/* GitHub */}
             <div className="menu-item">
               <a href={import.meta.env.VITE_GITHUB_REPO} target="_blank">
-                <img
-                  src="https://img.shields.io/github/stars/HuolalaTech/page-spy-web?style=social"
-                  alt=""
-                />
+                <img src={githubStarsUrl} alt="" />
               </a>
             </div>
           </div>

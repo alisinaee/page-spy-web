@@ -113,6 +113,16 @@
     "browser": "Browser",
     "platform": "Platform",
     "version": "Version",
+    "copy-all": "Copy All",
+    "download": "Download",
+    "clear-panel-logs": "Clear Panel Logs",
+    "copy-all-success": "All device logs copied",
+    "copy-all-error": "Could not copy all device logs",
+    "download-success": "Device log file downloaded",
+    "export-error": "Could not create device log file",
+    "clear-confirm-title": "Clear panel logs?",
+    "clear-confirm-description": "This removes console, network, page, storage, system, database, and connection data from this panel, and clears the device console. Storage on the device stays.",
+    "clear-success": "Panel logs cleared",
     "eval-plugin-required": "If you need to dynamically execute code in mini program, please use @huolala-tech/page-spy-plugin-mp-eval in client SDK.",
     "mp-warning": "When submitting the mini program for review, DO REMEMBER to delete the plugin-mp-eval in the code, otherwise the review will fail.",
     "menu": {
@@ -160,7 +170,8 @@
   "network": {
     "open-in-new-tab": "Open in new tab",
     "copy-link-address": "Copy link address",
-    "copy-as-curl": "Copy as cURL"
+    "copy-as-curl": "Copy as cURL",
+    "copy-full-log": "Copy full log"
   },
   "system": {
     "overview": "Overview",

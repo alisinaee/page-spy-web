@@ -1,7 +1,7 @@
-import ReactJsonView from '@huolala-tech/react-json-view';
 import { isString } from 'lodash-es';
 import { useMemo } from 'react';
 import { EntriesBody } from '@/components/EntriesBody';
+import { ColoredJson } from '../ColoredJson';
 
 export const RequestPayloadBlock: React.FC<{
   data: string | [string, string][];
@@ -13,7 +13,7 @@ export const RequestPayloadBlock: React.FC<{
         const params = new URLSearchParams(data);
         return <EntriesBody data={[...params]} />;
       }
-      return <ReactJsonView source={data} defaultExpand />;
+      return <ColoredJson value={data} />;
     }
     return <EntriesBody data={data} />;
   }, [data, urlencoded]);

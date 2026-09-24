@@ -1,8 +1,6 @@
 import { useSocketMessageStore } from '@/store/socket-message';
-import { ClearOutlined } from '@ant-design/icons';
-import { Row, Col, Tooltip, Button, Input, Select, Space } from 'antd';
+import { Row, Col, Input, Select, Space } from 'antd';
 import React, { useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
 import { SpyConsole } from '@huolala-tech/page-spy-types';
 import ErrorSvg from '@/assets/image/error.svg?react';
 import InfoSvg from '@/assets/image/info.svg?react';
@@ -12,12 +10,11 @@ import DebugSvg from '@/assets/image/debug.svg?react';
 import './index.less';
 import { debounce } from 'lodash-es';
 import { useShallow } from 'zustand/react/shallow';
+import { SectionLogActions } from '@/pages/Devtools/SectionLogActions';
 export const HeaderActions = () => {
-  const { t } = useTranslation();
-  const [clearRecord, changeConsoleMsgFilter, setConsoleMsgKeywordFilter] =
+  const [changeConsoleMsgFilter, setConsoleMsgKeywordFilter] =
     useSocketMessageStore(
       useShallow((state) => [
-        state.clearRecord,
         state.setConsoleMsgTypeFilter,
         state.setConsoleMsgKeywordFilter,
       ]),
@@ -74,10 +71,6 @@ export const HeaderActions = () => {
     },
   ];
 
-  const clear = useCallback(() => {
-    clearRecord('console');
-  }, [clearRecord]);
-
   const debounceKeywordFilter = useCallback(
     debounce((e) => {
       setConsoleMsgKeywordFilter(e.target.value);
@@ -104,11 +97,7 @@ export const HeaderActions = () => {
             allowClear={true}
             style={{ width: 200 }}
           />
-          <Tooltip title={t('common.clear')}>
-            <Button onClick={clear}>
-              <ClearOutlined />
-            </Button>
-          </Tooltip>
+          <SectionLogActions section="console" />
         </Space>
       </Col>
     </Row>

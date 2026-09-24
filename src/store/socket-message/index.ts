@@ -50,6 +50,7 @@ interface SocketMessage {
   setNetworkKeyword: (keyword: string) => void;
   setNetworkType: (type: NetworkType) => void;
   clearRecord: (key: string) => void;
+  clearDeviceSession: () => void;
   refresh: (key: string) => void;
 }
 
@@ -324,9 +325,62 @@ export const useSocketMessageStore = create<SocketMessage>()(
         case 'network':
           set({ networkMsg: [] });
           break;
+        case 'page':
+          set({
+            pageMsg: {
+              html: '',
+              tree: null,
+              location: null,
+            },
+          });
+          break;
+        case 'storage':
+          set({
+            storageMsg: {
+              localStorage: [],
+              sessionStorage: [],
+              cookie: [],
+              mpStorage: [],
+              AppStorage: [],
+              asyncStorage: [],
+            },
+            databaseMsg: {
+              basicInfo: null,
+              data: null,
+            },
+          });
+          break;
+        case 'system':
+          set({ systemMsg: [] });
+          break;
         default:
           break;
       }
+    },
+    clearDeviceSession: () => {
+      set((state) => {
+        state.consoleMsg = [];
+        state.networkMsg = [];
+        state.systemMsg = [];
+        state.connectMsg = [];
+        state.pageMsg = {
+          html: '',
+          tree: null,
+          location: null,
+        };
+        state.storageMsg = {
+          localStorage: [],
+          sessionStorage: [],
+          cookie: [],
+          mpStorage: [],
+          AppStorage: [],
+          asyncStorage: [],
+        };
+        state.databaseMsg = {
+          basicInfo: null,
+          data: null,
+        };
+      });
     },
     refresh: (key: string) => {
       const socket = get().socket;

@@ -10,6 +10,7 @@ import { useWhere } from '@/utils/useWhere';
 import { useTitle } from 'ahooks';
 import { useDarkTheme } from '@/utils/useDarkTheme';
 import { OpenDocSearch } from '@/components/DocSearch/OpenDocSearch';
+import { BRAND_NAME } from '@/utils/brand';
 const { Header, Content } = Layout;
 
 export const Layouts = () => {
@@ -23,7 +24,7 @@ export const Layouts = () => {
   }, [isDark]);
 
   const { isOSpy } = useWhere();
-  useTitle(isOSpy ? 'O-Spy' : 'PageSpy');
+  useTitle(isOSpy ? 'O-Spy' : BRAND_NAME);
 
   return (
     <Layout className="layouts">

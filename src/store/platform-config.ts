@@ -60,7 +60,7 @@ export const STORAGE_TYPES: {
   },
   {
     name: 'mpStorage',
-    label: '小程序 Storage',
+    label: 'Mini Program Storage',
     icon: StorageSvg,
     visible: (browser) => {
       return isMiniProgram(browser) || isUniAppNative(browser);

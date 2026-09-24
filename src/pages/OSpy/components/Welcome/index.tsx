@@ -72,13 +72,15 @@ export const Welcome = () => {
         <div className="welcome-left">
           <p className="slogan">
             <Trans i18nKey="oSpy.slogan">
-              离线记录
+              Offline Recording
               <br />
-              完整回放
+              Complete Replay
             </Trans>
           </p>
           <p className="slogan-desc">
-            <Trans i18nKey="oSpy.desc">程序不会撒谎，回放还原现场。</Trans>
+            <Trans i18nKey="oSpy.desc">
+              Program never lies, replay restores the scene.
+            </Trans>
           </p>
           <div className="welcome-buttons">
             <Flex gap={24}>

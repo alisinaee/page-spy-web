@@ -282,3 +282,4 @@ export function isMobile(ua?: string) {
   if (!ua) return false;
   return MOBILE_REGEXPS.some((reg) => reg.test(ua));
 }
+export const BRAND_NAME = import.meta.env.VITE_BRAND_NAME || 'PageSpy';

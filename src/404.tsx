@@ -7,10 +7,10 @@ export const Page404 = () => (
   <Result
     status="404"
     title="404"
-    subTitle="对不起，您找的页面不存在！"
+    subTitle="The page you requested does not exist."
     extra={
       <Button type="primary">
-        <Link to="/">返回首页</Link>
+        <Link to="/">Back to Home</Link>
       </Button>
     }
   />

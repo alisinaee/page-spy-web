@@ -24,20 +24,20 @@ const { Title } = Typography;
 
 const Schemas = [
   {
-    title: '基础信息',
+    title: 'Basic Information',
     schema: DeviceInfo,
   },
   {
-    title: '应用授权',
+    title: 'App Permissions',
     schema: AppAuthSettings,
   },
   {
-    title: '手机系统信息',
+    title: 'Device System Information',
     schema: SysInfo,
   },
 
   {
-    title: '用户授权',
+    title: 'User Permissions',
     schema: AuthInfo,
   },
 ];
@@ -65,7 +65,7 @@ const MPSysInfo = (props: Props) => {
   return (
     <div className="system-content">
       <div className="system-info">
-        <Title level={3}>主要信息</Title>
+        <Title level={3}>Key Information</Title>
         <Card>
           <Row>
             <Col span={12}>

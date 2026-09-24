@@ -1,14 +1,23 @@
 import {
+  Button,
   Col,
   Divider,
   Layout,
   Menu,
   message,
+  Popconfirm,
   Row,
+  Space,
   Skeleton,
   Tooltip,
   Typography,
 } from 'antd';
+import {
+  ClearOutlined,
+  CopyOutlined,
+  DownloadOutlined,
+} from '@ant-design/icons';
+import copy from 'copy-to-clipboard';
 import React, { memo, useEffect, useMemo, useState } from 'react';
 import ConsolePanel from './ConsolePanel';
 import NetworkPanel from './NetworkPanel';
@@ -34,6 +43,12 @@ import {
   isMiniProgram,
 } from '@/store/platform-config';
 import { useShallow } from 'zustand/react/shallow';
+import {
+  downloadDeviceSession,
+  serializeDeviceSession,
+  suggestDeviceLogName,
+} from '@/utils/device-session';
+import { confirmLogFileName } from './save-log-dialog';
 const { Sider, Content } = Layout;
 const { Title } = Typography;
 
@@ -178,6 +193,47 @@ const ClientInfo = memo(() => {
   const clientInfo = useSocketMessageStore(
     useShallow((state) => state.clientInfo),
   );
+  const socket = useSocketMessageStore((state) => state.socket);
+  const clearDeviceSession = useSocketMessageStore(
+    (state) => state.clearDeviceSession,
+  );
+
+  const copyAllLogs = () => {
+    try {
+      const copied = copy(serializeDeviceSession(address));
+      if (copied) {
+        message.success(t('copy-all-success'));
+      } else {
+        message.error(t('copy-all-error'));
+      }
+    } catch (error) {
+      console.error('Failed to copy device session', error);
+      message.error(t('copy-all-error'));
+    }
+  };
+
+  const downloadAllLogs = async () => {
+    try {
+      const fileName = await confirmLogFileName(
+        suggestDeviceLogName(address, 'all'),
+      );
+      if (!fileName) return;
+      downloadDeviceSession(address, fileName);
+      message.success(t('download-success'));
+    } catch (error) {
+      console.error('Failed to download device session', error);
+      message.error(t('export-error'));
+    }
+  };
+
+  const clearPanelLogs = () => {
+    clearDeviceSession();
+    socket?.unicastMessage({
+      type: 'debug',
+      data: 'console.clear()',
+    });
+    message.success(t('clear-success'));
+  };
 
   return (
     <div className="client-info">
@@ -229,6 +285,29 @@ const ClientInfo = memo(() => {
           </Col>
         </Row>
       </Tooltip>
+      <Space className="client-info__actions" direction="vertical" size={8}>
+        <Button size="small" icon={<CopyOutlined />} onClick={copyAllLogs}>
+          {t('copy-all')}
+        </Button>
+        <Button
+          size="small"
+          icon={<DownloadOutlined />}
+          onClick={downloadAllLogs}
+        >
+          {t('download')}
+        </Button>
+        <Popconfirm
+          title={t('clear-confirm-title')}
+          description={t('clear-confirm-description')}
+          okText="Clear"
+          cancelText="Cancel"
+          onConfirm={clearPanelLogs}
+        >
+          <Button danger size="small" icon={<ClearOutlined />}>
+            {t('clear-panel-logs')}
+          </Button>
+        </Popconfirm>
+      </Space>
     </div>
   );
 });

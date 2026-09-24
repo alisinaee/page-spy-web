@@ -2,7 +2,7 @@ import { ResolvedNetworkInfo } from '@/utils';
 import { dataUrlToBlob, downloadFile, semanticSize } from '../utils';
 import { withPopup, usePopupRef } from '@/utils/withPopup';
 import { DownloadOutlined } from '@ant-design/icons';
-import ReactJsonView from '@huolala-tech/react-json-view';
+import { ColoredJson } from '../ColoredJson';
 import { Form, message, Modal, Input, Alert, Button, Empty } from 'antd';
 import { useMemo } from 'react';
 import { EventsourceTable } from './MessageTable/EventsourceTable';
@@ -160,11 +160,7 @@ export const ResponseBody = ({ data }: ResponseBodyProps) => {
       return <MediaWidget dataUrl={response} />;
     }
 
-    return (
-      <div style={{ padding: 8 }}>
-        <ReactJsonView source={response} defaultExpand={1} />
-      </div>
-    );
+    return <ColoredJson value={response} />;
   }, [data]);
 
   return <div className="response-body">{bodyContent}</div>;

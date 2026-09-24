@@ -12,11 +12,11 @@ export const IntroBlock3 = () => {
     <div className="intro-block block-3">
       <div className="community-comments" style={{ textAlign: 'center' }}>
         <Trans i18nKey="intro.community-comments">
-          <h1>深受社区青睐</h1>
+          <h1>Trusted by Developers</h1>
           <h3>
-            不要只看我们说
+            Hear directly from the community
             <br />
-            来听听 PageSpy 社区中真实用户的声音
+            See what PageSpy users say
           </h3>
         </Trans>
         <div className="comments-container">

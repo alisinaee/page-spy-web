@@ -2,46 +2,26 @@ import Docs from '@/components/Docs';
 
 const sidebar = [
   {
-    group: {
-      zh: '指引',
-      en: 'Guide',
-      ja: 'ガイド',
-      ko: '가이드',
-    },
+    group: 'Guide',
     children: [
       {
-        label: {
-          zh: '简介',
-          en: 'Introduction',
-          ja: '紹介',
-          ko: '소개',
-        },
+        label: 'Introduction',
         doc: 'introduction',
       },
       {
-        label: {
-          zh: '自定义主题',
-          en: 'Customize Theme',
-          ja: 'カスタムテーマ',
-          ko: '사용자 지정 테마',
-        },
+        label: 'Customize Theme',
         doc: 'theme',
       },
       {
-        label: {
-          zh: '常见问题解答',
-          en: 'FAQ',
-          ja: 'よくある質問',
-          ko: '자주 묻는 질문',
-        },
+        label: 'FAQ',
         doc: 'faq',
       },
     ],
   },
 ];
 
-const mdxComponents = import.meta.glob('./md/*.mdx');
-const mdRawContents = import.meta.glob('./md/*.mdx', {
+const mdxComponents = import.meta.glob('./md/*.en.mdx');
+const mdRawContents = import.meta.glob('./md/*.en.mdx', {
   import: 'default',
   query: '?raw',
 }) as Record<string, () => Promise<string>>;

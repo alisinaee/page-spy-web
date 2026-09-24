@@ -46,7 +46,7 @@ export const StoragePanel = memo(() => {
       menus.splice(0);
       menus.push({
         key: 'mpStorage',
-        label: '小程序 Storage',
+        label: 'Miniprogram Storage',
         icon: <Icon component={StorageSvg} />,
       });
     } else if (isReactNative(browserType)) {

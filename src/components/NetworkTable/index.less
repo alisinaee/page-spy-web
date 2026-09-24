@@ -223,3 +223,34 @@
     }
   }
 }
+
+.colored-json {
+  margin: 8px;
+  padding: 12px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border-radius: 10px;
+  background: #0f172a;
+  color: #e2e8f0;
+  font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  .j-key {
+    color: #c4b5fd;
+  }
+  .j-str {
+    color: #86efac;
+  }
+  .j-num {
+    color: #93c5fd;
+  }
+  .j-bool {
+    color: #fdba74;
+  }
+  .j-nil {
+    color: #94a3b8;
+  }
+  .j-punct {
+    color: #cbd5e1;
+  }
+}

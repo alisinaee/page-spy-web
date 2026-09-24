@@ -90,7 +90,7 @@ export const DocContext = ({
     const components = Object.entries(mdxComponents).reduce((acc, cur) => {
       const [key, value] = cur;
       // 文档必须在 "md/" 目录下
-      const result = key.match(/md\/(.+)\.(zh|en|ja|ko)\.mdx$/);
+      const result = key.match(/md\/(.+)\.en\.mdx$/);
       if (!result) return acc;
       const [, doc, lang] = result;
       const lazyDoc = lazyDocWithNotification(doc, value);

@@ -1,57 +1,57 @@
 import { last } from 'lodash-es';
 
-export type InfoItem = {
+export interface InfoItem {
   keys: string[]; // the key maybe different in different platform
   label: string;
   render?: (props: { value: any }) => JSX.Element;
   icon?: React.ReactNode;
-};
+}
 
 export const DeviceInfo: InfoItem[] = [
   {
     keys: ['SDKVersion'],
-    label: '客户端基础库版本',
+    label: 'Client SDK Version',
   },
   {
     keys: ['pixelRatio'],
-    label: '设备像素比',
+    label: 'Device Pixel Ratio',
   },
   {
     keys: ['screenWidth'],
-    label: '屏幕宽度',
+    label: 'Screen Width',
   },
   {
     keys: ['screenHeight'],
-    label: '屏幕高度',
+    label: 'Screen Height',
   },
   {
     keys: ['windowWidth'],
-    label: '可使用窗口宽度',
+    label: 'Usable Window Width',
   },
   {
     keys: ['windowHeight'],
-    label: '可使用窗口高度',
+    label: 'Usable Window Height',
   },
   {
     keys: ['statusBarHeight'],
-    label: '状态栏的高度',
+    label: 'Status Bar Height',
   },
   {
     keys: ['language'],
-    label: '当前语言',
+    label: 'Current Language',
   },
   {
     keys: ['platform'],
-    label: '客户端平台',
+    label: 'Client Platform',
   },
   {
     keys: ['fontSizeSetting'],
-    label: '用户字体大小缩放比例',
+    label: 'User Font Scale',
   },
 
   {
     keys: ['benchmarkLevel'],
-    label: '性能等级',
+    label: 'Performance Level',
   },
   //  {
   //   keys: ['safeArea'],
@@ -70,144 +70,144 @@ export const DeviceInfo: InfoItem[] = [
 
   {
     keys: ['theme'],
-    label: '系统当前主题',
+    label: 'Current System Theme',
   },
 
   {
     keys: ['enableDebug'],
-    label: '是否开启调试',
+    label: 'Debug Mode Enabled',
   },
 ];
 
 export const SysInfo: InfoItem[] = [
   {
     keys: ['bluetoothEnabled'],
-    label: '蓝牙的系统开关',
+    label: 'Bluetooth Enabled',
   },
   {
     keys: ['locationEnabled'],
-    label: '地理位置的系统开关',
+    label: 'Location Services Enabled',
   },
   {
     keys: ['wifiEnabled'],
-    label: 'Wi-Fi 的系统开关',
+    label: 'Wi-Fi Enabled',
   },
   {
     keys: ['deviceOrientation'],
-    label: '设备方向',
+    label: 'Device Orientation',
   },
 ];
 
 export const AppAuthSettings: InfoItem[] = [
   {
     keys: ['albumAuthorized'],
-    label: '允许 APP 使用相册的开关（仅 iOS 有效）',
+    label: 'Photo Library Access (iOS)',
   },
   {
     keys: ['cameraAuthorized'],
-    label: '允许 APP 使用摄像头的开关',
+    label: 'Camera Access',
   },
   {
     keys: ['locationAuthorized'],
-    label: '允许 APP 使用定位的开关',
+    label: 'Location Access',
   },
   {
     keys: ['locationReducedAccuracy'],
-    label: '定位准确度。true 表示模糊定位，false 表示精确定位（仅 iOS 有效）',
+    label: 'Precise Location (iOS)',
   },
   {
     keys: ['microphoneAuthorized'],
-    label: '允许 APP 使用麦克风的开关',
+    label: 'Microphone Access',
   },
   {
     keys: ['notificationAuthorized'],
-    label: '允许 APP 通知的开关',
+    label: 'Notifications Allowed',
   },
   {
     keys: ['notificationAlertAuthorized'],
-    label: '允许 APP 通知带有提醒的开关（仅 iOS 有效）',
+    label: 'Alert Notifications (iOS)',
   },
   {
     keys: ['notificationBadgeAuthorized'],
-    label: '允许 APP 通知带有标记的开关（仅 iOS 有效）',
+    label: 'Badge Notifications (iOS)',
   },
   {
     keys: ['notificationSoundAuthorized'],
-    label: '允许 APP 通知带有声音的开关（仅 iOS 有效）',
+    label: 'Sound Notifications (iOS)',
   },
   {
     keys: ['phoneCalendarAuthorized'],
-    label: '允许 APP 使用日历的开关',
+    label: 'Calendar Access',
   },
 ];
 
 export const AuthInfo: InfoItem[] = [
   {
     keys: ['scope.hostId'],
-    label: '授权抖音号',
+    label: 'Authorized TikTok ID',
   },
   {
     keys: ['scope.userLocation', 'userLocation'],
-    label: '精确地理位置',
+    label: 'Precise Location',
   },
   {
     keys: ['scope.userFuzzyLocation', 'userFuzzyLocation'],
-    label: '模糊地理位置',
+    label: 'Approximate Location',
   },
   {
     keys: ['scope.userLocationBackground', 'userLocationBackground'],
-    label: '后台定位',
+    label: 'Background Location',
   },
   {
     keys: ['scope.record', 'record'],
-    label: '麦克风',
+    label: 'Microphone',
   },
   {
     keys: ['scope.camera', 'camera'],
-    label: '摄像头',
+    label: 'Camera',
   },
   {
     keys: ['scope.bluetooth', 'bluetooth'],
-    label: '蓝牙',
+    label: 'Bluetooth',
   },
   {
     keys: ['scope.writePhotosAlbum', 'writePhotosAlbum'],
-    label: '添加到相册',
+    label: 'Add to Photo Library',
   },
   {
     keys: ['scope.album'],
-    label: '读取相册', // 抖音
+    label: 'Read Photo Library',
   },
   {
     keys: ['scope.addPhoneContact', 'addPhoneContact'],
-    label: '添加到联系人',
+    label: 'Add to Contacts',
   },
   {
     keys: ['scope.addPhoneCalendar', 'addPhoneCalendar', 'scope.calendar'],
-    label: '添加日历事件',
+    label: 'Add Calendar Event',
   },
   {
     keys: ['scope.werun', 'werun'],
-    label: '微信运动步数',
+    label: 'WeChat Steps',
   },
   {
     keys: ['scope.address', 'address'],
-    label: '通讯地址',
+    label: 'Contact Address',
   },
   {
     keys: ['scope.invoiceTitle', 'invoiceTitle'],
-    label: '发票抬头',
+    label: 'Invoice Title',
   },
   {
     keys: ['scope.invoice', 'invoice'],
-    label: '获取发票',
+    label: 'Access Invoices',
   },
   {
     keys: ['scope.userInfo', 'userInfo'],
-    label: '用户信息',
+    label: 'User Information',
   },
   {
     keys: ['scope.clipboard'],
-    label: '剪切板',
+    label: 'Clipboard',
   },
 ];

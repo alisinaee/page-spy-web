@@ -1,20 +1,18 @@
 /* eslint-disable no-case-declarations */
-import { Row, Col, Tooltip, Button, Input, Space } from 'antd';
-import { memo, useRef } from 'react';
+import { Row, Col, Input, Space } from 'antd';
+import { memo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { ClearOutlined } from '@ant-design/icons';
 import './index.less';
 import { useTranslation } from 'react-i18next';
 import { useSocketMessageStore } from '@/store/socket-message';
 import { NetworkTable } from '@/components/NetworkTable';
 import { ONLINE_NETWORK_CACHE } from '@/components/ResizableTitle/cache-key';
 import { TypeFilter } from '@/components/NetworkTable/TypeFilter';
+import { SectionLogActions } from '../SectionLogActions';
 
 const NetworkPanel = memo(() => {
   const { t: ct } = useTranslation('translation', { keyPrefix: 'common' });
 
-  const storeRef = useRef(useSocketMessageStore.getState());
-  const clearRecord = useRef(storeRef.current.clearRecord);
   const [networkKeyword, setNetworkKeyword, networkType, setNetworkType] =
     useSocketMessageStore(
       useShallow((state) => [
@@ -49,11 +47,7 @@ const NetworkPanel = memo(() => {
                 setNetworkType(type);
               }}
             />
-            <Tooltip title={ct('clear')}>
-              <Button onClick={() => clearRecord.current!('network')}>
-                <ClearOutlined />
-              </Button>
-            </Tooltip>
+            <SectionLogActions section="network" />
           </Space>
         </Col>
       </Row>

@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PageSpy Smoke Test</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 0;
+        padding: 3rem 1.5rem;
+        background: #f5f7fb;
+        color: #172033;
+      }
+
+      main {
+        max-width: 42rem;
+        margin: 0 auto;
+        padding: 2rem;
+        border-radius: 1rem;
+        background: #ffffff;
+        box-shadow: 0 0.75rem 2rem rgb(30 50 90 / 10%);
+      }
+
+      button {
+        margin-top: 1rem;
+        padding: 0.75rem 1rem;
+        border: 0;
+        border-radius: 0.5rem;
+        background: #3457d5;
+        color: #ffffff;
+        cursor: pointer;
+        font: inherit;
+      }
+
+      code {
+        background: #edf1f8;
+        border-radius: 0.25rem;
+        padding: 0.1rem 0.3rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>PageSpy smoke test</h1>
+      <p>
+        Connected panel: <code id="panel">Detecting...</code>
+      </p>
+      <p id="status">Loading PageSpy SDK...</p>
+      <p>Click button, then inspect message in PageSpy Console panel.</p>
+      <button id="send" type="button">Send test log</button>
+      <button id="generate" type="button">Generate all test logs</button>
+      <div id="page-marker"></div>
+    </main>
+
+    <script src="./client-logs.js"></script>
+    <script>
+      PageSpyClientLogs.install();
+
+      const panel = new URLSearchParams(location.search).get('panel') || '6752';
+      const panelUrl = location.protocol + '//' + location.hostname + ':' + panel;
+      const project = panel === '6753' ? 'local-fork-test' : 'official-test';
+
+      document.querySelector('#panel').textContent = panelUrl;
+
+      const script = document.createElement('script');
+      script.crossOrigin = 'anonymous';
+      script.src = panelUrl + '/page-spy/index.min.js';
+      script.onerror = () => {
+        document.querySelector('#status').textContent = 'PageSpy SDK failed to load.';
+      };
+      script.onload = () => {
+        try {
+          window.$pageSpy = new PageSpy({
+            api: location.hostname + ':' + panel,
+            clientOrigin: panelUrl,
+            project: project,
+            lang: 'en',
+          });
+          PageSpyClientLogs.mountDialogActions();
+          new MutationObserver(PageSpyClientLogs.mountDialogActions).observe(document.documentElement, {
+            childList: true,
+            subtree: true,
+          });
+          document.querySelector('#status').textContent = 'PageSpy SDK loaded. Check panel connection.';
+          console.log('PageSpy connected', { panel: panelUrl, project: project });
+        } catch (error) {
+          document.querySelector('#status').textContent = 'PageSpy initialization failed: ' + error.message;
+          throw error;
+        }
+      };
+      document.head.appendChild(script);
+
+      document.querySelector('#send').addEventListener('click', () => {
+        console.log('PageSpy test log', {
+          event: 'smoke-test-button',
+          panel: panelUrl,
+          project: project,
+          time: new Date().toISOString(),
+          url: window.location.href,
+        });
+      });
+
+      document.querySelector('#generate').addEventListener('click', async () => {
+        console.debug('pagespy test debug');
+        console.info('pagespy test info');
+        console.log('pagespy test log');
+        console.warn('pagespy test warn');
+        console.error('pagespy test error');
+
+        await fetch('https://httpbin.org/get?pagespy=test').catch((error) => {
+          console.warn('GET request failed', error.message);
+        });
+        await fetch('https://httpbin.org/post', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ source: 'pagespy', ok: true }),
+        }).catch((error) => {
+          console.warn('POST request failed', error.message);
+        });
+        await fetch('https://httpbin.org/status/404').catch((error) => {
+          console.warn('404 request failed', error.message);
+        });
+        fetch('https://invalid.pagespy.test/fail').catch((error) => {
+          console.warn('failing network request', error.message);
+        });
+
+        document.title = 'PageSpy smoke page updated';
+        const marker = document.querySelector('#page-marker');
+        const node = document.createElement('p');
+        node.textContent = 'Page updated ' + new Date().toISOString();
+        marker.replaceChildren(node);
+        localStorage.setItem('pagespy-smoke-local', 'local-value');
+        sessionStorage.setItem('pagespy-smoke-session', 'session-value');
+        document.cookie = 'pagespy_smoke=cookie-value; path=/';
+      });
+    </script>
+  </body>
+</html>

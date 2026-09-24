@@ -42,6 +42,70 @@ const NoData = () => (
   <Empty description={false} className="empty-table-placeholder" />
 );
 
+const buildCurl = (
+  row: ResolvedNetworkInfo,
+  cookie?: SpyStorage.GetTypeDataItem['data'],
+) => {
+  const { url, method, requestHeader, requestPayload, withCredentials } = row;
+  let result = `curl -X ${method} '${url}'`;
+  let headers = '';
+  if (requestHeader) {
+    headers = requestHeader
+      .map(([key, value]) => `  -H '${key}: ${value}'`)
+      .join(' \\\r\n');
+  }
+  if (withCredentials && cookie) {
+    const cookieInfo = Object.entries(cookie)
+      .map(([key, item]) => `${key}=${item.value}`)
+      .join(';');
+    headers = `${headers && `${headers} \\\r\n`}  -H 'cookie:${cookieInfo}'`;
+  }
+  if (headers) {
+    result = `${result} \\\r\n${headers}`;
+  }
+  if (requestPayload) {
+    const contentType = getContentType(requestHeader);
+    let body = '';
+    if (isString(requestPayload)) {
+      body = `  --data-raw ${JSON.stringify(requestPayload)}`;
+    } else if (contentType === 'multipart/form-data') {
+      body = requestPayload
+        .map(([key, value]) => `  --form ${JSON.stringify(`${key}=${value}`)}`)
+        .join(' \\\r\n');
+    } else if (
+      contentType === 'application/x-www-form-urlencoded;charset=UTF-8'
+    ) {
+      body = requestPayload
+        .map(
+          ([key, value]) =>
+            `  --data-urlencode ${JSON.stringify(`${key}=${value}`)}`,
+        )
+        .join(' \\\r\n');
+    }
+    if (body) result = `${result} \\\r\n${body}`;
+  }
+  return result;
+};
+
+const formatResponseLog = (row: ResolvedNetworkInfo) => {
+  const headerText = row.responseHeader
+    ? row.responseHeader.map(([key, value]) => `${key}: ${value}`).join('\n')
+    : '';
+  let body = '';
+  if (row.response && typeof row.response !== 'string') {
+    try {
+      body = JSON.stringify(row.response, null, 2);
+    } catch (error) {
+      body = String(row.response);
+    }
+  } else {
+    body = row.response || row.responseReason || '';
+  }
+  return [`# Response`, `status: ${row.status ?? ''}`, headerText, body]
+    .filter(Boolean)
+    .join('\n');
+};
+
 interface NetworkTableProps {
   data: ResolvedNetworkInfo[];
   filterType: NetworkType;
@@ -147,63 +211,10 @@ export const NetworkTable = ({
           window.open(row.url);
           break;
         case 'copy-cURL':
-          const {
-            url,
-            method,
-            requestHeader,
-            requestPayload,
-            withCredentials,
-          } = row;
-          let result = `curl -X ${method} '${url}'`;
-          let headers = '';
-          if (requestHeader) {
-            headers = requestHeader
-              .map(([k, v]) => {
-                return `  -H '${k}: ${v}'`;
-              })
-              .join(' \\\r\n');
-          }
-          if (withCredentials && cookie) {
-            const cookieInfo = Object.entries(cookie)
-              .map(([k, { value }]) => `${k}=${value}`)
-              .join(';');
-            headers = `${
-              headers && `${headers} \\\r\n`
-            }  -H 'cookie:${cookieInfo}'`;
-          }
-          if (headers) {
-            result = `${result} \\\r\n${headers}`;
-          }
-          if (requestPayload) {
-            const contentType = getContentType(requestHeader);
-            let body = '';
-            if (isString(requestPayload)) {
-              body = `  --data-raw ${JSON.stringify(requestPayload)}`;
-            } else {
-              switch (contentType) {
-                case 'multipart/form-data':
-                  body = requestPayload
-                    .map(([key, value]) => {
-                      return `  --form ${JSON.stringify(`${key}=${value}`)}`;
-                    })
-                    .join(' \\\r\n');
-                  break;
-                case 'application/x-www-form-urlencoded;charset=UTF-8':
-                  body = requestPayload
-                    .map(([key, value]) => {
-                      return `  --data-urlencode ${JSON.stringify(
-                        `${key}=${value}`,
-                      )}`;
-                    })
-                    .join(' \\\r\n');
-                  break;
-                default:
-                  break;
-              }
-            }
-            result = `${result} \\\r\n${body}`;
-          }
-          copy(result);
+          copy(buildCurl(row, cookie));
+          break;
+        case 'copy-full-log':
+          copy([buildCurl(row, cookie), '', formatResponseLog(row)].join('\n'));
           break;
         default:
           throw Error('Unknown key');
@@ -314,6 +325,7 @@ export const NetworkTable = ({
                 label: nt('copy-link-address'),
               },
               { key: 'copy-cURL', label: nt('copy-as-curl') },
+              { key: 'copy-full-log', label: nt('copy-full-log') },
             ],
             onClick: ({ key }) => {
               onMenuClick(key, rowData);

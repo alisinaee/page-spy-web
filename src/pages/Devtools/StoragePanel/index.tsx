@@ -1,5 +1,7 @@
 import type { SpyStorage } from '@huolala-tech/page-spy-types';
 import { Button, Col, Layout, Menu, Row, Tooltip } from 'antd';
+import { Space } from 'antd';
+import { SectionLogActions } from '../SectionLogActions';
 import { useEffect, useMemo, useState } from 'react';
 import './index.less';
 import { useSocketMessageStore } from '@/store/socket-message';
@@ -48,15 +50,18 @@ export const StoragePanel = () => {
     <div className="storage-panel">
       <Row justify="end">
         <Col>
-          <Tooltip title={t('common.refresh')}>
-            <Button
-              onClick={() => {
-                refresh(activeTab);
-              }}
-            >
-              <ReloadOutlined />
-            </Button>
-          </Tooltip>
+          <Space>
+            <SectionLogActions section="storage" />
+            <Tooltip title={t('common.refresh')}>
+              <Button
+                onClick={() => {
+                  refresh(activeTab);
+                }}
+              >
+                <ReloadOutlined />
+              </Button>
+            </Tooltip>
+          </Space>
         </Col>
       </Row>
       <Layout className="storage-panel__layout">

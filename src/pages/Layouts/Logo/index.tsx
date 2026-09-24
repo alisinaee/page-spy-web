@@ -8,6 +8,7 @@ import Icon from '@ant-design/icons';
 import Title from 'antd/es/typography/Title';
 import './index.less';
 import { useWhere } from '@/utils/useWhere';
+import { BRAND_NAME } from '@/utils/brand';
 import clsx from 'clsx';
 
 export const Logo = () => {
@@ -24,7 +25,7 @@ export const Logo = () => {
     }
     return {
       image: LogoSvg,
-      name: 'PageSpy',
+      name: BRAND_NAME,
       link: '/',
     };
   }, [where]);

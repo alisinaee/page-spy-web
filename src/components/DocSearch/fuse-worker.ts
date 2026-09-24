@@ -15,7 +15,7 @@ export interface RecordItem {
 let fuse: Fuse<RecordItem>;
 
 const init = (lang: langType) => {
-  const list = (data[lang] ?? data.zh).filter(
+  const list = (data[lang] ?? data.en).filter(
     (i) => i.title.trim() && i.content.trim(),
   );
   if (!fuse) {
