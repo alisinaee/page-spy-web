@@ -29,6 +29,14 @@
         record({
           section: 'console',
           level,
+          args: args.map((item) => {
+            if (item == null || typeof item !== 'object') return item;
+            try {
+              return JSON.parse(JSON.stringify(item));
+            } catch (error) {
+              return String(item);
+            }
+          }),
           message: args.map(asText).join(' '),
         });
         original(...args);
@@ -43,6 +51,15 @@
       const method = String(
         init.method || (input && input.method) || 'GET',
       ).toUpperCase();
+      const requestHeaders = [];
+      try {
+        const headers = new Headers(
+          init.headers ||
+            (typeof input !== 'string' && input && input.headers) ||
+            undefined,
+        );
+        headers.forEach((value, key) => requestHeaders.push([key, value]));
+      } catch (error) {}
       let requestBody = '';
       if (typeof init.body === 'string') {
         try {
@@ -77,6 +94,7 @@
           url,
           status: response.status,
           ok: response.ok,
+          requestHeaders,
           requestBody,
           responseBody,
         });
@@ -88,6 +106,7 @@
           url,
           status: 'failed',
           ok: false,
+          requestHeaders,
           requestBody,
           error: error && error.message,
         });
@@ -323,17 +342,27 @@
   };
 
   const curlText = (item) => {
-    const method = item.method || 'GET';
-    const url = String(item.url || '').replace(/'/g, "'\\''");
-    let command = 'curl -X ' + method + " '" + url + "'";
+    const method = String(item.method || 'GET').toUpperCase();
+    const quote = (value) =>
+      "'" + String(value ?? '').replace(/'/g, "'\\''") + "'";
+    const lines = ['curl -X ' + method + ' ' + quote(item.url || '')];
+    const headers = Array.isArray(item.requestHeaders)
+      ? item.requestHeaders.slice()
+      : [];
+    const hasType = headers.some(
+      (pair) => String(pair[0]).toLowerCase() === 'content-type',
+    );
+    if (item.requestBody && !hasType)
+      headers.push(['content-type', 'application/json']);
+    headers.forEach((pair) => {
+      lines.push('  -H ' + quote(pair[0] + ': ' + pair[1]));
+    });
     if (item.requestBody) {
       const raw =
         typeof item.requestBody === 'string'
           ? item.requestBody
           : JSON.stringify(item.requestBody);
-      command +=
-        " \\\n  -H 'content-type: application/json' \\\n  --data-raw " +
-        JSON.stringify(raw);
+      lines.push('  --data-raw ' + quote(raw));
     }
     const response = deepen(item.responseBody);
     const responseText =
@@ -342,7 +371,9 @@
         : typeof response === 'string'
         ? response
         : JSON.stringify(response, null, 2);
-    return command + '\n\n# Response ' + item.status + '\n' + responseText;
+    return (
+      lines.join(' \\\n') + '\n\nResponse ' + item.status + '\n' + responseText
+    );
   };
 
   const openViewer = () => {
@@ -367,6 +398,8 @@
       '#pagespy-log-viewer .row{width:100%;padding:10px 12px;border-bottom:1px solid #e6e9f2;background:#fff}',
       '#pagespy-log-viewer .row b{display:inline-block;min-width:52px;margin-right:8px;font-size:12px;text-transform:uppercase}',
       '#pagespy-log-viewer .msg{white-space:pre-wrap;word-break:break-word}',
+      '#pagespy-log-viewer .log{display:block;width:100%;background:#fff;text-align:left;padding:10px 12px;color:#172033;border:0}',
+      '#pagespy-log-viewer .preview{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
       '#pagespy-log-viewer .net{display:block;width:100%;background:#fff;text-align:left;padding:10px 12px;color:#172033;border-bottom:1px solid #e6e9f2}',
       '#pagespy-log-viewer .line{display:flex;gap:8px;align-items:baseline;width:100%}',
       '#pagespy-log-viewer .url{flex:1;min-width:0;word-break:break-all}',
@@ -445,8 +478,11 @@
       if (name === 'Console') {
         if (!data.console.length) sheet.append(empty('No console logs'));
         data.console.forEach((item) => {
-          const row = document.createElement('div');
-          row.className = 'row';
+          const block = document.createElement('div');
+          block.className = 'card';
+          const toggle = document.createElement('button');
+          toggle.type = 'button';
+          toggle.className = 'log';
           const level = document.createElement('b');
           level.textContent = item.level;
           level.style.color =
@@ -455,11 +491,40 @@
               : item.level === 'warn'
               ? '#b54708'
               : '#344054';
-          const message = document.createElement('div');
-          message.className = 'msg';
-          message.textContent = item.message;
-          row.append(level, message);
-          sheet.append(row);
+          const preview = document.createElement('span');
+          preview.className = 'preview';
+          preview.textContent = String(item.message || '').replace(/\s+/g, ' ');
+          const when = document.createElement('div');
+          when.className = 'when';
+          const date = new Date(item.time);
+          when.textContent = Number.isNaN(date.getTime())
+            ? ''
+            : date.toLocaleString(undefined, {
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+                second: '2-digit',
+              });
+          const head = document.createElement('div');
+          head.className = 'line';
+          head.append(level, preview);
+          toggle.append(head, when);
+          const body = document.createElement('div');
+          body.className = 'detail';
+          body.hidden = true;
+          const full =
+            item.args && item.args.length
+              ? item.args.length === 1
+                ? item.args[0]
+                : item.args
+              : item.message;
+          body.append(jsonBlock(full));
+          toggle.onclick = () => {
+            body.hidden = !body.hidden;
+          };
+          block.append(toggle, body);
+          sheet.append(block);
         });
         return;
       }
