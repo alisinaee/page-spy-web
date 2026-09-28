@@ -1,5 +1,16 @@
+.page-spy-devtools-root {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
 .page-spy-devtools {
   height: 100%;
+  flex: 1;
+  overflow: hidden;
+
   &__sider {
     display: flex;
     flex-direction: column;
@@ -31,9 +42,14 @@
   &__content {
     position: relative;
     #scrollbar.light();
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
   }
   &__panel {
-    height: 100%;
+    flex: 1;
+    height: 0;
     overflow: auto;
     padding: 20px;
     padding-top: 40px;
@@ -42,6 +58,7 @@
     }
   }
 }
+
 .client-info {
   padding: 8px;
   &__logo {
@@ -111,7 +128,6 @@
       justify-content: space-around;
       align-items: center;
       padding: 8px;
-      // border-bottom: 1px solid #d9d9d9;
       transition: all ease-out 0.3s;
       background-color: #fff;
       opacity: 0.5;
@@ -150,4 +166,187 @@
 .sider-warning {
   margin: 4px 8px;
   border-radius: 8px;
+}
+
+/* Mobile top bar: hidden by default on desktop */
+.devtools-mobile-bar {
+  display: none;
+  background-color: #fff;
+  border-bottom: 1px solid #e8e8e8;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  z-index: 100;
+  flex-shrink: 0;
+
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    gap: 8px;
+  }
+
+  &__device-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    background: #f7f3fd;
+    padding: 4px 8px;
+    border-radius: 6px;
+    border: 1px solid #e9dcfc;
+
+    .device-name-text {
+      font-size: 12px;
+      color: #555;
+      max-width: 90px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  &__tabs {
+    display: flex;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 4px 8px 8px;
+    gap: 6px;
+    scrollbar-width: none;
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+}
+
+.devtools-mobile-tab-btn {
+  position: relative;
+  padding: 6px 14px;
+  border-radius: 16px;
+  border: none;
+  background-color: #f0f0f0;
+  color: #555;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  &.active {
+    background-color: @primary-color;
+    color: #fff;
+    font-weight: 600;
+    box-shadow: 0 2px 6px fade(@primary-color, 35%);
+  }
+
+  .tab-circle-badge {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: #ff4d4f;
+    display: inline-block;
+  }
+}
+
+.connection-indicator-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #bfbfbf;
+  &.online {
+    background-color: #52c41a;
+  }
+}
+
+/* Floating Action Button (FAB) */
+.devtools-floating-fab {
+  display: none;
+  position: fixed;
+  bottom: 24px;
+  right: 20px;
+  width: 48px;
+  height: 48px;
+  border-radius: 24px;
+  background-color: @primary-color;
+  box-shadow: 0 4px 16px fade(@primary-color, 45%), 0 2px 8px rgba(0, 0, 0, 0.2);
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 1000;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  &:active {
+    transform: scale(0.92);
+  }
+
+  .fab-badge-dot {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #ff4d4f;
+    border: 1.5px solid #fff;
+  }
+}
+
+.devtools-mobile-bottomsheet {
+  .ant-drawer-content-wrapper {
+    border-radius: 16px 16px 0 0;
+    overflow: hidden;
+  }
+  .mobile-bottomsheet-body {
+    padding-bottom: 20px;
+  }
+  .bottomsheet-panel-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+}
+
+/* MOBILE RESPONSIVE MEDIA QUERY */
+@media (max-width: 768px) {
+  .devtools-mobile-bar {
+    display: block !important;
+  }
+
+  .devtools-floating-fab {
+    display: flex !important;
+  }
+
+  .page-spy-devtools {
+    flex-direction: column !important;
+
+    .devtools-desktop-sider,
+    .ant-layout-sider {
+      display: none !important;
+    }
+
+    .connect-status {
+      display: none !important;
+    }
+
+    &__content {
+      width: 100% !important;
+      max-width: 100% !important;
+      flex: 1 1 auto;
+      height: 0;
+      overflow: hidden;
+    }
+
+    &__panel {
+      padding: 8px !important;
+      padding-top: 8px !important;
+      height: 100% !important;
+      overflow: auto;
+      > div {
+        height: 100%;
+      }
+    }
+  }
 }

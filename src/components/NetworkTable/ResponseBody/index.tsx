@@ -9,6 +9,7 @@ import { EventsourceTable } from './MessageTable/EventsourceTable';
 import { WebsocketTable } from './MessageTable/WebsocketTable';
 import { isPlainObject } from 'lodash-es';
 import { PLACEHOLDER_RESPONSE } from '@/utils/constants';
+import { decodeDataUrl, isTextLike, parseMediaSummary } from '../body-codec';
 
 const FilenameModal = withPopup<void, string | false>(
   ({ visible, resolve }) => {
@@ -154,8 +155,33 @@ export const ResponseBody = ({ data }: ResponseBodyProps) => {
       );
     }
     if (['blob', 'arraybuffer'].includes(responseType)) {
+      if (typeof response === 'string') {
+        const decoded = decodeDataUrl(response);
+        if (decoded && isTextLike(decoded.mime, decoded.text)) {
+          return <ColoredJson value={decoded.text} />;
+        }
+      }
       if (responseReason) {
         return <Alert type="error" message={responseReason} />;
+      }
+      const mediaSummary = parseMediaSummary(response);
+      if (mediaSummary) {
+        return (
+          <div className="media-widget">
+            {[
+              { label: 'File type: ', content: mediaSummary.type },
+              {
+                label: 'File size: ',
+                content: semanticSize(mediaSummary.size),
+              },
+            ].map(({ label, content }) => (
+              <div className="content-item" key={label}>
+                <b className="content-item__label">{label}</b>
+                <span className="content-item__value">{content}</span>
+              </div>
+            ))}
+          </div>
+        );
       }
       return <MediaWidget dataUrl={response} />;
     }

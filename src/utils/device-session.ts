@@ -8,12 +8,27 @@ type JsonValue =
   | JsonValue[]
   | { [key: string]: JsonValue };
 
-const normalizeForExport = (value: unknown, ancestors = new Set<unknown>()) => {
+const SECRET_HEADER_NAMES = new Set([
+  'authorization',
+  'proxy-authorization',
+  'cookie',
+  'set-cookie',
+]);
+
+export const isSecretHeaderName = (name: unknown): boolean =>
+  typeof name === 'string' &&
+  SECRET_HEADER_NAMES.has(name.trim().toLowerCase());
+
+export const normalizeForExport = (
+  value: unknown,
+  ancestors = new Set<unknown>(),
+): any => {
   if (value === null) return null;
 
   const valueType = typeof value;
   if (valueType === 'string' || valueType === 'boolean') return value;
-  if (valueType === 'number') return Number.isFinite(value) ? value : null;
+  if (valueType === 'number')
+    return Number.isFinite(value as number) ? value : null;
   if (valueType === 'bigint') return value.toString();
   if (valueType === 'undefined' || valueType === 'function') return undefined;
   if (valueType === 'symbol') return value.toString();
@@ -24,6 +39,15 @@ const normalizeForExport = (value: unknown, ancestors = new Set<unknown>()) => {
       message: value.message,
       stack: value.stack,
     };
+  }
+
+  // Redact secret header pairs [name, val]
+  if (
+    Array.isArray(value) &&
+    value.length === 2 &&
+    isSecretHeaderName(value[0])
+  ) {
+    return [value[0], '<redacted>'];
   }
 
   if (ancestors.has(value)) return '[Circular]';
@@ -39,7 +63,9 @@ const normalizeForExport = (value: unknown, ancestors = new Set<unknown>()) => {
     normalized = Object.fromEntries(
       Array.from(value.entries()).map(([key, item]) => [
         String(key),
-        normalizeForExport(item, ancestors),
+        isSecretHeaderName(key)
+          ? '<redacted>'
+          : normalizeForExport(item, ancestors),
       ]),
     );
   } else if (value instanceof Set) {
@@ -53,6 +79,10 @@ const normalizeForExport = (value: unknown, ancestors = new Set<unknown>()) => {
     const record = value as Record<string, unknown>;
     normalized = Object.entries(record).reduce<Record<string, JsonValue>>(
       (result, [key, item]) => {
+        if (isSecretHeaderName(key)) {
+          result[key] = '<redacted>';
+          return result;
+        }
         const normalizedItem = normalizeForExport(item, ancestors);
         if (normalizedItem !== undefined) result[key] = normalizedItem;
         return result;
@@ -63,6 +93,17 @@ const normalizeForExport = (value: unknown, ancestors = new Set<unknown>()) => {
 
   ancestors.delete(value);
   return normalized;
+};
+
+export const ensurePageSnapshot = async (timeoutMs = 500) => {
+  const store = useSocketMessageStore.getState();
+  if (store.pageMsg?.location || !store.socket) return;
+  store.refresh('page');
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    await new Promise((r) => setTimeout(r, 50));
+    if (useSocketMessageStore.getState().pageMsg?.location) return;
+  }
 };
 
 export const createDeviceSessionSnapshot = (deviceId: string) => {
@@ -109,7 +150,11 @@ export const suggestDeviceLogName = (deviceId: string, section = 'all') => {
   );
 };
 
-export const downloadDeviceSession = (deviceId: string, fileName?: string) => {
+export const downloadDeviceSession = async (
+  deviceId: string,
+  fileName?: string,
+) => {
+  await ensurePageSnapshot();
   const json = serializeDeviceSession(deviceId);
   const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);

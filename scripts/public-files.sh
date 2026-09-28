@@ -1,11 +1,14 @@
 #!/bin/bash
 
-root=$(pwd)
+root=$(cd "$(dirname "$0")/.." && pwd)
 
 # SDK
 target_sdk="${root}/public/page-spy"
 mkdir -p "$target_sdk"
 cp "${root}/node_modules/@huolala-tech/page-spy-browser/dist/iife/index.min.js" "${root}/public/page-spy/index.min.js"
+if [ -f "${root}/scripts/patch-sdk-network.mjs" ]; then
+  node "${root}/scripts/patch-sdk-network.mjs" "${target_sdk}/index.min.js"
+fi
 
 # Official plugins
 target_plugin="${root}/public/plugin"
@@ -27,3 +30,4 @@ cp "${root}/node_modules/source-map/lib/mappings.wasm" "${root}/public/source-ma
 
 # shiki
 cp -R "${root}/node_modules/shiki" "${root}/public/shiki"
+

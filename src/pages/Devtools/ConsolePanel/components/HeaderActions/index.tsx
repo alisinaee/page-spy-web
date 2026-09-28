@@ -11,6 +11,7 @@ import './index.less';
 import { debounce } from 'lodash-es';
 import { useShallow } from 'zustand/react/shallow';
 import { SectionLogActions } from '@/pages/Devtools/SectionLogActions';
+
 export const HeaderActions = () => {
   const [changeConsoleMsgFilter, setConsoleMsgKeywordFilter] =
     useSocketMessageStore(
@@ -79,9 +80,9 @@ export const HeaderActions = () => {
   );
 
   return (
-    <Row justify="end">
-      <Col>
-        <Space>
+    <Row justify="end" className="console-header-actions">
+      <Col xs={24} sm={24} md="auto" style={{ width: '100%' }}>
+        <Space wrap style={{ width: '100%', justifyContent: 'flex-end' }}>
           <Select
             onChange={changeConsoleMsgFilter}
             maxTagCount="responsive"
@@ -89,13 +90,13 @@ export const HeaderActions = () => {
             allowClear={true}
             options={logLevelList}
             placeholder="Log Level Filter"
-            style={{ width: 200 }}
+            className="console-filter-select"
           />
           <Input
             onChange={debounceKeywordFilter}
             placeholder="Keyword Filter"
             allowClear={true}
-            style={{ width: 200 }}
+            className="console-filter-input"
           />
           <SectionLogActions section="console" />
         </Space>

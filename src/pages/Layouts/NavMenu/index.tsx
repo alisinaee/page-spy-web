@@ -2,7 +2,7 @@ import { isClient } from '@/utils/constants';
 import Icon from '@ant-design/icons';
 import { Divider, Dropdown, ConfigProvider, Flex } from 'antd';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import DocsSvg from '@/assets/image/docs.svg?react';
 import BugSvg from '@/assets/image/bug.svg?react';
 import OnlineSvg from '@/assets/image/online.svg?react';
@@ -111,6 +111,9 @@ export const NavMenuOnMobile = () => {
   const { t } = useTranslation();
   const [expand, setExpand] = useState(false);
   const fixedMenuRef = useRef<HTMLDivElement | null>(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const isDevtools = location.pathname.includes('/devtools');
 
   return (
     <>
@@ -141,6 +144,41 @@ export const NavMenuOnMobile = () => {
           unmountOnExit
         >
           <div ref={fixedMenuRef} className="fixed-menu">
+            {isDevtools && (
+              <>
+                <div
+                  style={{
+                    color: '#aaa',
+                    fontSize: 12,
+                    padding: '4px 16px',
+                    fontWeight: 600,
+                  }}
+                >
+                  Devtools Panels
+                </div>
+                {['Console', 'Network', 'Page', 'Storage', 'System'].map(
+                  (tab) => (
+                    <div
+                      key={tab}
+                      className="menu-item"
+                      style={{ padding: '8px 16px', cursor: 'pointer' }}
+                      onClick={() => {
+                        navigate({ search: location.search, hash: tab });
+                        setExpand(false);
+                      }}
+                    >
+                      <span>{tab}</span>
+                    </div>
+                  ),
+                )}
+                <Divider
+                  style={{
+                    margin: '8px 0',
+                    borderColor: 'rgba(255, 255, 255, 0.2)',
+                  }}
+                />
+              </>
+            )}
             {/* Docs */}
             <Link
               to="docs"

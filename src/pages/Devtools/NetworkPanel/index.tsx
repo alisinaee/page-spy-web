@@ -29,9 +29,9 @@ const NetworkPanel = memo(() => {
 
   return (
     <div className="network-panel">
-      <Row justify="end">
-        <Col>
-          <Space>
+      <Row justify="end" className="network-header-actions">
+        <Col xs={24} sm={24} md="auto" style={{ width: '100%' }}>
+          <Space wrap style={{ width: '100%', justifyContent: 'flex-end' }}>
             <Input
               value={networkKeyword}
               onChange={(e) => {
@@ -39,7 +39,7 @@ const NetworkPanel = memo(() => {
               }}
               placeholder={ct('filter')!}
               allowClear={true}
-              style={{ width: 200 }}
+              className="network-filter-input"
             />
             <TypeFilter
               value={networkType}

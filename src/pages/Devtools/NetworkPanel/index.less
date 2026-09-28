@@ -11,6 +11,24 @@
   }
 }
 
+.network-header-actions {
+  width: 100%;
+  .network-filter-input {
+    width: 200px;
+  }
+  @media (max-width: 768px) {
+    .ant-space {
+      width: 100%;
+      justify-content: flex-start !important;
+    }
+    .network-filter-input {
+      width: 100% !important;
+      min-width: 120px;
+      flex: 1 1 120px;
+    }
+  }
+}
+
 .select-item {
   display: flex;
   align-items: center;

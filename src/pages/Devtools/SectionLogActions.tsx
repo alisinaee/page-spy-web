@@ -2,7 +2,11 @@ import { ClearOutlined, DownloadOutlined } from '@ant-design/icons';
 import { Button, Space } from 'antd';
 import { useSocketMessageStore } from '@/store/socket-message';
 import useSearch from '@/utils/useSearch';
-import { suggestDeviceLogName } from '@/utils/device-session';
+import {
+  ensurePageSnapshot,
+  normalizeForExport,
+  suggestDeviceLogName,
+} from '@/utils/device-session';
 import { confirmLogFileName } from './save-log-dialog';
 
 type SectionName = 'console' | 'network' | 'page' | 'storage' | 'system';
@@ -12,8 +16,11 @@ const downloadSection = async (section: SectionName, deviceId: string) => {
     suggestDeviceLogName(deviceId, section),
   );
   if (!fileName) return;
+  if (section === 'page') {
+    await ensurePageSnapshot();
+  }
   const state = useSocketMessageStore.getState();
-  const data = {
+  const rawData = {
     console: state.consoleMsg,
     network: state.networkMsg,
     page: state.pageMsg,
@@ -23,13 +30,14 @@ const downloadSection = async (section: SectionName, deviceId: string) => {
     },
     system: state.systemMsg,
   }[section];
+  const data = normalizeForExport(rawData);
   const blob = new Blob(
     [
       JSON.stringify(
         {
           exportedAt: new Date().toISOString(),
           deviceId,
-          clientInfo: state.clientInfo,
+          clientInfo: normalizeForExport(state.clientInfo),
           section,
           data,
         },

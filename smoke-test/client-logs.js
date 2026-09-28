@@ -681,16 +681,18 @@
 
   const mountDialogActions = () => {
     const host = document.getElementById('__pageSpy');
-    if (host && host.shadowRoot && !host.shadowRoot.__pagespyActionsObserved) {
-      host.shadowRoot.__pagespyActionsObserved = true;
-      new MutationObserver(mountDialogActions).observe(host.shadowRoot, {
-        childList: true,
-        subtree: true,
-      });
-    }
     const root = host && host.shadowRoot ? host.shadowRoot : document;
     const copyButton = root.querySelector('#page-spy-copy-link');
-    if (!copyButton || root.querySelector('#page-spy-download-logs')) return;
+    const footer = copyButton
+      ? copyButton.parentElement
+      : root.querySelector('.page-spy-modal-footer') ||
+        document.querySelector('.page-spy-modal-footer');
+    if (
+      !copyButton ||
+      !footer ||
+      footer.querySelector('#page-spy-download-logs')
+    )
+      return;
     if (!root.querySelector('#pagespy-action-style')) {
       const style = document.createElement('style');
       style.id = 'pagespy-action-style';
@@ -700,16 +702,20 @@
         '#page-spy-clear-logs{color:#b42318}',
       ].join('');
       (host && host.shadowRoot ? host.shadowRoot : document.head).append(style);
+      if (
+        host &&
+        host.shadowRoot &&
+        !document.getElementById('pagespy-action-style')
+      ) {
+        document.head.append(style.cloneNode(true));
+      }
     }
-    const footer = copyButton.parentElement;
-    if (footer) {
-      footer.style.display = 'flex';
-      footer.style.flexDirection = 'column';
-      footer.style.gap = '8px';
-      footer.style.width = '100%';
-      footer.style.padding = '4px 16px 16px';
-      footer.style.boxSizing = 'border-box';
-    }
+    footer.style.display = 'flex';
+    footer.style.flexDirection = 'column';
+    footer.style.gap = '8px';
+    footer.style.width = '100%';
+    footer.style.padding = '4px 16px 16px';
+    footer.style.boxSizing = 'border-box';
     const paint = (button, kind, label) => {
       button.innerHTML = actionIcons[kind] + '<span></span>';
       button.querySelector('span').textContent = label;
@@ -746,3 +752,38 @@
 
   window.PageSpyClientLogs = { install, mountDialogActions, clear };
 })();
+
+if (typeof document !== 'undefined') {
+  const runMount = () => {
+    try {
+      if (window.PageSpyClientLogs) {
+        window.PageSpyClientLogs.mountDialogActions();
+      }
+    } catch (e) {}
+  };
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', runMount);
+  } else {
+    runMount();
+  }
+  const observer = new MutationObserver(runMount);
+  observer.observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+  });
+  window.addEventListener('modal:show', runMount);
+  document.addEventListener(
+    'click',
+    (e) => {
+      if (
+        e.target &&
+        (e.target.closest('.page-spy-logo') || e.target.closest('#__pageSpy'))
+      ) {
+        setTimeout(runMount, 0);
+        setTimeout(runMount, 50);
+        setTimeout(runMount, 200);
+      }
+    },
+    true,
+  );
+}

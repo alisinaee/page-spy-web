@@ -6,7 +6,8 @@ COPY scripts/public-files.sh ./scripts/public-files.sh
 RUN yarn install --frozen-lockfile --ignore-optional
 
 COPY . .
-RUN yarn build:client
+RUN node scripts/patch-sdk-network.mjs public/page-spy/index.min.js \
+  && yarn build:client
 
 FROM golang:1.23 AS backend
 WORKDIR /app

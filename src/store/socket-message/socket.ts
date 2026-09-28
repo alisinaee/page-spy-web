@@ -108,6 +108,7 @@ export class SocketStore extends EventTarget {
               this.clientConnection = content.connection;
               this.getCacheQueueMessage();
               this.dispatchConnectStatus();
+              this.triggerLazilyRefreshEvents();
             }
             break;
           case ERROR:

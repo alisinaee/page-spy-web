@@ -6,3 +6,23 @@
     margin-left: 5px;
   }
 }
+
+.console-header-actions {
+  width: 100%;
+  .console-filter-select,
+  .console-filter-input {
+    width: 200px;
+  }
+  @media (max-width: 768px) {
+    .ant-space {
+      width: 100%;
+      justify-content: flex-start !important;
+    }
+    .console-filter-select,
+    .console-filter-input {
+      width: 100% !important;
+      min-width: 130px;
+      flex: 1 1 130px;
+    }
+  }
+}

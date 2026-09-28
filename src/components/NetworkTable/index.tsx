@@ -3,9 +3,10 @@ import { SpyStorage } from '@huolala-tech/page-spy-types';
 import { Dropdown, Empty, Space, Tooltip, Flex } from 'antd';
 import clsx from 'clsx';
 import copy from 'copy-to-clipboard';
-import { isString, throttle } from 'lodash-es';
+import { throttle } from 'lodash-es';
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { getContentType, getStatusInfo, getTime } from './utils';
+import { getStatusInfo, getTime } from './utils';
+import { buildCurlCommand, responseLogText } from './body-codec';
 import { useTranslation } from 'react-i18next';
 import './index.less';
 import { NetworkDetail } from './NetworkDetail';
@@ -45,63 +46,18 @@ const NoData = () => (
 const buildCurl = (
   row: ResolvedNetworkInfo,
   cookie?: SpyStorage.GetTypeDataItem['data'],
-) => {
-  const { url, method, requestHeader, requestPayload, withCredentials } = row;
-  let result = `curl -X ${method} '${url}'`;
-  let headers = '';
-  if (requestHeader) {
-    headers = requestHeader
-      .map(([key, value]) => `  -H '${key}: ${value}'`)
-      .join(' \\\r\n');
-  }
-  if (withCredentials && cookie) {
-    const cookieInfo = Object.entries(cookie)
-      .map(([key, item]) => `${key}=${item.value}`)
-      .join(';');
-    headers = `${headers && `${headers} \\\r\n`}  -H 'cookie:${cookieInfo}'`;
-  }
-  if (headers) {
-    result = `${result} \\\r\n${headers}`;
-  }
-  if (requestPayload) {
-    const contentType = getContentType(requestHeader);
-    let body = '';
-    if (isString(requestPayload)) {
-      body = `  --data-raw ${JSON.stringify(requestPayload)}`;
-    } else if (contentType === 'multipart/form-data') {
-      body = requestPayload
-        .map(([key, value]) => `  --form ${JSON.stringify(`${key}=${value}`)}`)
-        .join(' \\\r\n');
-    } else if (
-      contentType === 'application/x-www-form-urlencoded;charset=UTF-8'
-    ) {
-      body = requestPayload
-        .map(
-          ([key, value]) =>
-            `  --data-urlencode ${JSON.stringify(`${key}=${value}`)}`,
-        )
-        .join(' \\\r\n');
-    }
-    if (body) result = `${result} \\\r\n${body}`;
-  }
-  return result;
-};
+) => buildCurlCommand(row, cookie);
 
 const formatResponseLog = (row: ResolvedNetworkInfo) => {
   const headerText = row.responseHeader
     ? row.responseHeader.map(([key, value]) => `${key}: ${value}`).join('\n')
     : '';
-  let body = '';
-  if (row.response && typeof row.response !== 'string') {
-    try {
-      body = JSON.stringify(row.response, null, 2);
-    } catch (error) {
-      body = String(row.response);
-    }
-  } else {
-    body = row.response || row.responseReason || '';
-  }
-  return [`# Response`, `status: ${row.status ?? ''}`, headerText, body]
+  return [
+    '# Response',
+    `status: ${row.status ?? ''}`,
+    headerText,
+    responseLogText(row.response, row.responseReason),
+  ]
     .filter(Boolean)
     .join('\n');
 };

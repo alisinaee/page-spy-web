@@ -2,6 +2,7 @@ import {
   Button,
   Col,
   Divider,
+  Drawer,
   Layout,
   Menu,
   message,
@@ -9,6 +10,7 @@ import {
   Row,
   Space,
   Skeleton,
+  Tag,
   Tooltip,
   Typography,
 } from 'antd';
@@ -16,9 +18,11 @@ import {
   ClearOutlined,
   CopyOutlined,
   DownloadOutlined,
+  SettingOutlined,
+  MenuOutlined,
 } from '@ant-design/icons';
 import copy from 'copy-to-clipboard';
-import React, { memo, useEffect, useMemo, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import ConsolePanel from './ConsolePanel';
 import NetworkPanel from './NetworkPanel';
 import SystemPanel from './SystemPanel';
@@ -49,6 +53,7 @@ import {
   suggestDeviceLogName,
 } from '@/utils/device-session';
 import { confirmLogFileName } from './save-log-dialog';
+
 const { Sider, Content } = Layout;
 const { Title } = Typography;
 
@@ -89,13 +94,7 @@ const MENU_COMPONENTS: Record<
   },
 };
 
-interface BadgeMenuProps {
-  active: MenuType;
-}
-const BadgeMenu = memo(({ active }: BadgeMenuProps) => {
-  const { t } = useTranslation('translation', { keyPrefix: 'devtool' });
-  const navigate = useNavigate();
-  const { search } = useLocation();
+const useDevtoolsBadge = (active: MenuType) => {
   const [badge, setBadge] = useState<Record<MenuType, boolean>>({
     Console: false,
     Network: false,
@@ -103,6 +102,7 @@ const BadgeMenu = memo(({ active }: BadgeMenuProps) => {
     Storage: false,
     System: false,
   });
+
   useEventListener(
     CUSTOM_EVENT.NewMessageComing,
     throttle((evt) => {
@@ -126,55 +126,76 @@ const BadgeMenu = memo(({ active }: BadgeMenuProps) => {
     }));
   }, [active]);
 
+  return badge;
+};
+
+const useVisibleMenus = () => {
   const clientInfo = useSocketMessageStore(
     useShallow((state) => state.clientInfo),
   );
+  return useMemo(() => {
+    if (!clientInfo) return Object.keys(MENU_COMPONENTS) as MenuType[];
+    return (Object.keys(MENU_COMPONENTS) as MenuType[]).filter((key) => {
+      const item = MENU_COMPONENTS[key];
+      return (
+        !item.visible ||
+        item.visible({
+          browser: clientInfo.browser.type,
+          os: clientInfo.os.type,
+        })
+      );
+    });
+  }, [clientInfo]);
+};
+
+interface BadgeMenuProps {
+  active: MenuType;
+  badge: Record<MenuType, boolean>;
+}
+const BadgeMenu = memo(({ active, badge }: BadgeMenuProps) => {
+  const { t } = useTranslation('translation', { keyPrefix: 'devtool' });
+  const navigate = useNavigate();
+  const { search } = useLocation();
+
+  const clientInfo = useSocketMessageStore(
+    useShallow((state) => state.clientInfo),
+  );
+  const visibleMenus = useVisibleMenus();
 
   const menuItems = useMemo(() => {
     if (!clientInfo) return;
-    return Object.entries(MENU_COMPONENTS)
-      .filter(([key, item]) => {
-        // Menu filter by some conditions``
-        return (
-          !item.visible ||
-          item.visible({
-            browser: clientInfo.browser.type,
-            os: clientInfo.os.type,
-          })
-        );
-      })
-      .map(([key, item]) => {
-        return {
-          key,
-          label: (
-            <div
-              className="sider-menu__item"
-              onClick={() => {
-                navigate({ search, hash: key });
-              }}
-            >
-              <span>{t(`menu.${key}`)}</span>
-              <div
-                className={clsx('circle-badge', {
-                  show: badge[key as MenuType],
-                })}
-              />
-            </div>
-          ),
-        };
-      });
-  }, [clientInfo, badge, navigate, search, t]);
+    return visibleMenus.map((key) => ({
+      key,
+      label: (
+        <div
+          className="sider-menu__item"
+          onClick={() => {
+            navigate({ search, hash: key });
+          }}
+        >
+          <span>{t(`menu.${key}`)}</span>
+          <div
+            className={clsx('circle-badge', {
+              show: badge[key as MenuType],
+            })}
+          />
+        </div>
+      ),
+    }));
+  }, [clientInfo, visibleMenus, badge, navigate, search, t]);
 
   if (!clientInfo) {
-    return Object.keys(MENU_COMPONENTS).map((_, index) => {
-      return (
-        <Skeleton.Button
-          key={index}
-          active
-          style={{ display: 'block', width: '90%', margin: '12px auto 0' }}
-        />
-      );
-    });
+    return (
+      <>
+        {Object.keys(MENU_COMPONENTS).map((_, index) => (
+          <Skeleton.Button
+            key={index}
+            active
+            style={{ display: 'block', width: '90%', margin: '12px auto 0' }}
+          />
+        ))}
+      </>
+    );
   }
 
   return (
@@ -218,7 +239,7 @@ const ClientInfo = memo(() => {
         suggestDeviceLogName(address, 'all'),
       );
       if (!fileName) return;
-      downloadDeviceSession(address, fileName);
+      await downloadDeviceSession(address, fileName);
       message.success(t('download-success'));
     } catch (error) {
       console.error('Failed to download device session', error);
@@ -315,6 +336,11 @@ const ClientInfo = memo(() => {
 export default function Devtools() {
   const { hash = '#Console' } = useLocation();
   const { address = '', secret = '' } = useSearch();
+  const { t } = useTranslation('translation', { keyPrefix: 'devtool' });
+  const navigate = useNavigate();
+  const { search } = useLocation();
+  const [bottomSheetOpen, setBottomSheetOpen] = useState(false);
+
   const [socket, initSocket, clientInfo] = useSocketMessageStore(
     useShallow((state) => [state.socket, state.initSocket, state.clientInfo]),
   );
@@ -332,6 +358,38 @@ export default function Devtools() {
     return value as MenuType;
   }, [hash]);
 
+  const badge = useDevtoolsBadge(hashKey);
+  const visibleMenus = useVisibleMenus();
+  const isClientOnline = Boolean(socket?.clientConnection);
+
+  const copyAllLogs = useCallback(() => {
+    try {
+      const copied = copy(serializeDeviceSession(address));
+      if (copied) {
+        message.success(t('copy-all-success'));
+      } else {
+        message.error(t('copy-all-error'));
+      }
+    } catch (error) {
+      console.error('Failed to copy device session', error);
+      message.error(t('copy-all-error'));
+    }
+  }, [address, t]);
+
+  const downloadAllLogs = useCallback(async () => {
+    try {
+      const fileName = await confirmLogFileName(
+        suggestDeviceLogName(address, 'all'),
+      );
+      if (!fileName) return;
+      await downloadDeviceSession(address, fileName);
+      message.success(t('download-success'));
+    } catch (error) {
+      console.error('Failed to download device session', error);
+      message.error(t('export-error'));
+    }
+  }, [address, t]);
+
   const ActiveContent = useMemo(() => {
     const content = MENU_COMPONENTS[hashKey];
     return content.component || ConsolePanel;
@@ -342,24 +400,176 @@ export default function Devtools() {
     return null;
   }
 
-  // eslint-disable-next-line consistent-return
   return (
-    <Layout className="page-spy-devtools">
-      <Sider theme="light">
-        <div className="page-spy-devtools__sider">
+    <div className="page-spy-devtools-root">
+      {/* Mobile Top Navigation (shown on mobile via CSS) */}
+      <div className="devtools-mobile-bar">
+        <div className="devtools-mobile-bar__header">
+          <div
+            className="devtools-mobile-bar__device-badge"
+            onClick={() => setBottomSheetOpen(true)}
+            role="button"
+            tabIndex={0}
+          >
+            <Tag
+              color="purple"
+              style={{ fontFamily: 'Monaco', fontWeight: 700, margin: 0 }}
+            >
+              #{address.slice(0, 4)}
+            </Tag>
+            <span
+              className={clsx('connection-indicator-dot', {
+                online: isClientOnline,
+              })}
+              title={isClientOnline ? 'Client Online' : 'Client Offline'}
+            />
+            <span className="device-name-text">
+              {clientInfo?.browser?.name || clientInfo?.os?.name || 'Device'}
+            </span>
+          </div>
+          <Space size={6}>
+            <Button
+              size="small"
+              icon={<CopyOutlined />}
+              onClick={copyAllLogs}
+              title={t('copy-all')}
+            />
+            <Button
+              size="small"
+              icon={<DownloadOutlined />}
+              onClick={downloadAllLogs}
+              title={t('download')}
+            />
+            <Button
+              size="small"
+              type="primary"
+              icon={<SettingOutlined />}
+              onClick={() => setBottomSheetOpen(true)}
+            >
+              Side Panel
+            </Button>
+          </Space>
+        </div>
+        <div className="devtools-mobile-bar__tabs">
+          {visibleMenus.map((key) => {
+            const isActive = key === hashKey;
+            const hasBadge = badge[key];
+            return (
+              <button
+                key={key}
+                type="button"
+                className={clsx('devtools-mobile-tab-btn', {
+                  active: isActive,
+                })}
+                onClick={() => {
+                  navigate({ search, hash: key });
+                }}
+              >
+                <span>{t(`menu.${key}`)}</span>
+                {hasBadge && <span className="tab-circle-badge" />}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Main Layout (Sider on left on desktop, hidden on mobile via CSS) */}
+      <Layout className="page-spy-devtools">
+        <Sider theme="light" className="devtools-desktop-sider">
+          <div className="page-spy-devtools__sider">
+            <ClientInfo />
+            {clientInfo?.plugins?.includes('MPEvalPlugin') && (
+              <MPWarning className="sider-warning" />
+            )}
+            <BadgeMenu active={hashKey} badge={badge} />
+          </div>
+        </Sider>
+        <Content className="page-spy-devtools__content">
+          <ConnectStatus />
+          <div className="page-spy-devtools__panel">
+            <ActiveContent />
+          </div>
+        </Content>
+      </Layout>
+
+      {/* Floating Action Button (FAB) for mobile */}
+      <div
+        className="devtools-floating-fab"
+        onClick={() => setBottomSheetOpen(true)}
+        role="button"
+        tabIndex={0}
+        title="Open Side Panel & Actions"
+      >
+        <SettingOutlined style={{ fontSize: 20, color: '#fff' }} />
+        {Object.values(badge).some(Boolean) && (
+          <span className="fab-badge-dot" />
+        )}
+      </div>
+
+      {/* Mobile BottomSheet Drawer for Side Panel */}
+      <Drawer
+        title={
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              width: '100%',
+              paddingRight: 16,
+            }}
+          >
+            <span>{t('device')} &amp; Side Panel</span>
+            <Tag
+              color="purple"
+              style={{ fontFamily: 'Monaco', fontWeight: 700 }}
+            >
+              #{address.slice(0, 4)}
+            </Tag>
+          </div>
+        }
+        placement="bottom"
+        open={bottomSheetOpen}
+        onClose={() => setBottomSheetOpen(false)}
+        height="80vh"
+        className="devtools-mobile-bottomsheet"
+      >
+        <div className="mobile-bottomsheet-body">
+          <div className="bottomsheet-panel-switcher">
+            <Typography.Text
+              type="secondary"
+              style={{ fontSize: 12, marginBottom: 8, display: 'block' }}
+            >
+              Switch Panel
+            </Typography.Text>
+            <div className="bottomsheet-panel-buttons">
+              {visibleMenus.map((key) => (
+                <Button
+                  key={key}
+                  type={key === hashKey ? 'primary' : 'default'}
+                  onClick={() => {
+                    navigate({ search, hash: key });
+                    setBottomSheetOpen(false);
+                  }}
+                  style={{ borderRadius: 16, margin: '2px 4px' }}
+                >
+                  {t(`menu.${key}`)}
+                  {badge[key] && (
+                    <span
+                      className="tab-circle-badge"
+                      style={{ marginLeft: 4 }}
+                    />
+                  )}
+                </Button>
+              ))}
+            </div>
+          </div>
+          <Divider style={{ margin: '12px 0' }} />
           <ClientInfo />
           {clientInfo?.plugins?.includes('MPEvalPlugin') && (
             <MPWarning className="sider-warning" />
           )}
-          <BadgeMenu active={hashKey} />
         </div>
-      </Sider>
-      <Content className="page-spy-devtools__content">
-        <ConnectStatus />
-        <div className="page-spy-devtools__panel">
-          <ActiveContent />
-        </div>
-      </Content>
-    </Layout>
+      </Drawer>
+    </div>
   );
 }

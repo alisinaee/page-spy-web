@@ -4,8 +4,10 @@
   flex-direction: column;
   justify-content: flex-end;
   gap: 8px;
+  height: 100%;
   &__layout {
     flex: 1;
+    height: 0;
   }
   &__sider {
     position: absolute;
@@ -25,6 +27,36 @@
       position: sticky;
       top: 0;
       z-index: 10;
+    }
+  }
+
+  @media (max-width: 768px) {
+    &__layout {
+      display: flex;
+      flex-direction: column !important;
+    }
+    &__sider {
+      position: static !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      min-width: 100% !important;
+      height: auto !important;
+      border-right: none !important;
+      border-bottom: 1px solid #d9d9d9;
+      background: #fff;
+      flex: none !important;
+    }
+    &__menu {
+      height: auto !important;
+      display: flex !important;
+      overflow-x: auto !important;
+      white-space: nowrap !important;
+      border-bottom: none !important;
+      line-height: 40px !important;
+      .ant-menu-item {
+        margin: 0 4px !important;
+        padding: 0 12px !important;
+      }
     }
   }
 }
