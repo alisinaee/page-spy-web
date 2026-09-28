@@ -50,6 +50,7 @@
       <p>Click button, then inspect message in PageSpy Console panel.</p>
       <button id="send" type="button">Send test log</button>
       <button id="generate" type="button">Generate all test logs</button>
+      <button id="open-modal-test" type="button" style="background:#6d28d9;margin-left:8px;">Open PageSpy Dialog</button>
       <div id="page-marker"></div>
     </main>
 
@@ -91,6 +92,17 @@
       };
       document.head.appendChild(script);
 
+      document.querySelector('#open-modal-test').addEventListener('click', () => {
+        if (window.$pageSpy && window.$pageSpy.constructor && window.$pageSpy.constructor.modal) {
+          window.$pageSpy.constructor.modal.show();
+        } else {
+          const logo = document.querySelector('.page-spy-logo');
+          if (logo) {
+            logo.isMoveEvent = false;
+            logo.click();
+          }
+        }
+      });
       document.querySelector('#send').addEventListener('click', () => {
         console.log('PageSpy test log', {
           event: 'smoke-test-button',
