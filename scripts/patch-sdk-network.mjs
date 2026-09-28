@@ -223,6 +223,43 @@ function patchSdk(filePath) {
     throw new Error(`PagePlugin definition not found in ${filePath}`);
   }
 
+  // 6. Native dialog action buttons in SDK startRender
+  const SDK_TARGET = 'd&&(m.disabled=!0,m.title="In Offline Mode"),modal.build({logo:l.logo||img$2,title:l.title||"PageSpy",content:y,footer:[m],mounted:h})';
+  const SDK_REPLACEMENT = [
+    'd&&(m.disabled=!0,m.title="In Offline Mode");',
+    '(()=>{',
+    'var _btnDl=document.createElement("button");',
+    '_btnDl.type="button";',
+    '_btnDl.id="page-spy-download-logs";',
+    '_btnDl.className="page-spy-btn";',
+    '_btnDl.innerHTML=\'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="M8 11l4 4 4-4"/><path d="M5 20h14"/></svg><span>Download logs</span>\';',
+    '_btnDl.onclick=function(e){e.preventDefault();e.stopPropagation();if(window.PageSpyClientLogs&&window.PageSpyClientLogs.download){window.PageSpyClientLogs.download()}else{var dt={deviceId:this.address||"",exportedAt:new Date().toISOString()};var bl=new Blob([JSON.stringify(dt,null,2)],{type:"application/json"});var ul=URL.createObjectURL(bl);var an=document.createElement("a");an.href=ul;an.download="pagespy-logs.json";an.click();URL.revokeObjectURL(ul)}}.bind(this);',
+    'var _btnView=document.createElement("button");',
+    '_btnView.type="button";',
+    '_btnView.id="page-spy-see-logs";',
+    '_btnView.className="page-spy-btn";',
+    '_btnView.innerHTML=\'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s4-6 10-6 10 6 10 6-4 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.5"/></svg><span>See logs</span>\';',
+    '_btnView.onclick=function(e){e.preventDefault();e.stopPropagation();if(window.PageSpyClientLogs&&window.PageSpyClientLogs.openViewer){window.PageSpyClientLogs.openViewer()}else{var ul=n+"/#/devtools?address="+encodeURIComponent(this.address||"");if(s&&i){ul+="&secret="+i}window.open(ul,"_blank")}}.bind(this);',
+    'var _btnClear=document.createElement("button");',
+    '_btnClear.type="button";',
+    '_btnClear.id="page-spy-clear-logs";',
+    '_btnClear.className="page-spy-btn";',
+    '_btnClear.style.color="#b42318";',
+    '_btnClear.innerHTML=\'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V5h6v2"/><path d="M7 7l1 13h8l1-13"/></svg><span>Clear logs</span>\';',
+    '_btnClear.onclick=function(e){e.preventDefault();e.stopPropagation();if(window.PageSpyClientLogs&&window.PageSpyClientLogs.clear){window.PageSpyClientLogs.clear()}console.clear();modal.close();Toast.message("Logs cleared")};',
+    'var _st=document.createElement("style");',
+    '_st.textContent="#page-spy-copy-link,#page-spy-download-logs,#page-spy-see-logs,#page-spy-clear-logs{width:100%!important;min-height:42px;margin:0!important;display:flex!important;align-items:center;justify-content:center;gap:8px;padding:0 12px!important;border:1px solid #e6e8f0!important;border-radius:10px!important;background:#fff!important;color:#1f2430!important;box-shadow:none!important;font:14px/1 system-ui,sans-serif!important;cursor:pointer}#page-spy-clear-logs{color:#b42318!important}.page-spy-modal-footer{display:flex!important;flex-direction:column!important;gap:8px!important;width:100%!important;padding:4px 16px 16px!important;box-sizing:border-box!important}";',
+    'h.appendChild(_st);',
+    'modal.build({logo:l.logo||img$2,title:l.title||"PageSpy",content:y,footer:[m,_btnDl,_btnView,_btnClear],mounted:h});',
+    '})()',
+  ].join('');
+
+  if (next.includes(SDK_TARGET)) {
+    next = next.replace(SDK_TARGET, SDK_REPLACEMENT);
+  } else if (!next.includes('_btnDl')) {
+    throw new Error(`SDK startRender anchor not found in ${filePath}`);
+  }
+
   if (next !== source) {
     fs.writeFileSync(filePath, next);
     console.log(`patched ${filePath}`);
