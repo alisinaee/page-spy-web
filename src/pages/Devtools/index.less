@@ -168,100 +168,6 @@
   border-radius: 8px;
 }
 
-/* Mobile top bar: hidden by default on desktop */
-.devtools-mobile-bar {
-  display: none;
-  background-color: #fff;
-  border-bottom: 1px solid #e8e8e8;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
-  z-index: 100;
-  flex-shrink: 0;
-
-  &__header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px 12px;
-    gap: 8px;
-  }
-
-  &__device-badge {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    cursor: pointer;
-    background: #f7f3fd;
-    padding: 4px 8px;
-    border-radius: 6px;
-    border: 1px solid #e9dcfc;
-
-    .device-name-text {
-      font-size: 12px;
-      color: #555;
-      max-width: 90px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-  }
-
-  &__tabs {
-    display: flex;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    padding: 4px 8px 8px;
-    gap: 6px;
-    scrollbar-width: none;
-    &::-webkit-scrollbar {
-      display: none;
-    }
-  }
-}
-
-.devtools-mobile-tab-btn {
-  position: relative;
-  padding: 6px 14px;
-  border-radius: 16px;
-  border: none;
-  background-color: #f0f0f0;
-  color: #555;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  white-space: nowrap;
-  flex-shrink: 0;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-
-  &.active {
-    background-color: @primary-color;
-    color: #fff;
-    font-weight: 600;
-    box-shadow: 0 2px 6px fade(@primary-color, 35%);
-  }
-
-  .tab-circle-badge {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background-color: #ff4d4f;
-    display: inline-block;
-  }
-}
-
-.connection-indicator-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: #bfbfbf;
-  &.online {
-    background-color: #52c41a;
-  }
-}
-
 /* Floating Action Button (FAB) */
 .devtools-floating-fab {
   display: none;
@@ -311,10 +217,6 @@
 
 /* MOBILE RESPONSIVE MEDIA QUERY */
 @media (max-width: 768px) {
-  .devtools-mobile-bar {
-    display: block !important;
-  }
-
   .devtools-floating-fab {
     display: flex !important;
   }

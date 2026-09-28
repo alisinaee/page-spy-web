@@ -721,7 +721,7 @@
       button.querySelector('span').textContent = label;
     };
     paint(copyButton, 'copy', 'Copy debug link');
-    if (root.querySelector('#page-spy-download-logs')) return;
+    if (footer.querySelector('#page-spy-download-logs')) return;
     const makeButton = (id, kind, label) => {
       const button = document.createElement('button');
       button.type = 'button';
