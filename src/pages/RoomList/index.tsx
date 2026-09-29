@@ -21,11 +21,17 @@ import {
   Select,
   Space,
   Layout,
+  Drawer,
+  Badge,
 } from 'antd';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import './index.less';
-import { ClearOutlined, SearchOutlined } from '@ant-design/icons';
+import {
+  ClearOutlined,
+  SearchOutlined,
+  FilterOutlined,
+} from '@ant-design/icons';
 import { RoomCard } from './RoomCard';
 import { Statistics } from './Statistics';
 import { LoadingFallback } from '@/components/LoadingFallback';
@@ -77,7 +83,15 @@ const filterConnections = (
     .filter(({ tags }) => {
       return String(tags.title).toLowerCase().includes(lowerCaseTitle);
     })
-    .filter((i) => i.address.slice(0, 4).includes(address || ''))
+    .filter((i) => {
+      const query = String(address || '')
+        .trim()
+        .toLowerCase();
+      if (!query) return true;
+      return String(i.address || '')
+        .toLowerCase()
+        .includes(query);
+    })
     .filter((clientInfo) => {
       return (
         (!os || clientInfo.os.type === os) &&
@@ -88,8 +102,10 @@ const filterConnections = (
 
 const RoomList = () => {
   const [form] = Form.useForm();
+  const [mobileForm] = Form.useForm();
   const { t } = useTranslation();
 
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [showMaximumAlert, setMaximumAlert] = useState(false);
   const showLoadingRef = useRef(false);
   const {
@@ -151,9 +167,21 @@ const RoomList = () => {
   const [conditions, setConditions] = useState({
     title: '',
     address: '',
+    project: '',
     os: '',
     browser: '',
   });
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (conditions.title) count++;
+    if (conditions.address) count++;
+    if (conditions.project) count++;
+    if (conditions.os) count++;
+    if (conditions.browser) count++;
+    return count;
+  }, [conditions]);
+  const hasActiveFilters = activeFilterCount > 0;
 
   const onFormFinish = useCallback(
     async (value: any) => {
@@ -184,14 +212,15 @@ const RoomList = () => {
         />
       );
     }
-    setMaximumAlert(matchedConnections.length > MAXIMUM_CONNECTIONS);
-
     const list = sortConnections(
       matchedConnections.slice(0, MAXIMUM_CONNECTIONS),
     );
 
     return (
-      <Row gutter={24} style={{ padding: 24 }}>
+      <Row
+        gutter={[16, 16]}
+        style={{ padding: '24px 16px', margin: 0, width: '100%' }}
+      >
         {list.map((room) => (
           <RoomCard key={room.address} room={room} />
         ))}
@@ -199,9 +228,14 @@ const RoomList = () => {
     );
   }, [conditions, connectionList, error, loading]);
 
+  useEffect(() => {
+    const matchedConnections = filterConnections(connectionList, conditions);
+    setMaximumAlert(matchedConnections.length > MAXIMUM_CONNECTIONS);
+  }, [connectionList, conditions]);
+
   return (
     <Layout style={{ height: '100%' }} className="room-list">
-      <Sider width={350} theme="light">
+      <Sider width={350} theme="light" className="room-list-desktop-sider">
         <div className="room-list-sider">
           <Title level={3} style={{ marginBottom: 32 }}>
             {t('common.connections')}
@@ -305,7 +339,149 @@ const RoomList = () => {
           {debug.enabled && <Statistics data={connectionList} />}
         </div>
       </Sider>
-      <Content>{mainContent}</Content>
+      <Content className="room-list-content">
+        <div className="room-list-mobile-header">
+          <div className="room-list-mobile-header__title">
+            <Title level={4} style={{ margin: 0 }}>
+              {t('common.connections')}
+            </Title>
+            <Badge
+              count={filterConnections(connectionList, conditions).length}
+              overflowCount={999}
+              style={{ backgroundColor: '#7c3aed' }}
+            />
+          </div>
+          <Button
+            icon={<FilterOutlined />}
+            type={hasActiveFilters ? 'primary' : 'default'}
+            onClick={() => {
+              mobileForm.setFieldsValue(form.getFieldsValue());
+              setMobileFilterOpen(true);
+            }}
+          >
+            {hasActiveFilters ? 'Filter (' + activeFilterCount + ')' : 'Filter'}
+          </Button>
+        </div>
+
+        <div className="room-list-cards-wrapper">{mainContent}</div>
+
+        <Drawer
+          title={
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <FilterOutlined style={{ color: '#7c3aed' }} />
+              <span>Filter Connections</span>
+            </div>
+          }
+          placement="right"
+          width="85%"
+          open={mobileFilterOpen}
+          onClose={() => setMobileFilterOpen(false)}
+          className="room-list-filter-drawer"
+        >
+          <Form
+            layout="vertical"
+            form={mobileForm}
+            onFinish={async (val) => {
+              await onFormFinish(val);
+              form.setFieldsValue(val);
+              setMobileFilterOpen(false);
+            }}
+          >
+            <Form.Item label={t('common.device-id')} name="address">
+              <Input placeholder={t('common.device-id')!} allowClear />
+            </Form.Item>
+            <Form.Item label={t('common.project')} name="project">
+              <Input placeholder={t('common.project')!} allowClear />
+            </Form.Item>
+            <Form.Item label={t('common.title')} name="title">
+              <Input placeholder={t('common.title')!} allowClear />
+            </Form.Item>
+            <Form.Item label={t('common.os')} name="os">
+              <Select placeholder={t('connections.select-os')} allowClear>
+                {Object.entries(OS_CONFIG).map(([name, conf]) => (
+                  <Option value={name} key={name}>
+                    <div className="flex-between">
+                      <span>{conf.label}</span>
+                      <img src={conf.logo} height="20" alt="" />
+                    </div>
+                  </Option>
+                ))}
+              </Select>
+            </Form.Item>
+            <Form.Item label={t('devtool.platform')} name="browser">
+              <Select
+                listHeight={500}
+                placeholder={t('connections.select-browser')}
+                allowClear
+              >
+                {!!BrowserOptions.length && (
+                  <Select.OptGroup label="Web" key="web">
+                    {BrowserOptions.map(({ name, logo, label }) => (
+                      <Option key={name} value={name}>
+                        <div className="flex-between">
+                          <span>{label}</span>
+                          <img src={logo} width="20" height="20" alt="" />
+                        </div>
+                      </Option>
+                    ))}
+                  </Select.OptGroup>
+                )}
+
+                {!!MPTypeOptions.length && (
+                  <Select.OptGroup
+                    label={t('common.miniprogram')}
+                    key="miniprogram"
+                  >
+                    {MPTypeOptions.map(({ name, logo, label }) => (
+                      <Option key={name} value={name}>
+                        <div className="flex-between">
+                          <span>{label}</span>
+                          <img src={logo} width="20" height="20" alt="" />
+                        </div>
+                      </Option>
+                    ))}
+                  </Select.OptGroup>
+                )}
+              </Select>
+            </Form.Item>
+            <Row justify="end">
+              <Col span={24}>
+                <Form.Item style={{ marginBottom: 0 }}>
+                  <Space
+                    style={{
+                      width: '100%',
+                      justifyContent: 'space-between',
+                      display: 'flex',
+                    }}
+                  >
+                    <Button
+                      type="primary"
+                      htmlType="submit"
+                      icon={<SearchOutlined />}
+                      style={{ flex: 1 }}
+                    >
+                      {t('common.search')}
+                    </Button>
+                    <Button
+                      type="default"
+                      icon={<ClearOutlined />}
+                      style={{ flex: 1 }}
+                      onClick={() => {
+                        mobileForm.resetFields();
+                        form.resetFields();
+                        mobileForm.submit();
+                        setMobileFilterOpen(false);
+                      }}
+                    >
+                      {t('common.reset')}
+                    </Button>
+                  </Space>
+                </Form.Item>
+              </Col>
+            </Row>
+          </Form>
+        </Drawer>
+      </Content>
     </Layout>
   );
 };

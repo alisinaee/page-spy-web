@@ -1,3 +1,5 @@
+import { buildCurlCommand, redactSecrets } from './log-format.js';
+
 (() => {
   const logs = [];
   const textLimit = 12000;
@@ -20,6 +22,84 @@
 
   const record = (entry) => {
     logs.push({ time: new Date().toISOString(), ...entry });
+  };
+
+  const describeRequestBody = async (body) => {
+    if (body == null || body === '') return '';
+    if (typeof body === 'string') return body;
+    if (typeof FormData !== 'undefined' && body instanceof FormData) {
+      const fields = [];
+      body.forEach((value, key) => {
+        if (typeof value === 'string') fields.push([key, value]);
+        else {
+          fields.push([
+            key,
+            `(file name=${value.name || ''} type=${value.type || ''} size=${
+              value.size || 0
+            })`,
+          ]);
+        }
+      });
+      return fields;
+    }
+    if (
+      typeof URLSearchParams !== 'undefined' &&
+      body instanceof URLSearchParams
+    ) {
+      return Array.from(body.entries());
+    }
+    let bytes = null;
+    if (body instanceof ArrayBuffer) bytes = new Uint8Array(body);
+    else if (ArrayBuffer.isView(body)) {
+      bytes = new Uint8Array(body.buffer, body.byteOffset, body.byteLength);
+    } else if (typeof Blob !== 'undefined' && body instanceof Blob) {
+      const media = body.type && /^(image|video|audio)\//.test(body.type);
+      if (media || body.size > 2097152) {
+        return `(file name=${body.name || ''} type=${body.type || ''} size=${
+          body.size
+        })`;
+      }
+      try {
+        return await body.text();
+      } catch (error) {
+        return `[binary ${body.size} bytes]`;
+      }
+    }
+    if (!bytes) return '[binary body]';
+    if (!bytes.length) return '';
+    if (bytes.length > 2097152) return `[binary ${bytes.length} bytes]`;
+    const sample = bytes.subarray(0, Math.min(bytes.length, 2048));
+    let weird = 0;
+    for (let index = 0; index < sample.length; index += 1) {
+      const byte = sample[index];
+      if (byte === 9 || byte === 10 || byte === 13) continue;
+      if (byte < 32) weird += 1;
+    }
+    if (sample.length && weird / sample.length >= 0.05) {
+      return `[binary ${bytes.length} bytes]`;
+    }
+    return new TextDecoder('utf-8').decode(bytes);
+  };
+
+  const describeXhrResponse = async (xhr) => {
+    let type = '';
+    try {
+      type = xhr.getResponseHeader('content-type') || '';
+    } catch (error) {
+      type = '';
+    }
+    if (/^(image|video|audio)\//.test(type)) return `[${type}]`;
+    if (xhr.responseType === 'arraybuffer' || xhr.responseType === 'blob') {
+      return describeRequestBody(xhr.response);
+    }
+    if (xhr.responseType === 'json') return xhr.response;
+    try {
+      if (typeof xhr.responseText === 'string' && xhr.responseText)
+        return xhr.responseText;
+    } catch (error) {
+      return '';
+    }
+    return '';
   };
 
   const install = () => {
@@ -68,7 +148,7 @@
           requestBody = clip(init.body);
         }
       } else if (init.body) {
-        requestBody = '[request body]';
+        requestBody = await describeRequestBody(init.body);
       }
       try {
         const response = await originalFetch(...args);
@@ -112,6 +192,62 @@
         });
         throw error;
       }
+    };
+
+    const originalOpen = XMLHttpRequest.prototype.open;
+    const originalSend = XMLHttpRequest.prototype.send;
+    const originalSetHeader = XMLHttpRequest.prototype.setRequestHeader;
+    XMLHttpRequest.prototype.open = function open(method, url) {
+      this.__psLog = {
+        method: String(method || 'GET').toUpperCase(),
+        url: String(url || ''),
+        headers: [],
+        started: 0,
+      };
+      return originalOpen.apply(this, arguments);
+    };
+    XMLHttpRequest.prototype.setRequestHeader = function setRequestHeader(
+      name,
+      value,
+    ) {
+      if (this.__psLog) this.__psLog.headers.push([name, value]);
+      return originalSetHeader.apply(this, arguments);
+    };
+    XMLHttpRequest.prototype.send = function send(body) {
+      const meta = this.__psLog || {
+        method: 'GET',
+        url: '',
+        headers: [],
+        started: Date.now(),
+      };
+      meta.started = Date.now();
+      const xhr = this;
+      xhr.addEventListener('loadend', async () => {
+        let requestBody = '';
+        try {
+          requestBody = await describeRequestBody(body);
+        } catch (error) {
+          requestBody = '[binary body]';
+        }
+        let responseBody = '';
+        try {
+          responseBody = await describeXhrResponse(xhr);
+        } catch (error) {
+          responseBody = '';
+        }
+        record({
+          section: 'network',
+          method: meta.method,
+          url: meta.url,
+          status: xhr.status || 'failed',
+          ok: xhr.status >= 200 && xhr.status < 400,
+          costTime: Date.now() - meta.started,
+          requestHeaders: meta.headers,
+          requestBody,
+          responseBody,
+        });
+      });
+      return originalSend.apply(this, arguments);
     };
   };
 
@@ -297,7 +433,16 @@
     parent.append(token);
   };
 
-  const writeJson = (parent, value, indent) => {
+  const writeJson = (parent, value, indent, counter) => {
+    const budget = counter || { count: 0, marked: false };
+    if (budget.count >= 5000) {
+      if (!budget.marked) {
+        budget.marked = true;
+        addToken(parent, '… (truncated)', 'punct');
+      }
+      return;
+    }
+    budget.count += 1;
     const pad = '  '.repeat(indent);
     if (value === null) return addToken(parent, 'null', 'nil');
     if (typeof value === 'boolean')
@@ -311,7 +456,7 @@
       addToken(parent, '[\n', 'punct');
       value.forEach((item, index) => {
         addToken(parent, pad + '  ', 'punct');
-        writeJson(parent, item, indent + 1);
+        writeJson(parent, item, indent + 1, budget);
         addToken(parent, index === value.length - 1 ? '\n' : ',\n', 'punct');
       });
       addToken(parent, pad + ']', 'punct');
@@ -324,7 +469,7 @@
       addToken(parent, pad + '  ', 'punct');
       addToken(parent, JSON.stringify(key), 'key');
       addToken(parent, ': ', 'punct');
-      writeJson(parent, item, indent + 1);
+      writeJson(parent, item, indent + 1, budget);
       addToken(parent, index === entries.length - 1 ? '\n' : ',\n', 'punct');
     });
     addToken(parent, pad + '}', 'punct');
@@ -341,40 +486,13 @@
     return block;
   };
 
-  const curlText = (item) => {
-    const method = String(item.method || 'GET').toUpperCase();
-    const quote = (value) =>
-      "'" + String(value ?? '').replace(/'/g, "'\\''") + "'";
-    const lines = ['curl -X ' + method + ' ' + quote(item.url || '')];
-    const headers = Array.isArray(item.requestHeaders)
-      ? item.requestHeaders.slice()
-      : [];
-    const hasType = headers.some(
-      (pair) => String(pair[0]).toLowerCase() === 'content-type',
-    );
-    if (item.requestBody && !hasType)
-      headers.push(['content-type', 'application/json']);
-    headers.forEach((pair) => {
-      lines.push('  -H ' + quote(pair[0] + ': ' + pair[1]));
+  const curlText = (item) =>
+    buildCurlCommand({
+      url: item.url,
+      method: item.method,
+      requestHeader: item.requestHeaders,
+      requestPayload: item.requestBody,
     });
-    if (item.requestBody) {
-      const raw =
-        typeof item.requestBody === 'string'
-          ? item.requestBody
-          : JSON.stringify(item.requestBody);
-      lines.push('  --data-raw ' + quote(raw));
-    }
-    const response = deepen(item.responseBody);
-    const responseText =
-      response == null || response === ''
-        ? item.error || ''
-        : typeof response === 'string'
-        ? response
-        : JSON.stringify(response, null, 2);
-    return (
-      lines.join(' \\\n') + '\n\nResponse ' + item.status + '\n' + responseText
-    );
-  };
 
   const openViewer = () => {
     const data = snapshot();
@@ -476,55 +594,150 @@
       });
       sheet.replaceChildren();
       if (name === 'Console') {
-        if (!data.console.length) sheet.append(empty('No console logs'));
+        if (!data.console.length) {
+          sheet.append(empty('No console logs'));
+          return;
+        }
+
+        // Group console logs: group multi-line box chunks or consecutive lines
+        const groups = [];
+        let currentChunk = null;
+
+        const isBoxLine = (text) => /[┌│├└]/.test(text);
         data.console.forEach((item) => {
+          const text = String(item.message ?? '');
+          if (isBoxLine(text)) {
+            if (text.includes('┌') && currentChunk && currentChunk.isGroup) {
+              groups.push(currentChunk);
+              currentChunk = null;
+            }
+            if (!currentChunk || !currentChunk.isGroup) {
+              if (currentChunk) groups.push(currentChunk);
+              currentChunk = { isGroup: true, items: [item] };
+            } else {
+              currentChunk.items.push(item);
+            }
+            if (text.includes('└') || currentChunk.items.length >= 150) {
+              groups.push(currentChunk);
+              currentChunk = null;
+            }
+          } else {
+            if (currentChunk) groups.push(currentChunk);
+            currentChunk = { isGroup: false, item };
+          }
+        });
+        if (currentChunk) groups.push(currentChunk);
+
+        groups.forEach((group) => {
+          if (group.isGroup && group.items.length < 2) {
+            group = { isGroup: false, item: group.items[0] };
+          }
           const block = document.createElement('div');
           block.className = 'card';
           const toggle = document.createElement('button');
           toggle.type = 'button';
           toggle.className = 'log';
-          const level = document.createElement('b');
-          level.textContent = item.level;
-          level.style.color =
-            item.level === 'error'
-              ? '#b42318'
-              : item.level === 'warn'
-              ? '#b54708'
-              : '#344054';
-          const preview = document.createElement('span');
-          preview.className = 'preview';
-          preview.textContent = String(item.message || '').replace(/\s+/g, ' ');
-          const when = document.createElement('div');
-          when.className = 'when';
-          const date = new Date(item.time);
-          when.textContent = Number.isNaN(date.getTime())
-            ? ''
-            : date.toLocaleString(undefined, {
-                month: 'short',
-                day: 'numeric',
-                hour: 'numeric',
-                minute: '2-digit',
-                second: '2-digit',
-              });
-          const head = document.createElement('div');
-          head.className = 'line';
-          head.append(level, preview);
-          toggle.append(head, when);
-          const body = document.createElement('div');
-          body.className = 'detail';
-          body.hidden = true;
-          const full =
-            item.args && item.args.length
-              ? item.args.length === 1
-                ? item.args[0]
-                : item.args
-              : item.message;
-          body.append(jsonBlock(full));
-          toggle.onclick = () => {
-            body.hidden = !body.hidden;
-          };
-          block.append(toggle, body);
-          sheet.append(block);
+
+          if (group.isGroup) {
+            let cleanTitle = '';
+            for (const it of group.items) {
+              const cleaned = String(it.message || '')
+                .replace(/\[[0-9;]*m/g, '')
+                .replace(/^[┌│├└─\s]+/, '')
+                .replace(/\s+/g, ' ')
+                .trim();
+              if (cleaned && !cleaned.match(/^─+$/)) {
+                cleanTitle = cleaned;
+                break;
+              }
+            }
+            if (!cleanTitle) cleanTitle = 'Chunk log group';
+
+            const level = document.createElement('b');
+            level.textContent = 'GROUP (' + group.items.length + ')';
+            level.style.color = '#6d28d9';
+
+            const preview = document.createElement('span');
+            preview.className = 'preview';
+            preview.textContent = cleanTitle;
+
+            const when = document.createElement('div');
+            when.className = 'when';
+            const date = new Date(group.items[0].time);
+            when.textContent = Number.isNaN(date.getTime())
+              ? ''
+              : date.toLocaleString(undefined, {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  second: '2-digit',
+                });
+
+            const head = document.createElement('div');
+            head.className = 'line';
+            head.append(level, preview);
+            toggle.append(head, when);
+
+            const body = document.createElement('div');
+            body.className = 'detail';
+            body.hidden = true;
+
+            const fullText = group.items
+              .map((it) => String(it.message || '').replace(/\[[0-9;]*m/g, ''))
+              .join('\n');
+            const pre = document.createElement('pre');
+            pre.textContent = fullText;
+            body.append(pre);
+
+            toggle.onclick = () => {
+              body.hidden = !body.hidden;
+            };
+            block.append(toggle, body);
+            sheet.append(block);
+          } else {
+            const item = group.item;
+            const level = document.createElement('b');
+            level.textContent = item.level;
+            level.style.color =
+              item.level === 'error'
+                ? '#b42318'
+                : item.level === 'warn'
+                ? '#b54708'
+                : '#344054';
+            const preview = document.createElement('span');
+            preview.className = 'preview';
+            preview.textContent = String(item.message || '')
+              .replace(/\[[0-9;]*m/g, '')
+              .replace(/\s+/g, ' ');
+            const when = document.createElement('div');
+            when.className = 'when';
+            const date = new Date(item.time);
+            when.textContent = Number.isNaN(date.getTime())
+              ? ''
+              : date.toLocaleString(undefined, {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  second: '2-digit',
+                });
+            const head = document.createElement('div');
+            head.className = 'line';
+            head.append(level, preview);
+            toggle.append(head, when);
+            const body = document.createElement('div');
+            body.className = 'detail';
+            body.hidden = true;
+            const full =
+              item.args && item.args.length
+                ? item.args.length === 1
+                  ? item.args[0]
+                  : item.args
+                : item.message;
+            body.append(jsonBlock(full));
+            toggle.onclick = () => {
+              body.hidden = !body.hidden;
+            };
+            block.append(toggle, body);
+            sheet.append(block);
+          }
         });
         return;
       }
@@ -553,14 +766,14 @@
           const copyButton = document.createElement('button');
           copyButton.type = 'button';
           copyButton.className = 'copy';
-          copyButton.textContent = 'Copy';
+          copyButton.textContent = 'Copy cURL';
           copyButton.onclick = (event) => {
             event.stopPropagation();
             const text = curlText(item);
             const done = (ok) => {
               copyButton.textContent = ok ? 'Copied' : 'Failed';
               setTimeout(() => {
-                copyButton.textContent = 'Copy';
+                copyButton.textContent = 'Copy cURL';
               }, 1200);
             };
             const fallback = () => {
@@ -596,6 +809,12 @@
                 minute: '2-digit',
                 second: '2-digit',
               });
+          if (item.costTime != null && item.costTime !== '') {
+            when.textContent =
+              (when.textContent ? when.textContent + ' · ' : '') +
+              item.costTime +
+              ' ms';
+          }
           const body = document.createElement('div');
           body.className = 'detail';
           body.hidden = true;
@@ -651,7 +870,7 @@
   const download = async () => {
     const fileName = await askFileName(defaultFileName());
     if (!fileName) return;
-    saveBlob(fileName, snapshot());
+    saveBlob(fileName, redactSecrets(snapshot()));
   };
 
   const clear = () => {
@@ -750,7 +969,14 @@
     copyButton.after(downloadButton, viewButton, clearButton);
   };
 
-  window.PageSpyClientLogs = { install, mountDialogActions, clear };
+  window.PageSpyClientLogs = {
+    install,
+    mountDialogActions,
+    clear,
+    openViewer,
+    download,
+    record,
+  };
 })();
 
 if (typeof document !== 'undefined') {

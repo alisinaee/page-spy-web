@@ -215,7 +215,7 @@ function patchSdk(filePath) {
 
   // 5. Patch PagePlugin to send snapshot on init/join
   const PAGE_PLUGIN_OLD = 'class PagePlugin{constructor(){_defineProperty(this,"name","PagePlugin"),_defineProperty(this,"$pageSpyConfig",null)}onInit(e){let{config:t}=e;PagePlugin.hasInitd||(PagePlugin.hasInitd=!0,this.$pageSpyConfig=t,socketStore.addListener("refresh",((e,t)=>{let{source:r}=e;const{data:n}=r;if("page"===n){var o,a;const e=PagePlugin.collectHtml();if(!1===(null===(o=this.$pageSpyConfig)||void 0===o||null===(o=o.dataProcessor)||void 0===o||null===(a=o.page)||void 0===a?void 0:a.call(o,e)))return;const r=makeMessage("page",e);socketStore.dispatchEvent("public-data",r),t(r)}})))}onReset(){PagePlugin.hasInitd=!1}static collectHtml(){return{html:document.documentElement.outerHTML,location:window.location}}}';
-  const PAGE_PLUGIN_NEW = 'class PagePlugin{constructor(){_defineProperty(this,"name","PagePlugin"),_defineProperty(this,"$pageSpyConfig",null)}onInit(e){let{config:t}=e;if(!PagePlugin.hasInitd){PagePlugin.hasInitd=!0,this.$pageSpyConfig=t;const send=(cb)=>{var o,a;const e=PagePlugin.collectHtml();if(!1===(null===(o=this.$pageSpyConfig)||void 0===o||null===(o=o.dataProcessor)||void 0===o||null===(a=o.page)||void 0===a?void 0:a.call(o,e)))return;const r=makeMessage("page",e);socketStore.dispatchEvent("public-data",r);if(typeof cb==="function"){cb(r)}else{socketStore.broadcastMessage(r)}};socketStore.addListener("refresh",((e,t)=>{let{source:r}=e;const{data:n}=r;if("page"===n){send(t)}}));socketStore.addListener("debugger-online",(()=>{send()}));socketStore.addListener("harbor-clear",(()=>{send()}));send();}}onReset(){PagePlugin.hasInitd=!1}static collectHtml(){return{html:document.documentElement?document.documentElement.outerHTML:"",location:window.location?{href:window.location.href,origin:window.location.origin,protocol:window.location.protocol,host:window.location.host,hostname:window.location.hostname,port:window.location.port,pathname:window.location.pathname,search:window.location.search,hash:window.location.hash}:null}}}';
+  const PAGE_PLUGIN_NEW = 'class PagePlugin{constructor(){_defineProperty(this,"name","PagePlugin"),_defineProperty(this,"$pageSpyConfig",null)}onInit(e){let{config:t}=e;if(!PagePlugin.hasInitd){PagePlugin.hasInitd=!0,this.$pageSpyConfig=t;const send=(cb)=>{var o,a;const e=PagePlugin.collectHtml();if(!1===(null===(o=this.$pageSpyConfig)||void 0===o||null===(o=o.dataProcessor)||void 0===o||null===(a=o.page)||void 0===a?void 0:a.call(o,e)))return;const r=makeMessage("page",e);socketStore.dispatchEvent("public-data",r);if(typeof cb==="function"){cb(r)}else{socketStore.broadcastMessage(r)}};socketStore.addListener("refresh",((e,t)=>{let{source:r}=e;const{data:n}=r;if("page"===n){send(t)}}));socketStore.addListener("debugger-online",(()=>{send()}));socketStore.addListener("harbor-clear",(()=>{send()}));}}onReset(){PagePlugin.hasInitd=!1}static collectHtml(){return{html:document.documentElement?document.documentElement.outerHTML:"",location:window.location?{href:window.location.href,origin:window.location.origin,protocol:window.location.protocol,host:window.location.host,hostname:window.location.hostname,port:window.location.port,pathname:window.location.pathname,search:window.location.search,hash:window.location.hash}:null}}}';
 
   if (next.includes(PAGE_PLUGIN_OLD)) {
     next = next.replace(PAGE_PLUGIN_OLD, PAGE_PLUGIN_NEW);
@@ -233,24 +233,24 @@ function patchSdk(filePath) {
     '_btnDl.id="page-spy-download-logs";',
     '_btnDl.className="page-spy-btn";',
     '_btnDl.innerHTML=\'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="M8 11l4 4 4-4"/><path d="M5 20h14"/></svg><span>Download logs</span>\';',
-    '_btnDl.onclick=function(e){e.preventDefault();e.stopPropagation();if(window.PageSpyClientLogs&&window.PageSpyClientLogs.download){window.PageSpyClientLogs.download()}else{var dt={deviceId:this.address||"",exportedAt:new Date().toISOString()};var bl=new Blob([JSON.stringify(dt,null,2)],{type:"application/json"});var ul=URL.createObjectURL(bl);var an=document.createElement("a");an.href=ul;an.download="pagespy-logs.json";an.click();URL.revokeObjectURL(ul)}}.bind(this);',
+    '_btnDl.onclick=function(e){e.preventDefault();e.stopPropagation();if(window.PageSpyClientLogs&&window.PageSpyClientLogs.download){window.PageSpyClientLogs.download()}else{Toast.message("On-device log viewer is not on this page")}}.bind(this);',
     'var _btnView=document.createElement("button");',
     '_btnView.type="button";',
     '_btnView.id="page-spy-see-logs";',
     '_btnView.className="page-spy-btn";',
     '_btnView.innerHTML=\'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s4-6 10-6 10 6 10 6-4 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.5"/></svg><span>See logs</span>\';',
-    '_btnView.onclick=function(e){e.preventDefault();e.stopPropagation();if(window.PageSpyClientLogs&&window.PageSpyClientLogs.openViewer){window.PageSpyClientLogs.openViewer()}else{var ul=n+"/#/devtools?address="+encodeURIComponent(this.address||"");if(s&&i){ul+="&secret="+i}window.open(ul,"_blank")}}.bind(this);',
+    '_btnView.onclick=function(e){e.preventDefault();e.stopPropagation();if(window.PageSpyClientLogs&&window.PageSpyClientLogs.openViewer){window.PageSpyClientLogs.openViewer()}else{var ul="".concat(n,"/#/devtools?address=").concat(encodeURIComponent(this.address||""));s&&i&&(ul+="&secret=".concat(i));window.open(ul,"_blank")}}.bind(this);',
     'var _btnClear=document.createElement("button");',
     '_btnClear.type="button";',
     '_btnClear.id="page-spy-clear-logs";',
     '_btnClear.className="page-spy-btn";',
     '_btnClear.style.color="#b42318";',
     '_btnClear.innerHTML=\'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V5h6v2"/><path d="M7 7l1 13h8l1-13"/></svg><span>Clear logs</span>\';',
-    '_btnClear.onclick=function(e){e.preventDefault();e.stopPropagation();if(window.PageSpyClientLogs&&window.PageSpyClientLogs.clear){window.PageSpyClientLogs.clear()}console.clear();modal.close();Toast.message("Logs cleared")};',
+    '_btnClear.onclick=function(e){e.preventDefault();e.stopPropagation();if(window.PageSpyClientLogs&&window.PageSpyClientLogs.clear){window.PageSpyClientLogs.clear()}var cleared=false;var plugins=this.plugins||[];for(var pi=0;pi<plugins.length;pi++){var p=plugins[pi];if(p&&p.name==="DataHarborPlugin"&&typeof p.clearAndNotify==="function"){p.clearAndNotify();cleared=true}}if(!cleared&&typeof socketStore!=="undefined"&&socketStore.dispatchEvent){socketStore.dispatchEvent("harbor-clear",null)}console.clear();modal.close();Toast.message("Logs cleared")}.bind(this);',
     'var _st=document.createElement("style");',
     '_st.textContent="#page-spy-copy-link,#page-spy-download-logs,#page-spy-see-logs,#page-spy-clear-logs{width:100%!important;min-height:42px;margin:0!important;display:flex!important;align-items:center;justify-content:center;gap:8px;padding:0 12px!important;border:1px solid #e6e8f0!important;border-radius:10px!important;background:#fff!important;color:#1f2430!important;box-shadow:none!important;font:14px/1 system-ui,sans-serif!important;cursor:pointer}#page-spy-clear-logs{color:#b42318!important}.page-spy-modal-footer{display:flex!important;flex-direction:column!important;gap:8px!important;width:100%!important;padding:4px 16px 16px!important;box-sizing:border-box!important}";',
     'h.appendChild(_st);',
-    'modal.build({logo:l.logo||img$2,title:l.title||"PageSpy",content:y,footer:[m,_btnDl,_btnView,_btnClear],mounted:h});',
+    'modal.build({logo:l.logo||img$2,title:l.title||"PageSpy",content:y,footer:[m,_btnDl,_btnView,_btnClear],mounted:h});window.PageSpyModal=modal;PageSpy.modal=modal;if(typeof f!=="undefined"&&f)f.onclick=function(){modal.show()};',
     '})()',
   ].join('');
 
@@ -260,6 +260,10 @@ function patchSdk(filePath) {
     throw new Error(`SDK startRender anchor not found in ${filePath}`);
   }
 
+  const pageSpyExport = "\n;if(typeof window !== 'undefined'){window.PageSpy=PageSpy;};\n";
+  if (!next.includes("window.PageSpy=PageSpy")) {
+    next += pageSpyExport;
+  }
   if (next !== source) {
     fs.writeFileSync(filePath, next);
     console.log(`patched ${filePath}`);
@@ -340,6 +344,9 @@ async function selfTest() {
 
   console.log('sdk body self-test ok');
 }
+
+
+
 
 const args = process.argv.slice(2);
 if (args.includes('--self-test')) {

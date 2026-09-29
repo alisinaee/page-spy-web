@@ -28,7 +28,7 @@ export const RoomCard = memo(
     const { os, browser } = parseUserAgent(name);
 
     return (
-      <Col key={address} span={8} xl={6} xxl={4}>
+      <Col key={address} xs={24} sm={24} md={12} lg={12} xl={8} xxl={6}>
         <div className={clsx('connection-item')}>
           <div className="connection-item__title">
             <code style={{ fontSize: 36 }}>

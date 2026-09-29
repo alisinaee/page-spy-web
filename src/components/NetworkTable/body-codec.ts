@@ -1,12 +1,10 @@
-export const LOST_REQUEST_BODIES = new Set([
-  '[object TypedArray]',
-  '[object Blob]',
-  '[object ArrayBuffer]',
-  '[object Object]',
-]);
+import {
+  LOST_REQUEST_BODIES,
+  shellQuote,
+  buildCurlCommand,
+} from '../../../smoke-test/log-format.js';
 
-export const shellQuote = (value: string) =>
-  `'${String(value ?? '').replace(/'/g, `'\\''`)}`;
+export { LOST_REQUEST_BODIES, shellQuote, buildCurlCommand };
 
 const dataUrlParts = (data: string) => {
   if (!data.startsWith('data:')) return null;
@@ -106,85 +104,4 @@ export const responseLogText = (
   }
   if (typeof response === 'string' && response) return response;
   return responseReason || '';
-};
-
-type HeaderPairs = [string, string][] | null | undefined;
-type Payload = string | [string, string][] | null | undefined;
-type CookieInput =
-  | Record<string, { value: string }>
-  | Array<{ name?: string; value?: string }>
-  | null;
-
-const cookieHeader = (cookie: CookieInput) => {
-  if (!cookie) return '';
-  if (Array.isArray(cookie)) {
-    return cookie
-      .filter((item) => item?.name)
-      .map((item) => `${item.name}=${item.value ?? ''}`)
-      .join(';');
-  }
-  return Object.entries(cookie)
-    .map(([key, item]) => `${key}=${item.value}`)
-    .join(';');
-};
-
-const contentTypeOf = (headers: HeaderPairs) => {
-  const found = headers?.find(([key]) => key.toLowerCase() === 'content-type');
-  return (found?.[1] || '').toLowerCase();
-};
-
-const skipHeader = (key: string) => {
-  const name = key.toLowerCase();
-  return name === 'content-length' || name === 'host';
-};
-
-export const buildCurlCommand = (
-  row: {
-    url: string;
-    method: string;
-    requestHeader?: HeaderPairs;
-    requestPayload?: Payload;
-    withCredentials?: boolean;
-  },
-  cookie?: CookieInput,
-) => {
-  const { url, method, requestHeader, requestPayload, withCredentials } = row;
-  const lines = [`curl -X ${method || 'GET'} ${shellQuote(url || '')}`];
-  requestHeader?.forEach(([key, value]) => {
-    if (skipHeader(key)) return;
-    lines.push(`  -H ${shellQuote(`${key}: ${value}`)}`);
-  });
-  if (withCredentials && cookie) {
-    const cookieInfo = cookieHeader(cookie);
-    if (cookieInfo) lines.push(`  -H ${shellQuote(`cookie: ${cookieInfo}`)}`);
-  }
-
-  const contentType = contentTypeOf(requestHeader);
-  let note = '';
-  if (typeof requestPayload === 'string') {
-    if (LOST_REQUEST_BODIES.has(requestPayload)) {
-      note = `body not captured: ${requestPayload}`;
-    } else if (requestPayload) {
-      lines.push(`  --data-raw ${shellQuote(requestPayload)}`);
-    }
-  } else if (requestPayload?.length) {
-    if (contentType.includes('multipart/form-data')) {
-      requestPayload.forEach(([key, value]) => {
-        lines.push(`  --form ${shellQuote(`${key}=${value}`)}`);
-      });
-    } else if (contentType.includes('application/x-www-form-urlencoded')) {
-      requestPayload.forEach(([key, value]) => {
-        lines.push(`  --data-urlencode ${shellQuote(`${key}=${value}`)}`);
-      });
-    } else {
-      lines.push(
-        `  --data-raw ${shellQuote(
-          JSON.stringify(Object.fromEntries(requestPayload)),
-        )}`,
-      );
-    }
-  }
-
-  const command = lines.join(' \\\n');
-  return note ? `${command}\n# ${note}` : command;
 };

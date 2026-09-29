@@ -5,11 +5,16 @@
   font-size: 12px;
   white-space: pre-wrap;
   min-height: 27px;
+  transition: background-color 0.15s ease;
+
   &:first-child {
     border-top: none;
   }
   &:last-child {
     border-bottom: 1px solid #f0f0f0;
+  }
+  &:hover {
+    background-color: #fafafa;
   }
   &.debug {
     color: #1c419a;
@@ -23,15 +28,18 @@
     color: #eb3223;
     background-color: #fdeeee;
     border-color: #f9d2d1;
-    // color: #ec301d;
   }
   &__title {
     margin-top: 2px;
   }
   &__content {
     flex: 1;
+    min-width: 0;
   }
   &__url {
+    @media (max-width: 992px) {
+      display: none !important;
+    }
     max-width: 150px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -56,4 +64,97 @@
     font-size: 12px;
     color: #aaa;
   }
+  &__toggle-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    user-select: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .console-item {
+    &__url {
+      @media (max-width: 992px) {
+        display: none !important;
+      }
+      display: none !important;
+    }
+    &__content {
+      min-width: 0;
+    }
+  }
+}
+
+.console-group {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+.console-group__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  min-width: 0;
+  width: 100%;
+}
+.console-group__tag {
+  margin: 0;
+  font-size: 11px;
+  line-height: 18px;
+  padding: 0 6px;
+  font-weight: 600;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.console-group__title {
+  font-weight: 600;
+  color: #1f2430;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: calc(100vw - 160px);
+}
+.console-group__title--error {
+  color: #cf1322;
+}
+.console-group__title--warn {
+  color: #d46b08;
+}
+.console-group-details {
+  margin-top: 8px;
+  width: 100%;
+  background: #18181b;
+  color: #f4f4f5;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-family: SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 450px;
+  overflow-y: auto;
+  border: 1px solid #27272a;
+}
+.console-group-details__bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  border-bottom: 1px solid #3f3f46;
+  padding-bottom: 4px;
+}
+.console-group-details__count {
+  color: #a1a1aa;
+  font-size: 11px;
+}
+.console-group-details__copy {
+  color: #a1a1aa;
+  height: 22px;
+  font-size: 11px;
 }

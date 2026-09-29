@@ -48,17 +48,28 @@
       </p>
       <p id="status">Loading PageSpy SDK...</p>
       <p>Click button, then inspect message in PageSpy Console panel.</p>
-      <button id="send" type="button">Send test log</button>
-      <button id="generate" type="button">Generate all test logs</button>
-      <button id="open-modal-test" type="button" style="background:#6d28d9;margin-left:8px;">Open PageSpy Dialog</button>
+      <div style="display:flex; flex-direction:column; gap:8px; margin-top:1rem;">
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button id="send" type="button">Send test log</button>
+          <button id="generate" type="button">Generate basic logs</button>
+          <button id="open-modal-test" type="button" onclick="if(window.PageSpyModal)PageSpyModal.show()" style="background:#6d28d9;">Open PageSpy Dialog</button>
+          <button id="open-client-logs" type="button" onclick="if(window.PageSpyClientLogs)PageSpyClientLogs.openViewer()" style="background:#4338ca;">See Device Logs</button>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button id="load-sample-logs" type="button" style="background:#059669;">Load KYC Session</button>
+          <button id="load-loan-logs" type="button" style="background:#0284c7;">Load d340 Loan Session</button>
+          <button id="load-fa82-logs" type="button" style="background:#dc2626;">Load fa82 Error Session</button>
+          <button id="load-all-logs" type="button" style="background:#4f46e5;">Load All Real Sessions</button>
+        </div>
+      </div>
       <div id="page-marker"></div>
     </main>
 
-    <script src="./client-logs.js?v=5"></script>
-    <script>
+    <script type="module" src="./client-logs.js?v=7"></script>
+    <script type="module">
       PageSpyClientLogs.install();
 
-      const panel = new URLSearchParams(location.search).get('panel') || '6752';
+      const panel = new URLSearchParams(location.search).get('panel') || '6753';
       const panelUrl = location.protocol + '//' + location.hostname + ':' + panel;
       const project = panel === '6753' ? 'local-fork-test' : 'official-test';
 
@@ -84,6 +95,14 @@
             subtree: true,
           });
           document.querySelector('#status').textContent = 'PageSpy SDK loaded. Check panel connection.';
+          if (new URLSearchParams(location.search).get('autoload') === '1') {
+            setTimeout(loadKycLogs, 600);
+            setTimeout(() => {
+              if (window.$pageSpy && window.$pageSpy.constructor && window.$pageSpy.constructor.modal) {
+                window.$pageSpy.constructor.modal.show();
+              }
+            }, 1200);
+          }
           console.log('PageSpy connected', { panel: panelUrl, project: project });
         } catch (error) {
           document.querySelector('#status').textContent = 'PageSpy initialization failed: ' + error.message;
@@ -92,59 +111,153 @@
       };
       document.head.appendChild(script);
 
-      document.querySelector('#open-modal-test').addEventListener('click', () => {
-        if (window.$pageSpy && window.$pageSpy.constructor && window.$pageSpy.constructor.modal) {
-          window.$pageSpy.constructor.modal.show();
-        } else {
-          const logo = document.querySelector('.page-spy-logo');
-          if (logo) {
-            logo.isMoveEvent = false;
-            logo.click();
+      
+      async function injectSessionData(endpoint, sessionName) {
+        document.querySelector('#status').textContent = 'Loading ' + sessionName + '...';
+        try {
+          const res = await fetch(endpoint);
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const data = await res.json();
+
+          // 1. Console logs
+          if (Array.isArray(data.console)) {
+            const sampleLogs = data.console
+              .map((item) => {
+                const line = (item.logs || [])
+                  .map((l) => {
+                    if (typeof l.value === 'string') return l.value;
+                    if (l.value === 0 || l.value === false) return String(l.value);
+                    return l.value ? JSON.stringify(l.value) : '';
+                  })
+                  .filter((part) => part !== '')
+                  .join(' ');
+                return { item, line };
+              })
+              .filter((entry) => entry.line.trim())
+              .slice(0, 400);
+            sampleLogs.forEach(({ item, line }) => {
+              const level = item.logType || 'log';
+              if (console[level]) console[level](line);
+              else console.log(line);
+            });
           }
+
+          // 2. Network logs
+          if (Array.isArray(data.network)) {
+            data.network.forEach((net) => {
+              if (window.$pageSpy && window.$pageSpy.socketStore) {
+                const msg = { role: 'client', type: 'network', data: net };
+                try {
+                  window.$pageSpy.socketStore.dispatchEvent('public-data', msg);
+                  window.$pageSpy.socketStore.broadcastMessage(msg, false);
+                } catch (e) {}
+              }
+              if (window.PageSpyClientLogs && window.PageSpyClientLogs.record) {
+                let respObj = net.response;
+                try {
+                  if (
+                    typeof respObj === 'string' &&
+                    (respObj.startsWith('{') || respObj.startsWith('['))
+                  ) {
+                    respObj = JSON.parse(respObj);
+                  }
+                } catch (e) {}
+
+                window.PageSpyClientLogs.record({
+                  section: 'network',
+                  id: net.id,
+                  method: net.method,
+                  url: net.url,
+                  status: net.status,
+                  costTime: net.costTime,
+                  requestHeaders: net.requestHeader,
+                  requestBody: net.requestPayload,
+                  responseHeaders: net.responseHeader,
+                  responseBody: respObj,
+                });
+              }
+            });
+          }
+          // 3. Storage logs
+          if (data.storage) {
+            ['localStorage', 'sessionStorage'].forEach((stType) => {
+              const entries = data.storage[stType];
+              if (entries) {
+                const list = Array.isArray(entries)
+                  ? entries
+                  : Object.entries(entries).map(([name, value]) => ({ name, value }));
+                list.forEach((item) => {
+                  try {
+                    if (stType === 'localStorage') localStorage.setItem(item.name, typeof item.value === 'string' ? item.value : JSON.stringify(item.value));
+                    else sessionStorage.setItem(item.name, typeof item.value === 'string' ? item.value : JSON.stringify(item.value));
+                  } catch (e) {}
+                  if (window.$pageSpy && window.$pageSpy.socketStore) {
+                    const sMsg = {
+                      role: 'client',
+                      type: 'storage',
+                      data: {
+                        id: Math.random().toString(36).slice(2),
+                        type: stType,
+                        action: 'set',
+                        name: item.name,
+                        value: typeof item.value === 'string' ? item.value : JSON.stringify(item.value),
+                      },
+                    };
+                    try {
+                      window.$pageSpy.socketStore.dispatchEvent('public-data', sMsg);
+                      window.$pageSpy.socketStore.broadcastMessage(sMsg, false);
+                    } catch (e) {}
+                  }
+                });
+              }
+            });
+          }
+          document.querySelector('#status').textContent =
+            sessionName + ' loaded (' + (data.network?.length || 0) + ' requests, storage synced).';
+        } catch (err) {
+          document.querySelector('#status').textContent =
+            'Failed loading ' + sessionName + ': ' + err.message;
+        }
+      }
+
+      const loadKycLogs = () => injectSessionData('/data/kyc.json', 'KYC Real Session');
+      const loadLoanLogs = () => injectSessionData('/data/d340.json', 'd340 Loan Session');
+      const loadFa82Logs = () => injectSessionData('/data/fa82.json', 'fa82 Error Session');
+      const loadAllLogs = async () => {
+        if (window.PageSpyClientLogs && window.PageSpyClientLogs.clear) {
+          window.PageSpyClientLogs.clear();
+        }
+        await loadKycLogs();
+        await loadLoanLogs();
+        await loadFa82Logs();
+      };
+
+      document.querySelector('#load-sample-logs').addEventListener('click', loadKycLogs);
+      document.querySelector('#load-loan-logs').addEventListener('click', loadLoanLogs);
+      document.querySelector('#load-fa82-logs').addEventListener('click', loadFa82Logs);
+      document.querySelector('#load-all-logs').addEventListener('click', loadAllLogs);
+      document.querySelector('#send').addEventListener('click', () => {
+        console.log('PageSpy test log', { time: new Date().toISOString() });
+      });
+      document.querySelector('#generate').addEventListener('click', () => {
+        console.log('basic log');
+        console.info('basic info');
+        console.warn('basic warn');
+        console.error('basic error');
+      });
+      document.querySelector('#open-client-logs').addEventListener('click', () => {
+        if (window.PageSpyClientLogs && window.PageSpyClientLogs.openViewer) {
+          window.PageSpyClientLogs.openViewer();
         }
       });
-      document.querySelector('#send').addEventListener('click', () => {
-        console.log('PageSpy test log', {
-          event: 'smoke-test-button',
-          panel: panelUrl,
-          project: project,
-          time: new Date().toISOString(),
-          url: window.location.href,
-        });
-      });
-
-      document.querySelector('#generate').addEventListener('click', async () => {
-        console.debug('pagespy test debug');
-        console.info('pagespy test info');
-        console.log('pagespy test log');
-        console.warn('pagespy test warn');
-        console.error('pagespy test error');
-
-        await fetch('https://httpbin.org/get?pagespy=test').catch((error) => {
-          console.warn('GET request failed', error.message);
-        });
-        await fetch('https://httpbin.org/post', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ source: 'pagespy', ok: true }),
-        }).catch((error) => {
-          console.warn('POST request failed', error.message);
-        });
-        await fetch('https://httpbin.org/status/404').catch((error) => {
-          console.warn('404 request failed', error.message);
-        });
-        fetch('https://invalid.pagespy.test/fail').catch((error) => {
-          console.warn('failing network request', error.message);
-        });
-
-        document.title = 'PageSpy smoke page updated';
-        const marker = document.querySelector('#page-marker');
-        const node = document.createElement('p');
-        node.textContent = 'Page updated ' + new Date().toISOString();
-        marker.replaceChildren(node);
-        localStorage.setItem('pagespy-smoke-local', 'local-value');
-        sessionStorage.setItem('pagespy-smoke-session', 'session-value');
-        document.cookie = 'pagespy_smoke=cookie-value; path=/';
+      document.querySelector('#open-modal-test').addEventListener('click', () => {
+        if (window.PageSpyModal) {
+          window.PageSpyModal.show();
+        } else if (window.$pageSpy && window.$pageSpy.constructor && window.$pageSpy.constructor.modal) {
+          window.$pageSpy.constructor.modal.show();
+        } else {
+          document.querySelector('.page-spy-logo')?.click();
+        }
       });
     </script>
   </body>

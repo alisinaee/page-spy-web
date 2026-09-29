@@ -57,13 +57,10 @@ const PagePanel = () => {
       `,
       );
       const frameBody = frameDocument!.querySelector('body');
-      frameBody?.addEventListener(
-        'click',
-        (e) => {
-          e.stopPropagation();
-        },
-        true,
-      );
+      const stopClick = (event: Event) => {
+        event.stopPropagation();
+      };
+      frameBody?.addEventListener('click', stopClick, true);
 
       const spyRoot = frameDocument?.querySelector(
         '#__pageSpy',
@@ -74,6 +71,9 @@ const PagePanel = () => {
       setTimeout(() => {
         setLoading(false);
       }, 0);
+      return () => {
+        frameBody?.removeEventListener('click', stopClick, true);
+      };
     }
   }, [html]);
 

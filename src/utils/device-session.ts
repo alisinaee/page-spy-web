@@ -1,4 +1,5 @@
 import { useSocketMessageStore } from '@/store/socket-message';
+import { redactSecrets } from '../../smoke-test/log-format.js';
 
 type JsonValue =
   | null
@@ -19,7 +20,7 @@ export const isSecretHeaderName = (name: unknown): boolean =>
   typeof name === 'string' &&
   SECRET_HEADER_NAMES.has(name.trim().toLowerCase());
 
-export const normalizeForExport = (
+const normalizeValue = (
   value: unknown,
   ancestors = new Set<unknown>(),
 ): any => {
@@ -41,36 +42,25 @@ export const normalizeForExport = (
     };
   }
 
-  // Redact secret header pairs [name, val]
-  if (
-    Array.isArray(value) &&
-    value.length === 2 &&
-    isSecretHeaderName(value[0])
-  ) {
-    return [value[0], '<redacted>'];
-  }
-
   if (ancestors.has(value)) return '[Circular]';
   ancestors.add(value);
 
   let normalized: JsonValue;
   if (Array.isArray(value)) {
     normalized = value.map((item) => {
-      const result = normalizeForExport(item, ancestors);
+      const result = normalizeValue(item, ancestors);
       return result === undefined ? null : result;
     });
   } else if (value instanceof Map) {
     normalized = Object.fromEntries(
       Array.from(value.entries()).map(([key, item]) => [
         String(key),
-        isSecretHeaderName(key)
-          ? '<redacted>'
-          : normalizeForExport(item, ancestors),
+        normalizeValue(item, ancestors),
       ]),
     );
   } else if (value instanceof Set) {
     normalized = Array.from(value).map((item) => {
-      const result = normalizeForExport(item, ancestors);
+      const result = normalizeValue(item, ancestors);
       return result === undefined ? null : result;
     });
   } else if (value instanceof Date) {
@@ -79,11 +69,7 @@ export const normalizeForExport = (
     const record = value as Record<string, unknown>;
     normalized = Object.entries(record).reduce<Record<string, JsonValue>>(
       (result, [key, item]) => {
-        if (isSecretHeaderName(key)) {
-          result[key] = '<redacted>';
-          return result;
-        }
-        const normalizedItem = normalizeForExport(item, ancestors);
+        const normalizedItem = normalizeValue(item, ancestors);
         if (normalizedItem !== undefined) result[key] = normalizedItem;
         return result;
       },
@@ -95,13 +81,18 @@ export const normalizeForExport = (
   return normalized;
 };
 
-export const ensurePageSnapshot = async (timeoutMs = 500) => {
+export const normalizeForExport = (value: unknown) =>
+  redactSecrets(normalizeValue(value));
+
+export const ensurePageSnapshot = async (timeoutMs = 2000) => {
   const store = useSocketMessageStore.getState();
   if (store.pageMsg?.location || !store.socket) return;
   store.refresh('page');
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
-    await new Promise((r) => setTimeout(r, 50));
+    await new Promise((r) => {
+      setTimeout(r, 50);
+    });
     if (useSocketMessageStore.getState().pageMsg?.location) return;
   }
 };

@@ -22,7 +22,7 @@ import {
   MenuOutlined,
 } from '@ant-design/icons';
 import copy from 'copy-to-clipboard';
-import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { memo, useEffect, useMemo, useState } from 'react';
 import ConsolePanel from './ConsolePanel';
 import NetworkPanel from './NetworkPanel';
 import SystemPanel from './SystemPanel';
@@ -360,36 +360,6 @@ export default function Devtools() {
 
   const badge = useDevtoolsBadge(hashKey);
   const visibleMenus = useVisibleMenus();
-  const isClientOnline = Boolean(socket?.clientConnection);
-
-  const copyAllLogs = useCallback(() => {
-    try {
-      const copied = copy(serializeDeviceSession(address));
-      if (copied) {
-        message.success(t('copy-all-success'));
-      } else {
-        message.error(t('copy-all-error'));
-      }
-    } catch (error) {
-      console.error('Failed to copy device session', error);
-      message.error(t('copy-all-error'));
-    }
-  }, [address, t]);
-
-  const downloadAllLogs = useCallback(async () => {
-    try {
-      const fileName = await confirmLogFileName(
-        suggestDeviceLogName(address, 'all'),
-      );
-      if (!fileName) return;
-      await downloadDeviceSession(address, fileName);
-      message.success(t('download-success'));
-    } catch (error) {
-      console.error('Failed to download device session', error);
-      message.error(t('export-error'));
-    }
-  }, [address, t]);
-
   const ActiveContent = useMemo(() => {
     const content = MENU_COMPONENTS[hashKey];
     return content.component || ConsolePanel;
@@ -427,6 +397,12 @@ export default function Devtools() {
       <div
         className="devtools-floating-fab"
         onClick={() => setBottomSheetOpen(true)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            setBottomSheetOpen(true);
+          }
+        }}
         role="button"
         tabIndex={0}
         title="Open Side Panel & Actions"

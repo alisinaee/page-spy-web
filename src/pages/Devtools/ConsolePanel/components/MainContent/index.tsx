@@ -47,7 +47,7 @@ export const MainContent = memo(() => {
       return data.filter(
         (item) =>
           logLevels.includes(item.logType) &&
-          item.logs
+          (item.logs || [])
             .map((item) => item.value)
             .join('')
             .indexOf(keyword) !== -1,
@@ -60,7 +60,7 @@ export const MainContent = memo(() => {
 
     return data.filter(
       (item) =>
-        item.logs
+        (item.logs || [])
           .map((item) => item.value)
           .join('')
           .indexOf(keyword) !== -1,

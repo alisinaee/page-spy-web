@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 
 const deepen = (value: unknown, depth = 0): unknown => {
-  if (depth > 6 || value == null) return value;
+  if (depth > 6 || value === null || value === undefined) return value;
   if (typeof value === 'string') {
     const trimmed = value.trim();
     if (
@@ -28,50 +28,91 @@ const deepen = (value: unknown, depth = 0): unknown => {
   return value;
 };
 
-let tokenId = 0;
+const MAX_TOKENS = 5000;
 
-const token = (text: string, kind: string) => (
-  <span className={'j-' + kind} key={(tokenId += 1)}>
-    {text}
-  </span>
-);
+interface TokenCounter {
+  count: number;
+  id: number;
+  truncated: boolean;
+}
 
-const writeJson = (value: unknown, indent: number): JSX.Element[] => {
+const token = (text: string, kind: string, counter: TokenCounter) => {
+  counter.count += 1;
+  counter.id += 1;
+  return (
+    <span className={'j-' + kind} key={counter.id}>
+      {text}
+    </span>
+  );
+};
+
+const writeJson = (
+  value: unknown,
+  indent: number,
+  counter: TokenCounter,
+): JSX.Element[] => {
+  if (counter.count >= MAX_TOKENS) {
+    if (!counter.truncated) {
+      counter.truncated = true;
+      return [token('… (truncated)', 'punct', counter)];
+    }
+    return [];
+  }
   const pad = '  '.repeat(indent);
-  if (value === null) return [token('null', 'nil')];
-  if (typeof value === 'boolean') return [token(String(value), 'bool')];
-  if (typeof value === 'number') return [token(String(value), 'num')];
-  if (typeof value === 'string') return [token(JSON.stringify(value), 'str')];
+  if (value === null) return [token('null', 'nil', counter)];
+  if (typeof value === 'boolean')
+    return [token(String(value), 'bool', counter)];
+  if (typeof value === 'number') return [token(String(value), 'num', counter)];
+  if (typeof value === 'string')
+    return [token(JSON.stringify(value), 'str', counter)];
   if (Array.isArray(value)) {
-    if (!value.length) return [token('[]', 'punct')];
-    const nodes = [token('[\n', 'punct')];
-    value.forEach((item, index) => {
-      nodes.push(token(pad + '  ', 'punct'));
-      nodes.push(...writeJson(item, indent + 1));
-      nodes.push(token(index === value.length - 1 ? '\n' : ',\n', 'punct'));
-    });
-    nodes.push(token(pad + ']', 'punct'));
+    if (!value.length) return [token('[]', 'punct', counter)];
+    const nodes = [token('[\n', 'punct', counter)];
+    for (const [index, item] of value.entries()) {
+      if (counter.count >= MAX_TOKENS) {
+        nodes.push(token('… (truncated)\n', 'punct', counter));
+        counter.truncated = true;
+        break;
+      }
+      nodes.push(token(pad + '  ', 'punct', counter));
+      const child = writeJson(item, indent + 1, counter);
+      for (const node of child) nodes.push(node);
+      nodes.push(
+        token(index === value.length - 1 ? '\n' : ',\n', 'punct', counter),
+      );
+    }
+    if (!counter.truncated) nodes.push(token(pad + ']', 'punct', counter));
     return nodes;
   }
   const entries = Object.entries(value as Record<string, unknown>);
-  if (!entries.length) return [token('{}', 'punct')];
-  const nodes = [token('{\n', 'punct')];
-  entries.forEach(([key, item], index) => {
-    nodes.push(token(pad + '  ', 'punct'));
-    nodes.push(token(JSON.stringify(key), 'key'));
-    nodes.push(token(': ', 'punct'));
-    nodes.push(...writeJson(item, indent + 1));
-    nodes.push(token(index === entries.length - 1 ? '\n' : ',\n', 'punct'));
-  });
-  nodes.push(token(pad + '}', 'punct'));
+  if (!entries.length) return [token('{}', 'punct', counter)];
+  const nodes = [token('{\n', 'punct', counter)];
+  for (const [index, entry] of entries.entries()) {
+    if (counter.count >= MAX_TOKENS) {
+      nodes.push(token('… (truncated)\n', 'punct', counter));
+      counter.truncated = true;
+      break;
+    }
+    const [key, item] = entry;
+    nodes.push(token(pad + '  ', 'punct', counter));
+    nodes.push(token(JSON.stringify(key), 'key', counter));
+    nodes.push(token(': ', 'punct', counter));
+    const child = writeJson(item, indent + 1, counter);
+    for (const node of child) nodes.push(node);
+    nodes.push(
+      token(index === entries.length - 1 ? '\n' : ',\n', 'punct', counter),
+    );
+  }
+  if (!counter.truncated) nodes.push(token(pad + '}', 'punct', counter));
   return nodes;
 };
 
 export const ColoredJson = ({ value }: { value: unknown }) => {
   const nodes = useMemo(() => {
-    tokenId = 0;
-    if (value == null || value === '') return [token('None', 'nil')];
-    return writeJson(deepen(value), 0);
+    const counter: TokenCounter = { count: 0, id: 0, truncated: false };
+    if (value === null || value === undefined || value === '')
+      return [token('None', 'nil', counter)];
+    return writeJson(deepen(value), 0, counter);
   }, [value]);
 
   return <pre className="colored-json">{nodes}</pre>;
