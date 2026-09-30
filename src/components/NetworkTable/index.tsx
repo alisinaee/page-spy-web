@@ -193,6 +193,21 @@ export const NetworkTable = ({
     };
   }, []);
 
+  useEffect(() => {
+    const handleScrollToEnd = () => {
+      if (data.length > 0) {
+        tableRef.current?.scrollToRow(data.length - 1);
+      }
+    };
+    window.addEventListener('devtools:scroll-network-end', handleScrollToEnd);
+    return () => {
+      window.removeEventListener(
+        'devtools:scroll-network-end',
+        handleScrollToEnd,
+      );
+    };
+  }, [data]);
+
   const [columnsWidth, setColumnsWidth] = useState<Record<ColumnField, number>>(
     {
       name: 0.3,

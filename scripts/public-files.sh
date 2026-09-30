@@ -9,6 +9,8 @@ cp "${root}/node_modules/@huolala-tech/page-spy-browser/dist/iife/index.min.js" 
 if [ -f "${root}/scripts/patch-sdk-network.mjs" ]; then
   node "${root}/scripts/patch-sdk-network.mjs" "${target_sdk}/index.min.js"
 fi
+cp "${root}/smoke-test/client-logs.js" "${target_sdk}/client-logs.js"
+cp "${root}/smoke-test/log-format.js" "${target_sdk}/log-format.js"
 
 # Official plugins
 target_plugin="${root}/public/plugin"

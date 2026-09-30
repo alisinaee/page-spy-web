@@ -1,4 +1,9 @@
-import { ClearOutlined, DownloadOutlined } from '@ant-design/icons';
+import {
+  ClearOutlined,
+  DownloadOutlined,
+  VerticalAlignBottomOutlined,
+} from '@ant-design/icons';
+import { Tooltip } from 'antd';
 import { Button, Space } from 'antd';
 import { useSocketMessageStore } from '@/store/socket-message';
 import useSearch from '@/utils/useSearch';
@@ -55,12 +60,57 @@ const downloadSection = async (section: SectionName, deviceId: string) => {
   URL.revokeObjectURL(url);
 };
 
+const scrollToSectionEnd = (section: SectionName) => {
+  if (section === 'console') {
+    window.dispatchEvent(new CustomEvent('devtools:scroll-console-end'));
+    return;
+  }
+  if (section === 'network') {
+    window.dispatchEvent(new CustomEvent('devtools:scroll-network-end'));
+    const grid = document.querySelector(
+      '.network-table .ReactVirtualized__Grid',
+    ) as HTMLElement;
+    if (grid) grid.scrollTop = grid.scrollHeight;
+    return;
+  }
+  if (section === 'storage') {
+    const el = document.querySelector('.storage-panel__content') as HTMLElement;
+    if (el) el.scrollTop = el.scrollHeight;
+    return;
+  }
+  if (section === 'page') {
+    const iframe = document.querySelector(
+      '.page-panel__content iframe',
+    ) as HTMLIFrameElement;
+    if (iframe?.contentDocument) {
+      const scrollEl =
+        iframe.contentDocument.scrollingElement ||
+        iframe.contentDocument.documentElement ||
+        iframe.contentDocument.body;
+      if (scrollEl) scrollEl.scrollTop = scrollEl.scrollHeight;
+    }
+    return;
+  }
+  if (section === 'system') {
+    const el = document.querySelector('.system-content') as HTMLElement;
+    if (el) el.scrollTop = el.scrollHeight;
+    return;
+  }
+};
+
 export const SectionLogActions = ({ section }: { section: SectionName }) => {
   const clearRecord = useSocketMessageStore((state) => state.clearRecord);
   const { address = '' } = useSearch();
 
   return (
     <Space size={8}>
+      <Tooltip title="Scroll to bottom">
+        <Button
+          size="small"
+          icon={<VerticalAlignBottomOutlined />}
+          onClick={() => scrollToSectionEnd(section)}
+        />
+      </Tooltip>
       <Button
         size="small"
         icon={<DownloadOutlined />}

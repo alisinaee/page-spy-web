@@ -85,6 +85,21 @@ export const MainContent = memo(() => {
     }
   }, [consoleDataList, isAutoScroll]);
 
+  useEffect(() => {
+    const handleScrollToEnd = () => {
+      if (consoleDataList.length > 0) {
+        consoleListRef.current?.scrollToItem(consoleDataList.length - 1, 'end');
+      }
+    };
+    window.addEventListener('devtools:scroll-console-end', handleScrollToEnd);
+    return () => {
+      window.removeEventListener(
+        'devtools:scroll-console-end',
+        handleScrollToEnd,
+      );
+    };
+  }, [consoleDataList]);
+
   return (
     <div className="main-content">
       <ConsoleList

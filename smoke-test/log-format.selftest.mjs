@@ -63,3 +63,66 @@ assert(redacted.storage.cookie === '<redacted>', JSON.stringify(redacted));
 assert(redacted.storage.localStorage[0].value === 'keep', JSON.stringify(redacted));
 
 console.log('log-format self-test ok');
+
+import { createBoxLineGrouper } from './log-format.js';
+
+const flushed = [];
+const grouper = createBoxLineGrouper((item) => flushed.push(item));
+
+// 1. Separate feed() calls for GO_ROUTE box: start line, content line with |, end line.
+grouper.feed('\x1b[38;5;4m┌───────────────────────────────────────────────────────────\x1b[0m', { level: 'log' });
+grouper.feed('\x1b[38;5;4m│ [GO_ROUTE] | 8:28:32 726ms | operation=pop location=null name=null query={}\x1b[0m', { level: 'log' });
+grouper.feed('└───────────────────────────────────────────────────────────', { level: 'log' });
+
+// 2. Separate feed() calls for a JSON box
+grouper.feed('\x1b[38;5;4m┌───────────────────────────────────────────────────────────\x1b[0m', { level: 'log' });
+grouper.feed('│ {', { level: 'log' });
+grouper.feed('│   "ok": true', { level: 'log' });
+grouper.feed('│ }', { level: 'log' });
+grouper.feed('\x1b[38;5;4m└───────────────────────────────────────────────────────────\x1b[0m', { level: 'log' });
+
+// 3. While a box is open, feed normal line with | pipe at level warn
+grouper.feed('┌───────────────────────────────────────────────────────────', { level: 'log' });
+grouper.feed('│ box content before pipe', { level: 'log' });
+grouper.feed('normal line with | pipe', { level: 'warn' });
+
+// 4. Normal line: 0
+grouper.feed(0, { level: 'info' });
+
+// 5. Normal line: false
+grouper.feed(false, { level: 'log' });
+
+// 6. Warning with no box
+grouper.feed('warning without box', { level: 'warn' });
+
+grouper.flush();
+
+assert(flushed.length === 7, 'Expected 7 items, got ' + flushed.length);
+
+// Assertions for GO_ROUTE box: includes [GO_ROUTE] and |, and includes no ┌, └, or │
+assert(flushed[0].message.includes('[GO_ROUTE]'), flushed[0].message);
+assert(flushed[0].message.includes('|'), flushed[0].message);
+assert(!flushed[0].message.includes('┌'), flushed[0].message);
+assert(!flushed[0].message.includes('└'), flushed[0].message);
+assert(!flushed[0].message.includes('│'), flushed[0].message);
+
+// Assertions for JSON box: stored message still has the two-space indent before "ok", and no │
+assert(flushed[1].message.includes('  "ok": true'), flushed[1].message);
+assert(!flushed[1].message.includes('│'), flushed[1].message);
+
+// Assertions for open box flush on normal line with | pipe
+assert(flushed[2].message === 'box content before pipe', flushed[2].message);
+assert(flushed[3].message === 'normal line with | pipe', flushed[3].message);
+assert(flushed[3].level === 'warn', flushed[3].level);
+
+// Number 0 and false stay their own items
+assert(flushed[4].message === '0', flushed[4].message);
+assert(flushed[4].level === 'info', flushed[4].level);
+assert(flushed[5].message === 'false', flushed[5].message);
+assert(flushed[5].level === 'log', flushed[5].level);
+
+// Warning with no box stays its own item
+assert(flushed[6].message === 'warning without box', flushed[6].message);
+assert(flushed[6].level === 'warn', flushed[6].level);
+
+console.log('box line grouper self-test ok');

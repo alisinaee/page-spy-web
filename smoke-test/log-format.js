@@ -182,3 +182,114 @@ export const redactSecrets = (value, seen = new Set()) => {
   seen.delete(value);
   return result;
 };
+
+const ANSI_REGEX = /\x1b\[[0-9;]*[a-zA-Z]/g;
+
+export const stripAnsi = (value) => String(value ?? '').replace(ANSI_REGEX, '');
+
+const BOX_CHARS_REGEX = /[┌┐└┘│├┤┬┴┼─]/;
+
+export const isBoxSeparator = (line) => {
+  const stripped = stripAnsi(line).trim();
+  if (!stripped) return false;
+  return (
+    /^[┌┐└┘│├┤┬┴┼─\s_\-]+$/.test(stripped) && BOX_CHARS_REGEX.test(stripped)
+  );
+};
+
+export const stripBoxBorder = (line) => {
+  const cleaned = stripAnsi(line);
+  return cleaned.replace(/^[ \t]*│ ?/, '').replace(/ ?│[ \t]*$/, '');
+};
+
+export function createBoxLineGrouper(onFlush) {
+  let inBox = false;
+  let lines = [];
+  let firstMeta = null;
+
+  const flush = () => {
+    if (!lines.length) {
+      inBox = false;
+      firstMeta = null;
+      return;
+    }
+    const joined = lines.join('\n');
+    onFlush({
+      message: joined,
+      level: firstMeta?.level || 'log',
+      meta: firstMeta,
+    });
+    lines = [];
+    firstMeta = null;
+    inBox = false;
+  };
+
+  const feedOneLine = (rawLine, meta) => {
+    const rawStr = String(rawLine ?? '');
+    const hasStart = /[┌]/.test(rawStr);
+    const hasEnd = /[└┘]/.test(rawStr);
+    const hasBoxChar = BOX_CHARS_REGEX.test(rawStr);
+
+    if (hasStart) {
+      flush();
+      inBox = true;
+      if (!isBoxSeparator(rawStr)) {
+        const content = stripBoxBorder(rawStr);
+        if (content) {
+          lines.push(content);
+          if (!firstMeta) firstMeta = meta;
+        }
+      }
+      return;
+    }
+
+    if (inBox) {
+      if (hasEnd) {
+        if (!isBoxSeparator(rawStr)) {
+          const content = stripBoxBorder(rawStr);
+          if (content) {
+            lines.push(content);
+            if (!firstMeta) firstMeta = meta;
+          }
+        }
+        flush();
+        return;
+      }
+
+      if (hasBoxChar) {
+        if (isBoxSeparator(rawStr)) {
+          return;
+        }
+        const content = stripBoxBorder(rawStr);
+        if (!firstMeta) firstMeta = meta;
+        lines.push(content);
+        if (lines.length >= 150) {
+          flush();
+          inBox = true;
+        }
+        return;
+      }
+
+      // A normal line flushes the open group
+      flush();
+    }
+
+    // Normal line not in box
+    if (isBoxSeparator(rawStr)) return;
+    onFlush({
+      message: stripAnsi(rawStr),
+      level: meta?.level || 'log',
+      meta,
+    });
+  };
+
+  const feed = (rawArg, meta) => {
+    const rawStr = String(rawArg ?? '');
+    const splitLines = rawStr.split(/\r?\n/);
+    for (const line of splitLines) {
+      feedOneLine(line, meta);
+    }
+  };
+
+  return { feed, flush };
+}

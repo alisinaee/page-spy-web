@@ -1,4 +1,39 @@
 import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const DEVICE_LOGGER_LOAD = 'if(typeof window.__pageSpyLoadDeviceLogs!=="function"){window.__pageSpyLoadDeviceLogs=function(){if(window.PageSpyClientLogs){try{if(window.PageSpyClientLogs.install)window.PageSpyClientLogs.install()}catch(e){}return Promise.resolve()}if(window.__pageSpyDeviceLoggerPromise)return window.__pageSpyDeviceLoggerPromise;window.__pageSpyDeviceLoggerPromise=new Promise(function(resolve,reject){var src="";var scripts=document.getElementsByTagName("script");for(var i=0;i<scripts.length;i++){var item=scripts[i].src||"";if(item.indexOf("page-spy/index.min.js")!==-1)src=item}var base=src?src.replace(/[^\\/]*$/,""):"";if(!base){reject(new Error("sdk"));return}var el=document.createElement("script");el.type="module";el.src=base+"client-logs.js";el.onload=function(){try{if(window.PageSpyClientLogs&&window.PageSpyClientLogs.install)window.PageSpyClientLogs.install()}catch(e){}resolve()};el.onerror=function(){reject(new Error("device logger"))};(document.head||document.documentElement).appendChild(el)});return window.__pageSpyDeviceLoggerPromise}}';
+const DEVICE_LOGGER_OPEN = 'var openDeviceLogs=function(){try{if(window.PageSpyClientLogs&&window.PageSpyClientLogs.install)window.PageSpyClientLogs.install()}catch(err){}if(window.PageSpyClientLogs&&window.PageSpyClientLogs.openViewer){window.PageSpyClientLogs.openViewer();return 1}return 0};if(!openDeviceLogs()){' + DEVICE_LOGGER_LOAD + 'window.__pageSpyLoadDeviceLogs().then(function(){if(!openDeviceLogs())Toast.message("On-device log viewer is not on this page")}).catch(function(){Toast.message("On-device log viewer failed to load")})}';
+const DEVICE_LOGGER_OPEN_BROKEN = 'var openDeviceLogs=function(){try{if(window.PageSpyClientLogs&&window.PageSpyClientLogs.install)window.PageSpyClientLogs.install()}catch(err){}if(window.PageSpyClientLogs&&window.PageSpyClientLogs.openViewer){window.PageSpyClientLogs.openViewer();return 1}return 0};if(!openDeviceLogs()){var loadDeviceLogs=window.__pageSpyLoadDeviceLogs;if(typeof loadDeviceLogs==="function"){loadDeviceLogs().then(function(){if(!openDeviceLogs())Toast.message("On-device log viewer is not on this page")}).catch(function(){Toast.message("On-device log viewer failed to load")})}else{Toast.message("On-device log viewer is not on this page")}}';
+
+
+const DEVICE_DIALOG_EXTRAS = [
+  'var _btnMaster=document.createElement("button");',
+  '_btnMaster.type="button";',
+  '_btnMaster.id="page-spy-logs-toggle";',
+  '_btnMaster.className="page-spy-btn";',
+  '_btnMaster.innerHTML=\'<span>Logs ON</span>\';',
+  '_btnMaster.onclick=function(e){e.preventDefault();e.stopPropagation();var apply=function(){if(!window.PageSpyClientLogs||typeof window.PageSpyClientLogs.toggleMaster!=="function")return;var on=window.PageSpyClientLogs.toggleMaster();var span=_btnMaster.querySelector("span");if(span)span.textContent=on?"Logs ON":"Logs OFF"};if(window.PageSpyClientLogs&&window.PageSpyClientLogs.toggleMaster){apply()}else if(typeof window.__pageSpyLoadDeviceLogs==="function"){window.__pageSpyLoadDeviceLogs().then(apply)}else{Toast.message("On-device log viewer is not on this page")}};',
+  'var _btnSettings=document.createElement("button");',
+  '_btnSettings.type="button";',
+  '_btnSettings.id="page-spy-log-settings";',
+  '_btnSettings.className="page-spy-btn";',
+  '_btnSettings.innerHTML=\'<span>Settings</span>\';',
+  '_btnSettings.onclick=function(e){e.preventDefault();e.stopPropagation();var apply=function(){if(window.PageSpyClientLogs&&window.PageSpyClientLogs.openSettings)window.PageSpyClientLogs.openSettings()};if(window.PageSpyClientLogs&&window.PageSpyClientLogs.openSettings){apply()}else if(typeof window.__pageSpyLoadDeviceLogs==="function"){window.__pageSpyLoadDeviceLogs().then(apply)}else{Toast.message("On-device log viewer is not on this page")}};',
+].join('');
+
+const DEVICE_LOGGER_BOOT = ';if(typeof window!=="undefined"&&!window.__pageSpyLoadDeviceLogs){window.__pageSpyLoadDeviceLogs=function(){if(window.PageSpyClientLogs){try{if(window.PageSpyClientLogs.install)window.PageSpyClientLogs.install()}catch(e){}return Promise.resolve()}if(window.__pageSpyDeviceLoggerPromise)return window.__pageSpyDeviceLoggerPromise;window.__pageSpyDeviceLoggerPromise=new Promise(function(resolve,reject){var src="";if(document.currentScript&&document.currentScript.src)src=document.currentScript.src;if(!src){var scripts=document.getElementsByTagName("script");for(var i=0;i<scripts.length;i++){var item=scripts[i].src||"";if(item.indexOf("page-spy/index.min.js")!==-1)src=item}}var base=src?src.replace(/[^/]*$/,""):"";if(!base){reject(new Error("sdk"));return}var el=document.createElement("script");el.type="module";el.src=base+"client-logs.js";el.onload=function(){try{if(window.PageSpyClientLogs&&window.PageSpyClientLogs.install)window.PageSpyClientLogs.install()}catch(e){}resolve()};el.onerror=function(){reject(new Error("device logger"))};(document.head||document.documentElement).appendChild(el)});return window.__pageSpyDeviceLoggerPromise};window.__pageSpyLoadDeviceLogs()}';
+
+function publishDeviceLogger(sdkFilePath) {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const root = path.resolve(here, '..');
+  const destDir = path.dirname(path.resolve(sdkFilePath));
+  for (const name of ['client-logs.js', 'log-format.js']) {
+    fs.copyFileSync(path.join(root, 'smoke-test', name), path.join(destDir, name));
+  }
+  console.log(`published device logger to ${destDir}`);
+}
+
 
 const TYPED_ARRAY_RETURN = 'if(isTypedArray(e))return"[object TypedArray]";';
 const BLOB_RETURN = 'if(isBlob(e))return"[object Blob]";';
@@ -215,10 +250,13 @@ function patchSdk(filePath) {
 
   // 5. Patch PagePlugin to send snapshot on init/join
   const PAGE_PLUGIN_OLD = 'class PagePlugin{constructor(){_defineProperty(this,"name","PagePlugin"),_defineProperty(this,"$pageSpyConfig",null)}onInit(e){let{config:t}=e;PagePlugin.hasInitd||(PagePlugin.hasInitd=!0,this.$pageSpyConfig=t,socketStore.addListener("refresh",((e,t)=>{let{source:r}=e;const{data:n}=r;if("page"===n){var o,a;const e=PagePlugin.collectHtml();if(!1===(null===(o=this.$pageSpyConfig)||void 0===o||null===(o=o.dataProcessor)||void 0===o||null===(a=o.page)||void 0===a?void 0:a.call(o,e)))return;const r=makeMessage("page",e);socketStore.dispatchEvent("public-data",r),t(r)}})))}onReset(){PagePlugin.hasInitd=!1}static collectHtml(){return{html:document.documentElement.outerHTML,location:window.location}}}';
-  const PAGE_PLUGIN_NEW = 'class PagePlugin{constructor(){_defineProperty(this,"name","PagePlugin"),_defineProperty(this,"$pageSpyConfig",null)}onInit(e){let{config:t}=e;if(!PagePlugin.hasInitd){PagePlugin.hasInitd=!0,this.$pageSpyConfig=t;const send=(cb)=>{var o,a;const e=PagePlugin.collectHtml();if(!1===(null===(o=this.$pageSpyConfig)||void 0===o||null===(o=o.dataProcessor)||void 0===o||null===(a=o.page)||void 0===a?void 0:a.call(o,e)))return;const r=makeMessage("page",e);socketStore.dispatchEvent("public-data",r);if(typeof cb==="function"){cb(r)}else{socketStore.broadcastMessage(r)}};socketStore.addListener("refresh",((e,t)=>{let{source:r}=e;const{data:n}=r;if("page"===n){send(t)}}));socketStore.addListener("debugger-online",(()=>{send()}));socketStore.addListener("harbor-clear",(()=>{send()}));}}onReset(){PagePlugin.hasInitd=!1}static collectHtml(){return{html:document.documentElement?document.documentElement.outerHTML:"",location:window.location?{href:window.location.href,origin:window.location.origin,protocol:window.location.protocol,host:window.location.host,hostname:window.location.hostname,port:window.location.port,pathname:window.location.pathname,search:window.location.search,hash:window.location.hash}:null}}}';
+  const PAGE_PLUGIN_PREV = 'class PagePlugin{constructor(){_defineProperty(this,"name","PagePlugin"),_defineProperty(this,"$pageSpyConfig",null)}onInit(e){let{config:t}=e;if(!PagePlugin.hasInitd){PagePlugin.hasInitd=!0,this.$pageSpyConfig=t;const send=(cb)=>{var o,a;const e=PagePlugin.collectHtml();if(!1===(null===(o=this.$pageSpyConfig)||void 0===o||null===(o=o.dataProcessor)||void 0===o||null===(a=o.page)||void 0===a?void 0:a.call(o,e)))return;const r=makeMessage("page",e);socketStore.dispatchEvent("public-data",r);if(typeof cb==="function"){cb(r)}else{socketStore.broadcastMessage(r)}};socketStore.addListener("refresh",((e,t)=>{let{source:r}=e;const{data:n}=r;if("page"===n){send(t)}}));socketStore.addListener("debugger-online",(()=>{send()}));socketStore.addListener("harbor-clear",(()=>{send()}));}}onReset(){PagePlugin.hasInitd=!1}static collectHtml(){return{html:document.documentElement?document.documentElement.outerHTML:"",location:window.location?{href:window.location.href,origin:window.location.origin,protocol:window.location.protocol,host:window.location.host,hostname:window.location.hostname,port:window.location.port,pathname:window.location.pathname,search:window.location.search,hash:window.location.hash}:null}}}';
+  const PAGE_PLUGIN_NEW = 'class PagePlugin{constructor(){_defineProperty(this,"name","PagePlugin"),_defineProperty(this,"$pageSpyConfig",null)}onInit(e){let{config:t}=e;if(!PagePlugin.hasInitd){PagePlugin.hasInitd=!0,this.$pageSpyConfig=t;const send=(cb)=>{try{if(typeof window!=="undefined"&&window.PageSpyClientLogs){var _s=window.PageSpyClientLogs.getSettings?window.PageSpyClientLogs.getSettings():null;if(_s&&_s.pageSnapshots===false)return;}}catch(_e){}var o,a;const e=PagePlugin.collectHtml();if(!1===(null===(o=this.$pageSpyConfig)||void 0===o||null===(o=o.dataProcessor)||void 0===o||null===(a=o.page)||void 0===a?void 0:a.call(o,e)))return;const r=makeMessage("page",e);socketStore.dispatchEvent("public-data",r);if(typeof cb==="function"){cb(r)}else{socketStore.broadcastMessage(r)}};socketStore.addListener("refresh",((e,t)=>{let{source:r}=e;const{data:n}=r;if("page"===n){send(t)}}));socketStore.addListener("debugger-online",(()=>{send()}));socketStore.addListener("harbor-clear",(()=>{send()}));}}onReset(){PagePlugin.hasInitd=!1}static collectHtml(){return{html:document.documentElement?document.documentElement.outerHTML:"",location:window.location?{href:window.location.href,origin:window.location.origin,protocol:window.location.protocol,host:window.location.host,hostname:window.location.hostname,port:window.location.port,pathname:window.location.pathname,search:window.location.search,hash:window.location.hash}:null}}}';
 
   if (next.includes(PAGE_PLUGIN_OLD)) {
     next = next.replace(PAGE_PLUGIN_OLD, PAGE_PLUGIN_NEW);
+  } else if (next.includes(PAGE_PLUGIN_PREV)) {
+    next = next.replace(PAGE_PLUGIN_PREV, PAGE_PLUGIN_NEW);
   } else if (!next.includes(PAGE_PLUGIN_NEW)) {
     throw new Error(`PagePlugin definition not found in ${filePath}`);
   }
@@ -239,7 +277,7 @@ function patchSdk(filePath) {
     '_btnView.id="page-spy-see-logs";',
     '_btnView.className="page-spy-btn";',
     '_btnView.innerHTML=\'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s4-6 10-6 10 6 10 6-4 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.5"/></svg><span>See logs</span>\';',
-    '_btnView.onclick=function(e){e.preventDefault();e.stopPropagation();if(window.PageSpyClientLogs&&window.PageSpyClientLogs.openViewer){window.PageSpyClientLogs.openViewer()}else{var ul="".concat(n,"/#/devtools?address=").concat(encodeURIComponent(this.address||""));s&&i&&(ul+="&secret=".concat(i));window.open(ul,"_blank")}}.bind(this);',
+    '_btnView.onclick=function(e){e.preventDefault();e.stopPropagation();if(window.$pageSpy&&window.$pageSpy.constructor&&window.$pageSpy.constructor.modal&&typeof window.$pageSpy.constructor.modal.close==="function"){try{window.$pageSpy.constructor.modal.close()}catch(err){}}' + DEVICE_LOGGER_OPEN + '}.bind(this);',
     'var _btnClear=document.createElement("button");',
     '_btnClear.type="button";',
     '_btnClear.id="page-spy-clear-logs";',
@@ -254,22 +292,64 @@ function patchSdk(filePath) {
     '})()',
   ].join('');
 
+  const SDK_PREV_SEE_LOGS = '_btnView.onclick=function(e){e.preventDefault();e.stopPropagation();if(window.PageSpyClientLogs&&window.PageSpyClientLogs.openViewer){window.PageSpyClientLogs.openViewer()}';
+  const SDK_NEW_SEE_LOGS = '_btnView.onclick=function(e){e.preventDefault();e.stopPropagation();if(window.$pageSpy&&window.$pageSpy.constructor&&window.$pageSpy.constructor.modal&&typeof window.$pageSpy.constructor.modal.close==="function"){try{window.$pageSpy.constructor.modal.close()}catch(err){}}if(window.PageSpyClientLogs&&window.PageSpyClientLogs.openViewer){window.PageSpyClientLogs.openViewer()}';
+
   if (next.includes(SDK_TARGET)) {
     next = next.replace(SDK_TARGET, SDK_REPLACEMENT);
+  } else if (next.includes(SDK_PREV_SEE_LOGS)) {
+    next = next.replace(SDK_PREV_SEE_LOGS, SDK_NEW_SEE_LOGS);
   } else if (!next.includes('_btnDl')) {
     throw new Error(`SDK startRender anchor not found in ${filePath}`);
+  }
+
+  const panelFallback = 'if(window.PageSpyClientLogs&&window.PageSpyClientLogs.openViewer){window.PageSpyClientLogs.openViewer()}else{var ul="".concat(n,"/#/devtools?address=").concat(encodeURIComponent(this.address||""));s&&i&&(ul+="&secret=".concat(i));window.open(ul,"_blank")}';
+  if (next.includes(panelFallback)) {
+    next = next.replace(panelFallback, DEVICE_LOGGER_OPEN);
+  }
+  if (next.includes('window.open(ul,"_blank")')) {
+    throw new Error('See logs still opens the remote panel');
+  }
+  if (next.includes(DEVICE_LOGGER_OPEN_BROKEN)) {
+    next = next.replace(DEVICE_LOGGER_OPEN_BROKEN, DEVICE_LOGGER_OPEN);
+  }
+  if (!next.includes('base+"client-logs.js"')) {
+    next += DEVICE_LOGGER_BOOT;
   }
 
   const pageSpyExport = "\n;if(typeof window !== 'undefined'){window.PageSpy=PageSpy;};\n";
   if (!next.includes("window.PageSpy=PageSpy")) {
     next += pageSpyExport;
   }
+  if (!next.includes('page-spy-logs-toggle')) {
+    const clearStart = 'var _btnClear=document.createElement("button");';
+    if (!next.includes(clearStart)) {
+      throw new Error('clear button anchor missing');
+    }
+    next = next.replace(clearStart, DEVICE_DIALOG_EXTRAS + clearStart);
+    next = next.replace(
+      'footer:[m,_btnDl,_btnView,_btnClear]',
+      'footer:[m,_btnDl,_btnView,_btnMaster,_btnSettings,_btnClear]',
+    );
+    next = next.replace(
+      '#page-spy-see-logs,#page-spy-clear-logs{',
+      '#page-spy-see-logs,#page-spy-logs-toggle,#page-spy-log-settings,#page-spy-clear-logs{',
+    );
+  }
+  if (next.includes('(()=>{var _btnDl=document.createElement("button");') && !next.includes('(()=>{' + 'if(typeof window.__pageSpyLoadDeviceLogs')) {
+    next = next.replace(
+      '(()=>{var _btnDl=document.createElement("button");',
+      '(()=>{' + DEVICE_LOGGER_LOAD + ';var _btnDl=document.createElement("button");',
+    );
+  }
+
   if (next !== source) {
     fs.writeFileSync(filePath, next);
     console.log(`patched ${filePath}`);
   } else {
     console.log(`already patched ${filePath}`);
   }
+  publishDeviceLogger(filePath);
 }
 
 async function selfTest() {
