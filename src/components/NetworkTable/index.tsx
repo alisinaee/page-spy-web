@@ -1,6 +1,5 @@
 /* eslint-disable no-case-declarations */
 import { SpyStorage } from '@huolala-tech/page-spy-types';
-import { Dropdown, Empty, Space, Tooltip, Flex } from 'antd';
 import clsx from 'clsx';
 import copy from 'copy-to-clipboard';
 import { throttle } from 'lodash-es';
@@ -11,11 +10,12 @@ import { useTranslation } from 'react-i18next';
 import './index.less';
 import { NetworkDetail } from './NetworkDetail';
 import { ResolvedNetworkInfo } from '@/utils';
+import { ChevronDown, Info, ChevronUp } from 'lucide-react';
 import {
-  CaretDownOutlined,
-  InfoCircleOutlined,
-  CaretUpOutlined,
-} from '@ant-design/icons';
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import {
   Table,
   Column,
@@ -28,6 +28,7 @@ import 'react-virtualized/styles.css';
 import Draggable from 'react-draggable';
 import { NetworkType, RESOURCE_TYPE } from './TypeFilter';
 import { useEventListener } from '@/utils/useEventListener';
+import React from 'react';
 
 const columnField = [
   'name',
@@ -40,7 +41,9 @@ const columnField = [
 type ColumnField = (typeof columnField)[number];
 
 const NoData = () => (
-  <Empty description={false} className="empty-table-placeholder" />
+  <div className="empty-table-placeholder text-center py-12 text-muted-foreground text-xs">
+    No data
+  </div>
 );
 
 const buildCurl = (
@@ -88,6 +91,19 @@ export const NetworkTable = ({
   const [sortDirection, setSortDirection] = useState<
     SortDirectionType | undefined
   >(undefined);
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    row: ResolvedNetworkInfo;
+  } | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = () => setContextMenu(null);
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, []);
 
   // See: https://github.com/HuolalaTech/page-spy-web/issues/382
   const removeDuplicatedData = useMemo(() => {
@@ -175,6 +191,7 @@ export const NetworkTable = ({
         default:
           throw Error('Unknown key');
       }
+      setContextMenu(null);
     },
     [cookie],
   );
@@ -241,17 +258,17 @@ export const NetworkTable = ({
   const headerRenderer = useCallback<TableHeaderRenderer>(
     ({ dataKey, label }) => (
       <>
-        <Flex justify="space-between" align="center">
+        <div className="flex items-center justify-between w-full">
           <div className="ReactVirtualized__Table__headerTruncatedText">
             {label}
           </div>
           {sortBy === dataKey &&
             (sortDirection === 'ASC' ? (
-              <CaretUpOutlined />
+              <ChevronUp className="w-3.5 h-3.5 ml-1" />
             ) : (
-              <CaretDownOutlined />
+              <ChevronDown className="w-3.5 h-3.5 ml-1" />
             ))}
-        </Flex>
+        </div>
         <Draggable
           axis="x"
           defaultClassName="DragHandle"
@@ -281,77 +298,53 @@ export const NetworkTable = ({
     ),
     [sortBy, sortDirection],
   );
-  const NameColumn = useCallback<TableCellRenderer>(
-    ({ rowData }) => {
-      return (
-        <Dropdown
-          menu={{
-            items: [
-              {
-                key: 'open-in-new-tab',
-                label: nt('open-in-new-tab'),
-              },
-              {
-                key: 'copy-link',
-                label: nt('copy-link-address'),
-              },
-              { key: 'copy-cURL', label: nt('copy-as-curl') },
-              { key: 'copy-full-log', label: nt('copy-full-log') },
-            ],
-            onClick: ({ key }) => {
-              onMenuClick(key, rowData);
-            },
-          }}
-          trigger={['contextMenu']}
-        >
-          <div
-            title={rowData.name}
-            onClick={(evt: any) => {
-              setShowDetail(true);
-              setLeftDistance(evt.target.parentElement?.clientWidth);
-            }}
-            style={{
-              overflow: 'hidden',
-              whiteSpace: 'nowrap',
-              textOverflow: 'ellipsis',
-              height: '100%',
-              lineHeight: '30px',
-            }}
-          >
-            {rowData.name}
-          </div>
-        </Dropdown>
-      );
-    },
-    [nt, onMenuClick],
-  );
+  const NameColumn = useCallback<TableCellRenderer>(({ rowData }) => {
+    return (
+      <div
+        title={rowData.name}
+        onClick={(evt: any) => {
+          setShowDetail(true);
+          setLeftDistance(evt.target.parentElement?.clientWidth);
+        }}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setContextMenu({
+            x: e.clientX,
+            y: e.clientY,
+            row: rowData,
+          });
+        }}
+        style={{
+          overflow: 'hidden',
+          whiteSpace: 'nowrap',
+          textOverflow: 'ellipsis',
+          height: '100%',
+          lineHeight: '30px',
+          cursor: 'pointer',
+        }}
+      >
+        {rowData.name}
+      </div>
+    );
+  }, []);
   const StatusColumn = useCallback<TableCellRenderer>(({ rowData }) => {
     const { status, text } = getStatusInfo(rowData);
     return status === 'unknown' ? (
-      <Space>
+      <div className="flex items-center gap-1.5">
         <span>{text}</span>
-        <Tooltip
-          title={
-            <span>
-              The status code is {rowData.status}, see{' '}
-              <a
-                style={{
-                  color: 'white',
-                  textDecoration: 'underline',
-                  textUnderlineOffset: 3,
-                }}
-                href="https://developer.mozilla.org/en-US/docs/Web/API/PerformanceResourceTiming/responseStatus"
-                target="_blank"
-              >
-                MDN
-              </a>
-              .
-            </span>
-          }
-        >
-          <InfoCircleOutlined />
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <span className="cursor-pointer">
+                <Info className="w-3.5 h-3.5 text-muted-foreground" />
+              </span>
+            }
+          />
+          <TooltipContent>
+            <span>The status code is {rowData.status}, see MDN.</span>
+          </TooltipContent>
         </Tooltip>
-      </Space>
+      </div>
     ) : (
       text
     );
@@ -442,6 +435,45 @@ export const NetworkTable = ({
           );
         }}
       </AutoSizer>
+
+      {/* Floating context menu for row */}
+      {contextMenu && (
+        <div
+          className="fixed z-50 min-w-[160px] rounded-md border border-border bg-popover p-1 shadow-md text-popover-foreground text-xs"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            className="w-full text-left px-2.5 py-1.5 rounded-sm hover:bg-accent hover:text-accent-foreground cursor-pointer"
+            onClick={() => onMenuClick('open-in-new-tab', contextMenu.row)}
+          >
+            {nt('open-in-new-tab')}
+          </button>
+          <button
+            type="button"
+            className="w-full text-left px-2.5 py-1.5 rounded-sm hover:bg-accent hover:text-accent-foreground cursor-pointer"
+            onClick={() => onMenuClick('copy-link', contextMenu.row)}
+          >
+            {nt('copy-link-address')}
+          </button>
+          <button
+            type="button"
+            className="w-full text-left px-2.5 py-1.5 rounded-sm hover:bg-accent hover:text-accent-foreground cursor-pointer"
+            onClick={() => onMenuClick('copy-cURL', contextMenu.row)}
+          >
+            {nt('copy-as-curl')}
+          </button>
+          <button
+            type="button"
+            className="w-full text-left px-2.5 py-1.5 rounded-sm hover:bg-accent hover:text-accent-foreground cursor-pointer"
+            onClick={() => onMenuClick('copy-full-log', contextMenu.row)}
+          >
+            {nt('copy-full-log')}
+          </button>
+        </div>
+      )}
+
       {showDetail && activeRow && (
         <div
           className="network-detail"

@@ -1,11 +1,15 @@
 import { usePopupRef } from '@/utils/withPopup';
-import { Tooltip, Button, Space } from 'antd';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useHref } from 'react-router-dom';
 import { IArgs, SecretModal } from './SecretModal';
-import Icon from '@ant-design/icons';
 import LockSvg from '@/assets/image/lock.svg?react';
+import { Button } from '@/components/ui/button';
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from '@/components/ui/tooltip';
 
 interface Props {
   room: I.SpyRoom;
@@ -31,26 +35,36 @@ export const DebugButton = ({ room }: Props) => {
     } catch (e) {}
   }, [address, devtoolPath, modalRef, useSecret]);
 
+  const buttonElement = (
+    <Button
+      variant="default"
+      size="touch"
+      disabled={!client}
+      className="w-full rounded-full flex items-center justify-center gap-2 font-medium"
+      onClick={startDebug}
+    >
+      {room.useSecret && <LockSvg className="size-4" />}
+      <span>{t('common.debug')}</span>
+    </Button>
+  );
+
   return (
-    <Tooltip title={!client && t('socket.client-not-in-connection')}>
-      <div>
-        <Button
-          type="primary"
-          disabled={!client}
-          style={{
-            width: '100%',
-            pointerEvents: !client ? 'none' : 'auto',
-          }}
-          shape="round"
-          onClick={startDebug}
-        >
-          <Space style={{ display: 'flex', justifyContent: 'center' }}>
-            {room.useSecret && <Icon component={LockSvg} />}
-            {t('common.debug')}
-          </Space>
-        </Button>
-        <SecretModal ref={modalRef} />
-      </div>
-    </Tooltip>
+    <div>
+      {!client ? (
+        <Tooltip>
+          <TooltipTrigger
+            render={<span className="block w-full cursor-not-allowed" />}
+          >
+            {buttonElement}
+          </TooltipTrigger>
+          <TooltipContent>
+            {t('socket.client-not-in-connection')}
+          </TooltipContent>
+        </Tooltip>
+      ) : (
+        buttonElement
+      )}
+      <SecretModal ref={modalRef} />
+    </div>
   );
 };

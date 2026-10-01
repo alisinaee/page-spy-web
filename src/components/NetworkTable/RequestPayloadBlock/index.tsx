@@ -1,9 +1,11 @@
 import { isString } from 'lodash-es';
 import { useMemo } from 'react';
-import { Alert } from 'antd';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
 import { EntriesBody } from '@/components/EntriesBody';
 import { ColoredJson } from '../ColoredJson';
 import { LOST_REQUEST_BODIES } from '../body-codec';
+import React from 'react';
 
 export const RequestPayloadBlock: React.FC<{
   data: string | [string, string][];
@@ -13,12 +15,15 @@ export const RequestPayloadBlock: React.FC<{
     if (isString(data)) {
       if (LOST_REQUEST_BODIES.has(data)) {
         return (
-          <Alert
-            type="warning"
-            showIcon
-            message="Request body not captured"
-            description="Client sent raw bytes. This session only stored a placeholder, so the POST body and cURL cannot include the real data. Reload the app after the debugger SDK update, then capture the call again."
-          />
+          <Alert className="border-amber-500/50 bg-amber-500/10 text-amber-500">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Request body not captured</AlertTitle>
+            <AlertDescription className="text-xs text-muted-foreground mt-1">
+              Client sent raw bytes. This session only stored a placeholder, so
+              the POST body and cURL cannot include the real data. Reload the
+              app after the debugger SDK update, then capture the call again.
+            </AlertDescription>
+          </Alert>
         );
       }
       if (urlencoded) {

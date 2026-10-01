@@ -1,116 +1,31 @@
-import { isClient } from '@/utils/constants';
-import Icon from '@ant-design/icons';
-import { Divider, Dropdown, ConfigProvider, Flex } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import DocsSvg from '@/assets/image/docs.svg?react';
-import BugSvg from '@/assets/image/bug.svg?react';
 import OnlineSvg from '@/assets/image/online.svg?react';
-import ReplaySvg from '@/assets/image/replay.svg?react';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import clsx from 'clsx';
 import './index.less';
-import { CSSTransition } from 'react-transition-group';
 import { createPortal } from 'react-dom';
-import { useWhere } from '@/utils/useWhere';
-import { OpenDocSearch } from '@/components/DocSearch/OpenDocSearch';
-
-const githubRepo = import.meta.env.VITE_GITHUB_REPO.replace(
-  /^https?:\/\/github\.com\//,
-  '',
-).replace(/\/$/, '');
-const githubStarsUrl = `https://img.shields.io/github/stars/${githubRepo}?style=social`;
-
-const navDropdownConfig = {
-  components: {
-    Dropdown: {
-      colorBgElevated: '#313131',
-      colorText: '#eee',
-    },
-  },
-};
+import { Separator } from '@/components/ui/separator';
 
 export const NavMenuOnPc = () => {
-  const { isOSpy } = useWhere();
   const { t } = useTranslation();
 
   return (
-    <div className="nav-menu pc">
-      {/* Docs */}
-      <Link to="docs" className="menu-item doc">
-        <Flex align="center" gap={8}>
-          <Icon component={DocsSvg} style={{ fontSize: 18 }} />
-          <span>{t('common.doc')}</span>
-        </Flex>
-      </Link>
-      <Divider type="vertical" className="divider-bg" />
-      {isClient && !isOSpy && (
-        <>
-          <div className="menu-item debug-type">
-            <ConfigProvider theme={navDropdownConfig}>
-              <Dropdown
-                arrow
-                trigger={['click']}
-                menu={{
-                  items: [
-                    {
-                      key: 'online-debug',
-                      label: (
-                        <Link to="/room-list" className="menu-item online">
-                          <Flex align="center" gap={8}>
-                            <Icon
-                              component={OnlineSvg}
-                              style={{ fontSize: 18 }}
-                            />
-                            <span>{t('common.online-debug')}</span>
-                          </Flex>
-                        </Link>
-                      ),
-                    },
-                    {
-                      key: 'offline-debug',
-                      label: (
-                        <Link to="/log-list" className="menu-item offline">
-                          <Flex align="center" gap={8}>
-                            <Icon
-                              component={ReplaySvg}
-                              style={{ fontSize: 18 }}
-                            />
-                            <span>{t('common.offline-debug')}</span>
-                          </Flex>
-                        </Link>
-                      ),
-                    },
-                  ],
-                }}
-              >
-                <Flex align="center" gap={8}>
-                  <Icon component={BugSvg} style={{ fontSize: 18 }} />
-                  <span>{t('common.start-debug')}</span>
-                </Flex>
-              </Dropdown>
-            </ConfigProvider>
-          </div>
-          <Divider type="vertical" className="divider-bg" />
-        </>
-      )}
-      <a
-        href={import.meta.env.VITE_GITHUB_REPO}
-        target="_blank"
-        className="menu-item"
-        style={{ fontSize: 0 }}
+    <div className="nav-menu pc flex items-center gap-3">
+      <Link
+        to="/room-list"
+        className="menu-item online flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
       >
-        <img src={githubStarsUrl} alt="" />
-      </a>
+        <OnlineSvg className="size-4.5" />
+        <span>{t('common.connections')}</span>
+      </Link>
     </div>
   );
 };
 
 export const NavMenuOnMobile = () => {
-  const { isOSpy } = useWhere();
   const { t } = useTranslation();
   const [expand, setExpand] = useState(false);
-  const fixedMenuRef = useRef<HTMLDivElement | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
   const isDevtools = location.pathname.includes('/devtools');
@@ -118,7 +33,6 @@ export const NavMenuOnMobile = () => {
   return (
     <>
       <div className="nav-menu mobile">
-        <OpenDocSearch />
         <button
           className={clsx('menu-hamburger', {
             'is-expanded': expand,
@@ -126,6 +40,7 @@ export const NavMenuOnMobile = () => {
           onClick={() => {
             setExpand(!expand);
           }}
+          aria-label="Toggle navigation menu"
         >
           <div className="hamburger-box">
             <div className="hamburger-item top" />
@@ -134,16 +49,9 @@ export const NavMenuOnMobile = () => {
           </div>
         </button>
       </div>
-      {createPortal(
-        <CSSTransition
-          nodeRef={fixedMenuRef}
-          in={expand}
-          timeout={200}
-          classNames="fixed-menu-fade"
-          mountOnEnter
-          unmountOnExit
-        >
-          <div ref={fixedMenuRef} className="fixed-menu">
+      {expand &&
+        createPortal(
+          <div className="fixed-menu">
             {isDevtools && (
               <>
                 <div
@@ -171,54 +79,22 @@ export const NavMenuOnMobile = () => {
                     </div>
                   ),
                 )}
-                <Divider
-                  style={{
-                    margin: '8px 0',
-                    borderColor: 'rgba(255, 255, 255, 0.2)',
-                  }}
-                />
+                <Separator className="my-2 bg-border/40" />
               </>
             )}
-            {/* Docs */}
             <Link
-              to="docs"
-              className="menu-item doc"
+              to="room-list"
+              className="menu-item online flex items-center gap-2"
               onClick={() => {
                 setExpand(false);
               }}
             >
-              <Flex align="center" gap={8}>
-                <Icon component={DocsSvg} style={{ fontSize: 18 }} />
-                <span>{t('common.doc')}</span>
-              </Flex>
+              <OnlineSvg className="size-4.5" />
+              <span>{t('common.connections')}</span>
             </Link>
-            {isClient && !isOSpy && (
-              <>
-                {/* Connections */}
-                <Link
-                  to="room-list"
-                  className="menu-item online"
-                  onClick={() => {
-                    setExpand(false);
-                  }}
-                >
-                  <Flex align="center" gap={8}>
-                    <Icon component={OnlineSvg} style={{ fontSize: 18 }} />
-                    <span>{t('common.connections')}</span>
-                  </Flex>
-                </Link>
-              </>
-            )}
-            {/* GitHub */}
-            <div className="menu-item">
-              <a href={import.meta.env.VITE_GITHUB_REPO} target="_blank">
-                <img src={githubStarsUrl} alt="" />
-              </a>
-            </div>
-          </div>
-        </CSSTransition>,
-        document.querySelector('header') || document.body,
-      )}
+          </div>,
+          document.querySelector('header') || document.body,
+        )}
     </>
   );
 };

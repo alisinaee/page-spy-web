@@ -1,15 +1,12 @@
 /* eslint-disable react/no-unstable-nested-components */
 import { Column, TableCellProps } from 'react-virtualized';
 import { MessageTable } from '.';
-import Icon from '@ant-design/icons';
-import { Flex, Typography } from 'antd';
 import dayjs from 'dayjs';
 import { useMemo } from 'react';
 import ArrowUpSvg from '@/assets/image/arrow-up.svg?react';
 import ArrowDownSvg from '@/assets/image/arrow-down.svg?react';
 import { isNil } from 'lodash-es';
-
-const { Text } = Typography;
+import React from 'react';
 
 interface WebsocketData {
   id: string;
@@ -28,26 +25,39 @@ export const WebsocketTable = ({ data }: { data: WebsocketData[] }) => {
       })
       .filter((item) => !isNil(item.data));
   }, [data]);
+
   const DataColumn = ({ rowData }: TableCellProps) => {
     const isSend = rowData.type === 'send';
+    const ArrowComp = isSend ? ArrowUpSvg : ArrowDownSvg;
     return (
-      <Flex align="center" gap={8} style={{ height: '100%' }}>
-        <Icon
-          component={isSend ? ArrowUpSvg : ArrowDownSvg}
-          style={{ color: isSend ? '#156C2E' : '#B3261F', fontSize: 16 }}
+      <div className="flex items-center gap-2 h-full">
+        <ArrowComp
+          style={{
+            color: isSend ? '#156C2E' : '#B3261F',
+            width: 16,
+            height: 16,
+          }}
         />
-        <Text ellipsis>{rowData.data}</Text>
-      </Flex>
+        <span className="truncate block font-mono text-xs" title={rowData.data}>
+          {rowData.data}
+        </span>
+      </div>
     );
   };
 
   const LengthColumn = ({ rowData }: TableCellProps) => {
-    return <Text ellipsis>{rowData.data.length}</Text>;
+    return (
+      <span className="truncate block font-mono text-xs">
+        {rowData.data.length}
+      </span>
+    );
   };
 
   const TimeColumn = ({ rowData }: TableCellProps) => {
     return (
-      <Text ellipsis>{dayjs(rowData.timestamp).format('HH:mm:ss:SSS')}</Text>
+      <span className="truncate block font-mono text-xs text-muted-foreground">
+        {dayjs(rowData.timestamp).format('HH:mm:ss:SSS')}
+      </span>
     );
   };
 

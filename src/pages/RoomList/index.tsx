@@ -1,7 +1,6 @@
 import { getSpyRoom } from '@/apis';
 import {
   AllBrowserTypes,
-  AllMPTypes,
   ClientRoomInfo,
   OS_CONFIG,
   getBrowserLogo,
@@ -9,37 +8,24 @@ import {
   parseUserAgent,
 } from '@/utils/brand';
 import { useRequest } from 'ahooks';
-import {
-  Typography,
-  Row,
-  Col,
-  message,
-  Empty,
-  Button,
-  Input,
-  Form,
-  Select,
-  Space,
-  Layout,
-  Drawer,
-  Badge,
-} from 'antd';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import './index.less';
-import {
-  ClearOutlined,
-  SearchOutlined,
-  FilterOutlined,
-} from '@ant-design/icons';
+import { Search, RotateCcw, Filter, Inbox } from 'lucide-react';
 import { RoomCard } from './RoomCard';
 import { Statistics } from './Statistics';
 import { LoadingFallback } from '@/components/LoadingFallback';
 import { debug } from '@/utils/debug';
-
-const { Title } = Typography;
-const { Option } = Select;
-const { Sider, Content } = Layout;
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
+import { message } from '@/utils/message';
 
 const MAXIMUM_CONNECTIONS = 30;
 
@@ -101,9 +87,15 @@ const filterConnections = (
 };
 
 const RoomList = () => {
-  const [form] = Form.useForm();
-  const [mobileForm] = Form.useForm();
   const { t } = useTranslation();
+
+  const [formState, setFormState] = useState({
+    title: '',
+    address: '',
+    project: '',
+    os: '',
+    browser: '',
+  });
 
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [showMaximumAlert, setMaximumAlert] = useState(false);
@@ -152,18 +144,6 @@ const RoomList = () => {
     });
   }, [connectionList]);
 
-  const MPTypeOptions = useMemo(() => {
-    return AllMPTypes.filter((mp) => {
-      return connectionList?.some((conn) => conn.browser.type === mp);
-    }).map((name) => {
-      return {
-        name,
-        label: getBrowserName(name),
-        logo: getBrowserLogo(name),
-      };
-    });
-  }, [connectionList]);
-
   const [conditions, setConditions] = useState({
     title: '',
     address: '',
@@ -183,20 +163,31 @@ const RoomList = () => {
   }, [conditions]);
   const hasActiveFilters = activeFilterCount > 0;
 
-  const onFormFinish = useCallback(
-    async (value: any) => {
+  const handleSearch = useCallback(
+    async (e?: React.FormEvent) => {
+      if (e) e.preventDefault();
       try {
-        await requestConnections(value.project);
-        setConditions((state) => ({
-          ...state,
-          ...value,
-        }));
+        await requestConnections(formState.project);
+        setConditions(formState);
       } catch (e: any) {
         message.error(e.message);
       }
     },
-    [requestConnections],
+    [formState, requestConnections],
   );
+
+  const handleReset = useCallback(() => {
+    const emptyState = {
+      title: '',
+      address: '',
+      project: '',
+      os: '',
+      browser: '',
+    };
+    setFormState(emptyState);
+    setConditions(emptyState);
+    requestConnections('');
+  }, [requestConnections]);
 
   const mainContent = useMemo(() => {
     if (loading && !showLoadingRef.current) {
@@ -205,11 +196,12 @@ const RoomList = () => {
     const matchedConnections = filterConnections(connectionList, conditions);
     if (error || matchedConnections.length === 0) {
       return (
-        <Empty
-          style={{
-            marginTop: 60,
-          }}
-        />
+        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-2">
+          <Inbox className="size-12 opacity-30" />
+          <p className="text-sm">
+            {t('common.empty', { defaultValue: 'No connections' })}
+          </p>
+        </div>
       );
     }
     const list = sortConnections(
@@ -217,16 +209,13 @@ const RoomList = () => {
     );
 
     return (
-      <Row
-        gutter={[16, 16]}
-        style={{ padding: '24px 16px', margin: 0, width: '100%' }}
-      >
+      <div className="flex flex-wrap p-4 w-full">
         {list.map((room) => (
           <RoomCard key={room.address} room={room} />
         ))}
-      </Row>
+      </div>
     );
-  }, [conditions, connectionList, error, loading]);
+  }, [conditions, connectionList, error, loading, t]);
 
   useEffect(() => {
     const matchedConnections = filterConnections(connectionList, conditions);
@@ -234,255 +223,289 @@ const RoomList = () => {
   }, [connectionList, conditions]);
 
   return (
-    <Layout style={{ height: '100%' }} className="room-list">
-      <Sider width={350} theme="light" className="room-list-desktop-sider">
-        <div className="room-list-sider">
-          <Title level={3} style={{ marginBottom: 32 }}>
+    <div className="room-list flex-1 flex flex-col md:flex-row h-full min-h-0 bg-background text-foreground">
+      {/* Desktop Sider */}
+      <aside className="room-list-desktop-sider hidden md:flex flex-col w-[350px] shrink-0 border-r border-border p-6 overflow-y-auto bg-card/30">
+        <div className="room-list-sider flex flex-col gap-6">
+          <h3 className="text-xl font-bold tracking-tight text-foreground m-0">
             {t('common.connections')}
-          </Title>
-          <Form layout="vertical" form={form} onFinish={onFormFinish}>
-            <Form.Item label={t('common.device-id')} name="address">
-              <Input placeholder={t('common.device-id')!} allowClear />
-            </Form.Item>
-            <Form.Item label={t('common.project')} name="project">
-              <Input placeholder={t('common.project')!} allowClear />
-            </Form.Item>
-            <Form.Item label={t('common.title')} name="title">
-              <Input placeholder={t('common.title')!} allowClear />
-            </Form.Item>
-            <Form.Item label={t('common.os')} name="os">
-              <Select placeholder={t('connections.select-os')} allowClear>
-                {Object.entries(OS_CONFIG).map(([name, conf]) => {
-                  return (
-                    <Option value={name} key={name}>
-                      <div className="flex-between">
-                        <span>{conf.label}</span>
-                        <img src={conf.logo} height="20" alt="" />
-                      </div>
-                    </Option>
-                  );
-                })}
-              </Select>
-            </Form.Item>
-            <Form.Item label={t('devtool.platform')} name="browser">
-              <Select
-                listHeight={500}
-                placeholder={t('connections.select-browser')}
-                allowClear
-              >
-                {!!BrowserOptions.length && (
-                  <Select.OptGroup label="Web" key="web">
-                    {BrowserOptions.map(({ name, logo, label }) => {
-                      return (
-                        <Option key={name} value={name}>
-                          <div className="flex-between">
-                            <span>{label}</span>
-                            <img src={logo} width="20" height="20" alt="" />
-                          </div>
-                        </Option>
-                      );
-                    })}
-                  </Select.OptGroup>
-                )}
+          </h3>
+          <form onSubmit={handleSearch} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-muted-foreground">
+                {t('common.device-id')}
+              </label>
+              <Input
+                placeholder={t('common.device-id')!}
+                value={formState.address}
+                onChange={(e) =>
+                  setFormState((s) => ({ ...s, address: e.target.value }))
+                }
+              />
+            </div>
 
-                {!!MPTypeOptions.length && (
-                  <Select.OptGroup
-                    label={t('common.miniprogram')}
-                    key="miniprogram"
-                  >
-                    {MPTypeOptions.map(({ name, logo, label }) => {
-                      return (
-                        <Option key={name} value={name}>
-                          <div className="flex-between">
-                            <span>{label}</span>
-                            <img src={logo} width="20" height="20" alt="" />
-                          </div>
-                        </Option>
-                      );
-                    })}
-                  </Select.OptGroup>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-muted-foreground">
+                {t('common.project')}
+              </label>
+              <Input
+                placeholder={t('common.project')!}
+                value={formState.project}
+                onChange={(e) =>
+                  setFormState((s) => ({ ...s, project: e.target.value }))
+                }
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-muted-foreground">
+                {t('common.title')}
+              </label>
+              <Input
+                placeholder={t('common.title')!}
+                value={formState.title}
+                onChange={(e) =>
+                  setFormState((s) => ({ ...s, title: e.target.value }))
+                }
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-muted-foreground">
+                {t('common.os')}
+              </label>
+              <select
+                aria-label={t('common.os')!}
+                className="flex h-9 w-full rounded-md border border-input bg-card px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
+                value={formState.os}
+                onChange={(e) =>
+                  setFormState((s) => ({ ...s, os: e.target.value }))
+                }
+              >
+                <option value="">{t('connections.select-os')}</option>
+                {Object.entries(OS_CONFIG).map(([name, conf]) => (
+                  <option value={name} key={name}>
+                    {conf.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-muted-foreground">
+                {t('devtool.platform')}
+              </label>
+              <select
+                aria-label={t('devtool.platform')!}
+                className="flex h-9 w-full rounded-md border border-input bg-card px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
+                value={formState.browser}
+                onChange={(e) =>
+                  setFormState((s) => ({ ...s, browser: e.target.value }))
+                }
+              >
+                <option value="">{t('connections.select-browser')}</option>
+                {!!BrowserOptions.length && (
+                  <optgroup label="Web">
+                    {BrowserOptions.map(({ name, label }) => (
+                      <option key={name} value={name}>
+                        {label}
+                      </option>
+                    ))}
+                  </optgroup>
                 )}
-              </Select>
-            </Form.Item>
-            <Row justify="end">
-              <Col>
-                <Form.Item>
-                  <Space>
-                    <Button
-                      type="primary"
-                      htmlType="submit"
-                      icon={<SearchOutlined />}
-                    >
-                      {t('common.search')}
-                    </Button>
-                    <Button
-                      type="default"
-                      icon={<ClearOutlined />}
-                      onClick={() => {
-                        form.resetFields();
-                        form.submit();
-                      }}
-                    >
-                      {t('common.reset')}
-                    </Button>
-                  </Space>
-                </Form.Item>
-              </Col>
-            </Row>
+              </select>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <Button
+                type="submit"
+                variant="default"
+                size="default"
+                className="flex items-center gap-1.5"
+              >
+                <Search className="size-4" />
+                <span>{t('common.search')}</span>
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="default"
+                className="flex items-center gap-1.5"
+                onClick={handleReset}
+              >
+                <RotateCcw className="size-4" />
+                <span>{t('common.reset')}</span>
+              </Button>
+            </div>
 
             {showMaximumAlert && (
-              <div className="maximum-alert">
+              <div className="maximum-alert text-xs text-amber-500 bg-amber-500/10 p-2.5 rounded border border-amber-500/20">
                 {t('connections.maximum-alert')}
               </div>
             )}
-          </Form>
+          </form>
           {debug.enabled && <Statistics data={connectionList} />}
         </div>
-      </Sider>
-      <Content className="room-list-content">
-        <div className="room-list-mobile-header">
-          <div className="room-list-mobile-header__title">
-            <Title level={4} style={{ margin: 0 }}>
+      </aside>
+
+      {/* Main Content Area */}
+      <main className="room-list-content flex-1 flex flex-col overflow-y-auto">
+        <div className="room-list-mobile-header flex md:hidden items-center justify-between p-4 border-b border-border bg-card/40">
+          <div className="room-list-mobile-header__title flex items-center gap-2">
+            <h4 className="text-base font-semibold m-0 text-foreground">
               {t('common.connections')}
-            </Title>
-            <Badge
-              count={filterConnections(connectionList, conditions).length}
-              overflowCount={999}
-              style={{ backgroundColor: '#7c3aed' }}
-            />
+            </h4>
+            <Badge variant="secondary" className="bg-primary/20 text-primary">
+              {filterConnections(connectionList, conditions).length}
+            </Badge>
           </div>
           <Button
-            icon={<FilterOutlined />}
-            type={hasActiveFilters ? 'primary' : 'default'}
-            onClick={() => {
-              mobileForm.setFieldsValue(form.getFieldsValue());
-              setMobileFilterOpen(true);
-            }}
+            size="touch"
+            variant={hasActiveFilters ? 'default' : 'outline'}
+            className="flex items-center gap-2"
+            onClick={() => setMobileFilterOpen(true)}
           >
-            {hasActiveFilters ? 'Filter (' + activeFilterCount + ')' : 'Filter'}
+            <Filter className="size-4" />
+            <span>
+              {hasActiveFilters ? `Filter (${activeFilterCount})` : 'Filter'}
+            </span>
           </Button>
         </div>
 
-        <div className="room-list-cards-wrapper">{mainContent}</div>
+        <div className="room-list-cards-wrapper flex-1">{mainContent}</div>
 
-        <Drawer
-          title={
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <FilterOutlined style={{ color: '#7c3aed' }} />
-              <span>Filter Connections</span>
-            </div>
-          }
-          placement="right"
-          width="85%"
-          open={mobileFilterOpen}
-          onClose={() => setMobileFilterOpen(false)}
-          className="room-list-filter-drawer"
-        >
-          <Form
-            layout="vertical"
-            form={mobileForm}
-            onFinish={async (val) => {
-              await onFormFinish(val);
-              form.setFieldsValue(val);
-              setMobileFilterOpen(false);
-            }}
+        {/* Mobile Filter Sheet */}
+        <Sheet open={mobileFilterOpen} onOpenChange={setMobileFilterOpen}>
+          <SheetContent
+            side="right"
+            className="w-[85vw] max-w-md bg-card p-6 flex flex-col gap-4"
           >
-            <Form.Item label={t('common.device-id')} name="address">
-              <Input placeholder={t('common.device-id')!} allowClear />
-            </Form.Item>
-            <Form.Item label={t('common.project')} name="project">
-              <Input placeholder={t('common.project')!} allowClear />
-            </Form.Item>
-            <Form.Item label={t('common.title')} name="title">
-              <Input placeholder={t('common.title')!} allowClear />
-            </Form.Item>
-            <Form.Item label={t('common.os')} name="os">
-              <Select placeholder={t('connections.select-os')} allowClear>
-                {Object.entries(OS_CONFIG).map(([name, conf]) => (
-                  <Option value={name} key={name}>
-                    <div className="flex-between">
-                      <span>{conf.label}</span>
-                      <img src={conf.logo} height="20" alt="" />
-                    </div>
-                  </Option>
-                ))}
-              </Select>
-            </Form.Item>
-            <Form.Item label={t('devtool.platform')} name="browser">
-              <Select
-                listHeight={500}
-                placeholder={t('connections.select-browser')}
-                allowClear
-              >
-                {!!BrowserOptions.length && (
-                  <Select.OptGroup label="Web" key="web">
-                    {BrowserOptions.map(({ name, logo, label }) => (
-                      <Option key={name} value={name}>
-                        <div className="flex-between">
-                          <span>{label}</span>
-                          <img src={logo} width="20" height="20" alt="" />
-                        </div>
-                      </Option>
-                    ))}
-                  </Select.OptGroup>
-                )}
+            <SheetHeader>
+              <SheetTitle className="flex items-center gap-2 text-foreground">
+                <Filter className="size-4 text-primary" />
+                <span>Filter Connections</span>
+              </SheetTitle>
+            </SheetHeader>
+            <form
+              onSubmit={(e) => {
+                handleSearch(e);
+                setMobileFilterOpen(false);
+              }}
+              className="flex flex-col gap-4 overflow-y-auto flex-1 pr-1"
+            >
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-muted-foreground">
+                  {t('common.device-id')}
+                </label>
+                <Input
+                  placeholder={t('common.device-id')!}
+                  value={formState.address}
+                  onChange={(e) =>
+                    setFormState((s) => ({ ...s, address: e.target.value }))
+                  }
+                />
+              </div>
 
-                {!!MPTypeOptions.length && (
-                  <Select.OptGroup
-                    label={t('common.miniprogram')}
-                    key="miniprogram"
-                  >
-                    {MPTypeOptions.map(({ name, logo, label }) => (
-                      <Option key={name} value={name}>
-                        <div className="flex-between">
-                          <span>{label}</span>
-                          <img src={logo} width="20" height="20" alt="" />
-                        </div>
-                      </Option>
-                    ))}
-                  </Select.OptGroup>
-                )}
-              </Select>
-            </Form.Item>
-            <Row justify="end">
-              <Col span={24}>
-                <Form.Item style={{ marginBottom: 0 }}>
-                  <Space
-                    style={{
-                      width: '100%',
-                      justifyContent: 'space-between',
-                      display: 'flex',
-                    }}
-                  >
-                    <Button
-                      type="primary"
-                      htmlType="submit"
-                      icon={<SearchOutlined />}
-                      style={{ flex: 1 }}
-                    >
-                      {t('common.search')}
-                    </Button>
-                    <Button
-                      type="default"
-                      icon={<ClearOutlined />}
-                      style={{ flex: 1 }}
-                      onClick={() => {
-                        mobileForm.resetFields();
-                        form.resetFields();
-                        mobileForm.submit();
-                        setMobileFilterOpen(false);
-                      }}
-                    >
-                      {t('common.reset')}
-                    </Button>
-                  </Space>
-                </Form.Item>
-              </Col>
-            </Row>
-          </Form>
-        </Drawer>
-      </Content>
-    </Layout>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-muted-foreground">
+                  {t('common.project')}
+                </label>
+                <Input
+                  placeholder={t('common.project')!}
+                  value={formState.project}
+                  onChange={(e) =>
+                    setFormState((s) => ({ ...s, project: e.target.value }))
+                  }
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-muted-foreground">
+                  {t('common.title')}
+                </label>
+                <Input
+                  placeholder={t('common.title')!}
+                  value={formState.title}
+                  onChange={(e) =>
+                    setFormState((s) => ({ ...s, title: e.target.value }))
+                  }
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-muted-foreground">
+                  {t('common.os')}
+                </label>
+                <select
+                  aria-label={t('common.os')!}
+                  className="flex h-11 min-h-[44px] w-full rounded-md border border-input bg-card px-3 text-base text-foreground"
+                  value={formState.os}
+                  onChange={(e) =>
+                    setFormState((s) => ({ ...s, os: e.target.value }))
+                  }
+                >
+                  <option value="">{t('connections.select-os')}</option>
+                  {Object.entries(OS_CONFIG).map(([name, conf]) => (
+                    <option value={name} key={name}>
+                      {conf.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-muted-foreground">
+                  {t('devtool.platform')}
+                </label>
+                <select
+                  aria-label={t('devtool.platform')!}
+                  className="flex h-11 min-h-[44px] w-full rounded-md border border-input bg-card px-3 text-base text-foreground"
+                  value={formState.browser}
+                  onChange={(e) =>
+                    setFormState((s) => ({ ...s, browser: e.target.value }))
+                  }
+                >
+                  <option value="">{t('connections.select-browser')}</option>
+                  {!!BrowserOptions.length && (
+                    <optgroup label="Web">
+                      {BrowserOptions.map(({ name, label }) => (
+                        <option key={name} value={name}>
+                          {label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-3 pt-4 mt-auto">
+                <Button
+                  type="submit"
+                  size="touch"
+                  className="flex-1 flex items-center justify-center gap-2"
+                >
+                  <Search className="size-4" />
+                  <span>{t('common.search')}</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="touch"
+                  className="flex-1 flex items-center justify-center gap-2"
+                  onClick={() => {
+                    handleReset();
+                    setMobileFilterOpen(false);
+                  }}
+                >
+                  <RotateCcw className="size-4" />
+                  <span>{t('common.reset')}</span>
+                </Button>
+              </div>
+            </form>
+          </SheetContent>
+        </Sheet>
+      </main>
+    </div>
   );
 };
 

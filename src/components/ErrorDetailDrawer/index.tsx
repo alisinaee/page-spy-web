@@ -1,28 +1,27 @@
 import { LoadingFallback } from '@/components/LoadingFallback';
 import { getOriginFragments } from '@/utils/parseError';
 import { useEventListener } from '@/utils/useEventListener';
-import { AimOutlined, FrownOutlined } from '@ant-design/icons';
+import { Crosshair, Frown } from 'lucide-react';
 import { useRequest } from 'ahooks';
 import {
-  Button,
-  Col,
-  Drawer,
-  Result,
-  Row,
-  message,
-  Typography,
-  Empty,
-  Select,
-  Flex,
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+} from '@/components/ui/sheet';
+import { Button } from '@/components/ui/button';
+import {
   Tooltip,
-} from 'antd';
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { message } from '@/utils/message';
 import clsx from 'clsx';
 import { memo, useMemo, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import './index.less';
 import { BlockTitle } from '@/components/BlockTitle';
-
-const { Paragraph, Text } = Typography;
 
 export type RequiredFrames = Required<StackFrame>[];
 
@@ -58,30 +57,24 @@ const ErrorStackItem = ({ frame }: { frame: Required<StackFrame> }) => {
     if (loading) {
       return <LoadingFallback />;
     }
+
     if (error) {
       return (
-        <Result
-          icon={<FrownOutlined style={{ color: '#F79327', fontSize: 50 }} />}
-          title={t('failed-title')}
-        >
-          <div>
-            <Paragraph>
-              <Text strong style={{ fontSize: 16 }}>
-                {t('failed-advice')}
-              </Text>
-            </Paragraph>
-            <Paragraph>
+        <div className="flex flex-col items-center justify-center p-6 text-center space-y-4">
+          <Frown className="w-12 h-12 text-amber-500" />
+          <h4 className="text-base font-semibold">{t('failed-title')}</h4>
+          <div className="text-sm text-muted-foreground space-y-2">
+            <p className="font-medium text-foreground">{t('failed-advice')}</p>
+            <p>
               <Trans i18nKey="console.error-trace.fix-suggestion-1">
-                <Text>slot-0</Text>
+                <span>slot-0</span>
                 <code>slot-1</code>
-                <Text>slot-2</Text>
+                <span>slot-2</span>
               </Trans>
-            </Paragraph>
-            <Paragraph>
-              <Text>{t('fix-suggestion-2')}</Text>
-            </Paragraph>
+            </p>
+            <p>{t('fix-suggestion-2')}</p>
           </div>
-        </Result>
+        </div>
       );
     }
 
@@ -91,33 +84,29 @@ const ErrorStackItem = ({ frame }: { frame: Required<StackFrame> }) => {
 
     return (
       <div className="source-code-fragments">
-        <Row
-          className="fragments-header"
-          justify="space-between"
-          align="middle"
-          wrap={false}
-        >
-          <Col className="origin-filename">
+        <div className="fragments-header flex items-center justify-between flex-nowrap py-1">
+          <div className="origin-filename text-xs">
             <code>
               <span>{t('source-filename')}: </span>
               <span>
                 {data.source}({data.line}:{data.column})
               </span>
             </code>
-          </Col>
+          </div>
           {data.useTabs && (
-            <Select
-              size="small"
+            <select
               value={tabSize}
-              onChange={setTabSize}
-              popupMatchSelectWidth
-              options={TAB_SIZE.map((size) => ({
-                label: `\\t = ${size} Space`,
-                value: size,
-              }))}
-            />
+              onChange={(e) => setTabSize(Number(e.target.value))}
+              className="text-xs bg-secondary border border-border rounded px-2 py-1"
+            >
+              {TAB_SIZE.map((size) => (
+                <option key={size} value={size}>
+                  \t = {size} Space
+                </option>
+              ))}
+            </select>
           )}
-        </Row>
+        </div>
         <div
           style={{
             // @ts-ignore
@@ -135,17 +124,27 @@ const ErrorStackItem = ({ frame }: { frame: Required<StackFrame> }) => {
 
   return (
     <div className="error-stack-item">
-      <Flex gap={12} align="center" className="stack-filename" wrap={false}>
-        <Tooltip title={stackFilename}>
-          <code>{stackFilename}</code>
+      <div className="flex items-center gap-3 stack-filename flex-nowrap mb-2">
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <code className="text-xs truncate block max-w-[85%] cursor-pointer">
+                {stackFilename}
+              </code>
+            }
+          />
+          <TooltipContent>{stackFilename}</TooltipContent>
         </Tooltip>
-        <AimOutlined
-          className={clsx('locate-icon', {
-            loading,
-          })}
+        <Crosshair
+          className={clsx(
+            'locate-icon w-4 h-4 cursor-pointer text-muted-foreground hover:text-foreground shrink-0',
+            {
+              'animate-spin': loading,
+            },
+          )}
           onClick={requestChunk}
         />
-      </Flex>
+      </div>
       {content}
     </div>
   );
@@ -158,6 +157,7 @@ export const ErrorDetailDrawer = memo(() => {
   });
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+
   const errorMessage = useMemo(() => {
     if (error) {
       return [error.name, error.message].every((i) => error.stack?.includes(i))
@@ -176,42 +176,40 @@ export const ErrorDetailDrawer = memo(() => {
   });
 
   return (
-    <Drawer
-      width="50%"
-      open={open}
-      destroyOnClose
-      onClose={() => setOpen(false)}
-      title={t('title')}
-      className="error-detail-drawer"
-      footer={
-        <Row justify="end">
-          <Col>
-            <Button
-              type="primary"
-              onClick={() => {
-                setOpen(false);
-              }}
-            >
-              {ct('common.OK')}
-            </Button>
-          </Col>
-        </Row>
-      }
-    >
-      <BlockTitle title={t('message-title')} />
-      {errorMessage ? (
-        <div className="error-message-box">
-          <pre>
-            <code>{errorMessage}</code>
-          </pre>
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetContent
+        side="right"
+        className="w-full sm:max-w-2xl overflow-y-auto flex flex-col justify-between"
+      >
+        <div>
+          <SheetHeader className="pb-4">
+            <SheetTitle>{t('title')}</SheetTitle>
+          </SheetHeader>
+          <div className="space-y-4">
+            <BlockTitle title={t('message-title')} />
+            {errorMessage ? (
+              <div className="error-message-box p-3 bg-secondary/50 rounded-md text-xs font-mono overflow-x-auto">
+                <pre>
+                  <code>{errorMessage}</code>
+                </pre>
+              </div>
+            ) : (
+              <div className="text-center text-muted-foreground py-4 text-xs">
+                No error message
+              </div>
+            )}
+            <BlockTitle title={t('stack-title')} />
+            {frames?.map((f, index) => (
+              <ErrorStackItem key={f.fileName + index} frame={f} />
+            ))}
+          </div>
         </div>
-      ) : (
-        <Empty description={false} />
-      )}
-      <BlockTitle title={t('stack-title')} />
-      {frames?.map((f, index) => (
-        <ErrorStackItem key={f.fileName + index} frame={f} />
-      ))}
-    </Drawer>
+        <SheetFooter className="pt-4 border-t border-border flex justify-end">
+          <Button size="touch" onClick={() => setOpen(false)}>
+            {ct('common.OK')}
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 });

@@ -1,16 +1,16 @@
 import type { PropsWithChildren } from 'react';
-import { useEffect, useMemo, useRef } from 'react';
-import { useState } from 'react';
-import Icon, { PicLeftOutlined, ReloadOutlined } from '@ant-design/icons';
+import { useEffect, useRef, useState } from 'react';
 import CellularSVG from '@/assets/image/cellular.svg?react';
 import BatterySVG from '@/assets/image/battery.svg?react';
 import DeviceSVG from '@/assets/image/device.svg?react';
 import './index.less';
-import { Button, Space, Spin } from 'antd';
 import { ElementPanel } from '../ElementPanel';
 import { useTranslation } from 'react-i18next';
 import { useSocketMessageStore } from '@/store/socket-message';
 import { useShallow } from 'zustand/react/shallow';
+import { Button } from '@/components/ui/button';
+import { RotateCw, PanelLeft, Loader2 } from 'lucide-react';
+
 function getTime() {
   const date = new Date();
   let hours = String(date.getHours());
@@ -57,22 +57,31 @@ export const PCFrame = ({
     let containerWidth = 0;
     let MAX_SIZE = 0;
     let MIN_SIZE = 0;
-    function start(e: MouseEvent) {
-      e.preventDefault();
-      // `mousemove` not working when meet iframe
-      clientIframe.style.pointerEvents = 'none';
+    function getClientX(e: MouseEvent | TouchEvent): number {
+      if ('touches' in e && e.touches.length > 0) {
+        return e.touches[0].clientX;
+      }
+      return (e as MouseEvent).clientX;
+    }
+    function start(e: MouseEvent | TouchEvent) {
+      if (e.cancelable) e.preventDefault();
+      // `mousemove`/`touchmove` not working when meet iframe
+      if (clientIframe) clientIframe.style.pointerEvents = 'none';
       containerWidth = containerArea?.getBoundingClientRect().width || 0;
       MAX_SIZE = containerWidth * 0.6;
       MIN_SIZE = containerWidth * 0.4;
       rightWidth = utilsArea?.getBoundingClientRect().width || 0;
-      const { clientX } = e;
+      const clientX = getClientX(e);
       xAxisRef.current = clientX;
       document.addEventListener('mousemove', move);
       document.addEventListener('mouseup', end);
+      document.addEventListener('touchmove', move, { passive: false });
+      document.addEventListener('touchend', end);
+      document.addEventListener('touchcancel', end);
     }
-    function move(e: MouseEvent) {
-      e.preventDefault();
-      const { clientX } = e;
+    function move(e: MouseEvent | TouchEvent) {
+      if (e.cancelable) e.preventDefault();
+      const clientX = getClientX(e);
       const diffX = Number(
         (rightWidth - (clientX - xAxisRef.current)).toFixed(2),
       );
@@ -81,17 +90,25 @@ export const PCFrame = ({
     }
     function end() {
       xAxisRef.current = 0;
-      // reset `pointEvents` when mouse up
-      clientIframe.style.pointerEvents = 'auto';
+      // reset `pointerEvents` when mouse/touch up
+      if (clientIframe) clientIframe.style.pointerEvents = 'auto';
       document.removeEventListener('mousemove', move);
       document.removeEventListener('mouseup', end);
+      document.removeEventListener('touchmove', move);
+      document.removeEventListener('touchend', end);
+      document.removeEventListener('touchcancel', end);
     }
     dividerLine?.addEventListener('mousedown', start);
+    dividerLine?.addEventListener('touchstart', start, { passive: false });
     // eslint-disable-next-line consistent-return
     return () => {
       dividerLine?.removeEventListener('mousedown', start);
+      dividerLine?.removeEventListener('touchstart', start);
       document.removeEventListener('mousemove', move);
       document.removeEventListener('mouseup', end);
+      document.removeEventListener('touchmove', move);
+      document.removeEventListener('touchend', end);
+      document.removeEventListener('touchcancel', end);
     };
   }, [elementVisible]);
 
@@ -108,52 +125,62 @@ export const PCFrame = ({
 
   return (
     <div className="pc-frame" ref={containerRef}>
-      <div className="pc-frame__top">
-        <div className="pc-frame__top-left">
-          <Space>
-            <div className="function-circle close" />
-            <div className="function-circle mini" />
-            <div className="function-circle fullscreen" />
-          </Space>
+      <div className="pc-frame__top flex justify-between items-center px-3 py-1.5 border-b border-border/50">
+        <div className="pc-frame__top-left flex items-center gap-1.5">
+          <div className="function-circle close" />
+          <div className="function-circle mini" />
+          <div className="function-circle fullscreen" />
         </div>
-        <div className="pc-frame__top-center" title={pageLocation?.href}>
+        <div
+          className="pc-frame__top-center text-xs truncate max-w-sm px-2 text-muted-foreground"
+          title={pageLocation?.href}
+        >
           {pageLocation?.href || ''}
         </div>
-        <div className="pc-frame__top-right">
-          <Space>
-            <Button
-              type={elementVisible ? 'primary' : 'default'}
-              icon={<PicLeftOutlined />}
-              onClick={() => {
-                setElementVisible(!elementVisible);
-              }}
-            >
-              {t('element')}
-            </Button>
-            <Button
-              icon={<ReloadOutlined />}
-              onClick={() => {
-                if (loading) return;
-                onRefresh();
-              }}
-            >
-              {ct('refresh')}
-            </Button>
-            <Button
-              type={enableDevice ? 'primary' : 'default'}
-              icon={<Icon component={DeviceSVG} style={{ fontSize: 14 }} />}
-              onClick={() => {
-                setEnableDevice((state) => !state);
-                onRefresh();
-              }}
-            >
-              {t('device')}
-            </Button>
-          </Space>
+        <div className="pc-frame__top-right flex items-center gap-1.5">
+          <Button
+            variant={elementVisible ? 'default' : 'outline'}
+            size="sm"
+            className="flex items-center gap-1"
+            onClick={() => {
+              setElementVisible(!elementVisible);
+            }}
+          >
+            <PanelLeft className="size-3.5" />
+            <span>{t('element')}</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-1"
+            onClick={() => {
+              if (loading) return;
+              onRefresh();
+            }}
+          >
+            <RotateCw className="size-3.5" />
+            <span>{ct('refresh')}</span>
+          </Button>
+          <Button
+            variant={enableDevice ? 'default' : 'outline'}
+            size="sm"
+            className="flex items-center gap-1"
+            onClick={() => {
+              setEnableDevice((state) => !state);
+              onRefresh();
+            }}
+          >
+            <DeviceSVG className="size-3.5" />
+            <span>{t('device')}</span>
+          </Button>
         </div>
       </div>
-      <div className="pc-frame__body spin-container">
-        <Spin spinning={loading} className="spin-controller" />
+      <div className="pc-frame__body spin-container relative">
+        {loading && (
+          <div className="absolute inset-0 bg-background/50 z-20 flex items-center justify-center backdrop-blur-xs">
+            <Loader2 className="size-8 animate-spin text-primary" />
+          </div>
+        )}
         {enableDevice ? (
           <div className="mobile-frame">
             <div className="mobile-frame__body-content">{children}</div>
@@ -163,7 +190,10 @@ export const PCFrame = ({
         )}
         {elementVisible && (
           <>
-            <div className="pc-frame__body-divider" ref={dividerRef} />
+            <div
+              className="pc-frame__body-divider cursor-col-resize select-none"
+              ref={dividerRef}
+            />
             <div
               className="pc-frame__body-utils"
               ref={utilsRef}
@@ -188,18 +218,18 @@ const IOSFrame = ({ children }: PropsWithChildren<unknown>) => {
   return (
     <div className="ios-frame">
       <div className="ios-frame__hair">
-        <div className="ios-top">
-          <p className="ios-top-left">{time}</p>
-          <p className="ios-top-center">
-            <p className="ios-top-forehead" />
-          </p>
-          <p className="ios-top-right">
-            <Icon component={CellularSVG} />
-            <Icon component={BatterySVG} className="ios-battery" />
-          </p>
+        <div className="ios-top flex justify-between items-center">
+          <p className="ios-top-left m-0">{time}</p>
+          <div className="ios-top-center">
+            <div className="ios-top-forehead" />
+          </div>
+          <div className="ios-top-right flex items-center gap-1">
+            <CellularSVG className="size-3.5" />
+            <BatterySVG className="ios-battery size-4" />
+          </div>
         </div>
         <div className="ios-url">
-          <div className="ios-url-input" title={pageLocation?.href}>
+          <div className="ios-url-input truncate" title={pageLocation?.href}>
             {pageLocation?.href}
           </div>
         </div>
@@ -221,16 +251,16 @@ const AndroidFrame = ({ children }: PropsWithChildren<unknown>) => {
   return (
     <div className="android-frame">
       <div className="android-frame__camera" />
-      <div className="android-frame__top">
-        <p className="android-frame__top-left">{time}</p>
-        <p className="android-frame__top-right">
-          <Icon component={CellularSVG} />
-          <Icon component={BatterySVG} className="android-battery" />
-        </p>
+      <div className="android-frame__top flex justify-between items-center">
+        <p className="android-frame__top-left m-0">{time}</p>
+        <div className="android-frame__top-right flex items-center gap-1">
+          <CellularSVG className="size-3.5" />
+          <BatterySVG className="android-battery size-4" />
+        </div>
       </div>
 
       <div className="android-url">
-        <div className="android-url-input" title={pageLocation?.href}>
+        <div className="android-url-input truncate" title={pageLocation?.href}>
           {pageLocation?.href}
         </div>
       </div>
@@ -252,26 +282,33 @@ export const MobileFrame = ({
 
   const PhoneFrame = os === 'iOS' ? IOSFrame : AndroidFrame;
   return (
-    <div className="mobile-frame">
-      <div className="mobile-frame__left spin-container">
-        <Spin spinning={loading} className="spin-controller" />
+    <div className="mobile-frame flex flex-col md:flex-row h-full">
+      <div className="mobile-frame__left spin-container relative flex-1">
+        {loading && (
+          <div className="absolute inset-0 bg-background/50 z-20 flex items-center justify-center backdrop-blur-xs">
+            <Loader2 className="size-8 animate-spin text-primary" />
+          </div>
+        )}
         <PhoneFrame>{children}</PhoneFrame>
       </div>
-      <div className="mobile-frame__middle">
-        <Space direction="vertical">
-          <Button
-            style={{ position: 'relative', zIndex: 10 }}
-            onClick={() => {
-              if (loading) return;
-              onRefresh();
-            }}
-          >
-            {ct('refresh')}
-          </Button>
-        </Space>
+      <div className="mobile-frame__middle p-2 flex items-center justify-center">
+        <Button
+          variant="outline"
+          size="touch"
+          onClick={() => {
+            if (loading) return;
+            onRefresh();
+          }}
+        >
+          {ct('refresh')}
+        </Button>
       </div>
-      <div className="mobile-frame__right spin-container">
-        <Spin spinning={loading} className="spin-controller" />
+      <div className="mobile-frame__right spin-container relative flex-1">
+        {loading && (
+          <div className="absolute inset-0 bg-background/50 z-20 flex items-center justify-center backdrop-blur-xs">
+            <Loader2 className="size-8 animate-spin text-primary" />
+          </div>
+        )}
         <ElementPanel />
       </div>
     </div>

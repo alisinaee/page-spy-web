@@ -3,9 +3,9 @@ import { Resizable, ResizableProps } from 'react-resizable';
 import './index.less';
 
 export type ResizableTitleProps = HTMLAttributes<any> & {
-  onResizeStart: ResizableProps['onResizeStart'];
-  onResize: ResizableProps['onResize'];
-  onResizeStop: ResizableProps['onResizeStop'];
+  onResizeStart?: ResizableProps['onResizeStart'];
+  onResize?: ResizableProps['onResize'];
+  onResizeStop?: ResizableProps['onResizeStop'];
   width?: number;
   widthConstraints?: number[];
 };

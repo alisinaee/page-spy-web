@@ -1,5 +1,5 @@
 import { useCacheDetailStore } from '@/store/cache-detail';
-import { HolderOutlined } from '@ant-design/icons';
+import { GripHorizontal } from 'lucide-react';
 import ReactJsonView from '@huolala-tech/react-json-view';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -18,14 +18,8 @@ export const ResizableDetail = () => {
       resizeHandles={['n']}
       height={detailSize}
       handle={
-        <div className="resizable-height-controller">
-          <HolderOutlined
-            style={{
-              transform: 'rotateZ(90deg)',
-              color: '#aaa',
-              fontSize: 16,
-            }}
-          />
+        <div className="resizable-height-controller flex items-center justify-center cursor-row-resize">
+          <GripHorizontal className="h-4 w-4 text-muted-foreground" />
         </div>
       }
       onResize={(_, info) => {

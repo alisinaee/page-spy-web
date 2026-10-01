@@ -1,14 +1,18 @@
 /* eslint-disable no-underscore-dangle */
 import type { MouseEventHandler, ReactNode } from 'react';
 import React, { useCallback, useEffect, useState } from 'react';
-import { CaretRightOutlined } from '@ant-design/icons';
+import { ChevronRight } from 'lucide-react';
 import './index.less';
 import clsx from 'clsx';
 import type { SpyAtom } from '@huolala-tech/page-spy-types';
 import { LoadMore } from './LoadMore';
 import { useSocketMessageStore } from '@/store/socket-message';
 import { useDebugConfig } from '@/components/DebugConfigProvider';
-import { Tooltip } from 'antd';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { Trans } from 'react-i18next';
 import CopyContent from '@/components/CopyContent';
 import { useShallow } from 'zustand/react/shallow';
@@ -221,15 +225,30 @@ function AtomNode({ id, value, showArrow = true }: AtomNodeProps) {
     setSpread(!spread);
   }, [offline, id, socket, property, spread]);
 
+  const codeEl = (
+    <code className="console-node atom" onClick={getAtomDetail}>
+      {showArrow && (
+        <ChevronRight
+          className={clsx([
+            'spread-controller inline w-3 h-3',
+            spread && 'spread',
+          ])}
+        />
+      )}
+      <i>{value}</i>
+    </code>
+  );
+
   return (
     <div
       className={clsx('atom-node', {
         disabled: offline,
       })}
     >
-      <Tooltip
-        title={
-          offline && (
+      {offline ? (
+        <Tooltip>
+          <TooltipTrigger render={codeEl} />
+          <TooltipContent>
             <Trans i18nKey="replay.unsupport-spread">
               <p>
                 Objects cannot be expanded by default. Set
@@ -247,18 +266,11 @@ function AtomNode({ id, value, showArrow = true }: AtomNodeProps) {
                 to enable.
               </p>
             </Trans>
-          )
-        }
-      >
-        <code className="console-node atom" onClick={getAtomDetail}>
-          {showArrow && (
-            <CaretRightOutlined
-              className={clsx(['spread-controller', spread && 'spread'])}
-            />
-          )}
-          <i>{value}</i>
-        </code>
-      </Tooltip>
+          </TooltipContent>
+        </Tooltip>
+      ) : (
+        codeEl
+      )}
       <PropertyPanel />
     </div>
   );
@@ -278,7 +290,7 @@ const ConsoleNode = React.memo<ConsoleNodeProps>(({ data }) => {
     const superName = value.constructor.name;
     return (
       <code className="console-node object">
-        <CaretRightOutlined />
+        <ChevronRight className="inline w-3 h-3" />
         <i>
           {`${superName} {`}
           <ConsoleNode

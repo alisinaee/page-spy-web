@@ -6,12 +6,12 @@ import {
   useMemo,
   PropsWithChildren,
 } from 'react';
-import { message } from 'antd';
+import { message } from './message';
 import { useTranslation } from 'react-i18next';
 import { requestAuthStatus, requestLogin } from '@/apis';
 import { AUTH_FAILED_EVENT, TOKEN_KEY } from '@/apis/request';
 import { useEventListener } from './useEventListener';
-import { isClient, isDoc } from './constants';
+import { isClient } from './constants';
 import { useRequest } from 'ahooks';
 
 // 认证上下文定义
@@ -31,10 +31,7 @@ export const AuthProvider = ({ children }: PropsWithChildren<unknown>) => {
   // 为 true 时存在几种可能
   // 1. 无需密码
   // 2. 认证通过
-  // 3. 构建文档 (yarn build:doc)
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(
-    isDoc ? true : false,
-  );
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   useEventListener(AUTH_FAILED_EVENT, () => setIsAuthenticated(false));
 
   const { loading: autoVerifyLoading } = useRequest(requestAuthStatus, {

@@ -1,6 +1,6 @@
-import { Space } from 'antd';
 import { useState, useMemo } from 'react';
 import { EntriesBody } from '@/components/EntriesBody';
+import React from 'react';
 
 export const QueryParamsBlock: React.FC<{ data: [string, string][] }> = ({
   data,
@@ -22,15 +22,15 @@ export const QueryParamsBlock: React.FC<{ data: [string, string][] }> = ({
 
   return (
     <div className="detail-block">
-      <Space className="detail-block__label">
+      <div className="detail-block__label flex items-center gap-2">
         <span>Query String Parameters</span>
         <span
           onClick={() => setDecoded(!decoded)}
-          style={{ fontWeight: 'normal', cursor: 'pointer' }}
+          className="text-xs text-primary font-normal cursor-pointer hover:underline"
         >
           {toggleText}
         </span>
-      </Space>
+      </div>
       <div className="detail-block__content">
         <EntriesBody data={decodedData} />
       </div>

@@ -1,6 +1,5 @@
 import { EntriesBody } from '@/components/EntriesBody';
 import { getObjectKeys, ResolvedNetworkInfo } from '@/utils';
-import { Empty, Space } from 'antd';
 import { ReactNode, memo, useEffect, useMemo, useState } from 'react';
 import { PartOfHeader } from '../PartOfHeader';
 import { StatusCode } from '../StatusCode';
@@ -9,8 +8,8 @@ import { QueryParamsBlock } from '../QueryParamsBlock';
 import { RequestPayloadBlock } from '../RequestPayloadBlock';
 import { ResponseBody } from '../ResponseBody';
 import clsx from 'clsx';
-import Icon from '@ant-design/icons';
-import CloseSvg from '@/assets/image/close.svg?react';
+import { X } from 'lucide-react';
+import React from 'react';
 
 interface Props {
   data: ResolvedNetworkInfo;
@@ -76,20 +75,17 @@ const TABS: TabItem[] = [
           {headerContent.map((item) => {
             return (
               <div className="detail-block" key={item.label}>
-                <Space className="detail-block__label">
+                <div className="detail-block__label flex items-center gap-2">
                   <span>{item.label}</span>
                   <PartOfHeader />
-                </Space>
+                </div>
                 <div className="detail-block__content">
                   {item.data?.length ? (
                     <EntriesBody data={item.data} />
                   ) : (
-                    <Empty
-                      image={Empty.PRESENTED_IMAGE_SIMPLE}
-                      description={false}
-                      style={{ margin: '10px 0' }}
-                      imageStyle={{ height: 30 }}
-                    />
+                    <div className="text-muted-foreground text-center py-2 text-xs">
+                      (empty)
+                    </div>
                   )}
                 </div>
               </div>
@@ -156,7 +152,8 @@ export const NetworkDetail = memo(({ data, onClose }: Props) => {
   const [activeTab, setActiveTab] = useState('Headers');
   const activeContent = useMemo(() => {
     const tabItem = TABS.find((t) => t.title === activeTab);
-    if (!tabItem) return <Empty />;
+    if (!tabItem)
+      return <div className="text-center py-4 text-xs">No content</div>;
     return tabItem.content(data);
   }, [activeTab, data]);
 
@@ -182,9 +179,12 @@ export const NetworkDetail = memo(({ data, onClose }: Props) => {
 
   return (
     <>
-      <div className="network-detail-header">
-        <div className="network-detail-close" onClick={onClose}>
-          <Icon component={CloseSvg} style={{ fontSize: 20 }} />
+      <div className="network-detail-header flex items-center justify-between">
+        <div
+          className="network-detail-close cursor-pointer p-1 text-muted-foreground hover:text-foreground"
+          onClick={onClose}
+        >
+          <X className="w-5 h-5" />
         </div>
         <ul className="network-detail-tabs">
           {TABS.filter((t) => t.visible(data)).map((i) => {

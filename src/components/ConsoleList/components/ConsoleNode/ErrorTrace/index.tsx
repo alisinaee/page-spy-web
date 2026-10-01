@@ -1,7 +1,6 @@
 import { SpyConsole } from '@huolala-tech/page-spy-types';
 import ErrorStackSvg from '@/assets/image/error-stack.svg?react';
 import './index.less';
-import Icon from '@ant-design/icons';
 import { useCallback, useMemo } from 'react';
 import ErrorStackParser from 'error-stack-parser';
 
@@ -87,10 +86,10 @@ export const ErrorTraceNode = ({ data }: Props) => {
 
   return (
     <div className="error-trace">
-      <Icon
-        component={ErrorStackSvg}
+      <ErrorStackSvg
         className="error-trace-icon"
         onClick={onPopupDetail}
+        style={{ width: 16, height: 16, cursor: 'pointer' }}
       />
       <div className="error-trace-node">
         <code>{errorMessage}</code>

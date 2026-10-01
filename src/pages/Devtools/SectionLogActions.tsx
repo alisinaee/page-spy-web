@@ -1,10 +1,10 @@
+import { ArrowDownToLine, Download, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import {
-  ClearOutlined,
-  DownloadOutlined,
-  VerticalAlignBottomOutlined,
-} from '@ant-design/icons';
-import { Tooltip } from 'antd';
-import { Button, Space } from 'antd';
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from '@/components/ui/tooltip';
 import { useSocketMessageStore } from '@/store/socket-message';
 import useSearch from '@/utils/useSearch';
 import {
@@ -103,28 +103,38 @@ export const SectionLogActions = ({ section }: { section: SectionName }) => {
   const { address = '' } = useSearch();
 
   return (
-    <Space size={8}>
-      <Tooltip title="Scroll to bottom">
-        <Button
-          size="small"
-          icon={<VerticalAlignBottomOutlined />}
-          onClick={() => scrollToSectionEnd(section)}
-        />
+    <div className="flex items-center gap-1.5">
+      <Tooltip>
+        <TooltipTrigger render={<span />}>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => scrollToSectionEnd(section)}
+            aria-label="Scroll to bottom"
+          >
+            <ArrowDownToLine className="size-3.5" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Scroll to bottom</TooltipContent>
       </Tooltip>
       <Button
-        size="small"
-        icon={<DownloadOutlined />}
+        variant="ghost"
+        size="sm"
+        className="h-7 px-2 text-xs flex items-center gap-1"
         onClick={() => downloadSection(section, address)}
       >
-        Download
+        <Download className="size-3.5" />
+        <span>Download</span>
       </Button>
       <Button
-        size="small"
-        icon={<ClearOutlined />}
+        variant="ghost"
+        size="sm"
+        className="h-7 px-2 text-xs flex items-center gap-1 text-muted-foreground hover:text-destructive"
         onClick={() => clearRecord(section)}
       >
-        Clear
+        <Trash2 className="size-3.5" />
+        <span>Clear</span>
       </Button>
-    </Space>
+    </div>
   );
 };

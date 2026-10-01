@@ -1,5 +1,5 @@
 import React, { memo } from 'react';
-import { CaretRightOutlined } from '@ant-design/icons';
+import { ChevronRight } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import './index.less';
 import type { ElementContent, Element } from 'hast';
@@ -10,6 +10,7 @@ import sh from '@/utils/shiki-highlighter';
 import type { Lang } from 'shiki';
 import { isArray } from 'lodash-es';
 import { useShallow } from 'zustand/react/shallow';
+
 const tag2lang = {
   style: 'css',
   script: 'javascript',
@@ -94,13 +95,20 @@ function ElementItem({
       <code className="element-item">
         <div className="element-controller">
           {children.length > 0 && (
-            <CaretRightOutlined
-              className="element-controller__btn"
-              rotate={spread ? 90 : 0}
+            <button
+              type="button"
+              className="element-controller__btn p-0 bg-transparent border-0 cursor-pointer inline-flex items-center text-muted-foreground hover:text-foreground"
               onClick={() => {
                 setSpread(!spread);
               }}
-            />
+              aria-label="Toggle element expansion"
+            >
+              <ChevronRight
+                className={`size-3 transition-transform duration-150 ${
+                  spread ? 'rotate-90' : ''
+                }`}
+              />
+            </button>
           )}
         </div>
         <div className="element-content">

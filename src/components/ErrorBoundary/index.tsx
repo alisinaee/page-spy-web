@@ -1,9 +1,7 @@
-import { GithubOutlined, ReloadOutlined } from '@ant-design/icons';
-import { Row, Col, Button } from 'antd';
-import Title from 'antd/es/typography/Title';
+import { RotateCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Component, ReactNode } from 'react';
 import './index.less';
-import Link from 'antd/es/typography/Link';
 import { Trans, useTranslation } from 'react-i18next';
 
 const ErrorElement = ({ error }: { error: Error }) => {
@@ -11,39 +9,39 @@ const ErrorElement = ({ error }: { error: Error }) => {
   return (
     <div className="error-boundary">
       <div className="error-container">
-        <Row align="middle" gutter={32}>
-          <Col>
-            <div className="logo" />
-          </Col>
-          <Col>
-            <Title level={3}>😱 {t('error.oops')}</Title>
-            <p className="error-actions">
+        <div className="flex items-center gap-8 flex-col sm:flex-row">
+          <div className="logo shrink-0" />
+          <div>
+            <h3 className="text-xl font-bold mb-2">😱 {t('error.oops')}</h3>
+            <p className="error-actions flex items-center flex-wrap gap-2 text-sm text-muted-foreground">
               <Trans i18nKey="error.actions">
                 You can take a
                 <Button
-                  size="middle"
-                  icon={<ReloadOutlined />}
+                  size="sm"
+                  variant="outline"
                   onClick={() => {
                     window.location.reload();
                   }}
+                  className="mx-1"
                 >
+                  <RotateCw className="h-3.5 w-3.5 mr-1" />
                   Try again
                 </Button>
                 or
-                <Button size="middle" icon={<GithubOutlined />}>
-                  <Link
-                    href={`${import.meta.env.VITE_GITHUB_REPO}/issues`}
-                    target="_blank"
-                  >
-                    Report
-                  </Link>
-                </Button>
+                <a
+                  href={`${import.meta.env.VITE_GITHUB_REPO}/issues`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mx-1 inline-flex items-center justify-center rounded-md border border-input bg-background px-3 py-1 text-xs font-medium shadow-xs hover:bg-accent hover:text-accent-foreground"
+                >
+                  Report
+                </a>
                 the issue.
               </Trans>
             </p>
-          </Col>
-        </Row>
-        <div className="error-detail">
+          </div>
+        </div>
+        <div className="error-detail mt-4">
           <pre>{error.stack}</pre>
         </div>
       </div>

@@ -1,6 +1,5 @@
 import { useSocketMessageStore } from '@/store/socket-message';
-import { Row, Col, Input, Select, Space } from 'antd';
-import React, { useCallback } from 'react';
+import React, { useMemo, useState } from 'react';
 import { SpyConsole } from '@huolala-tech/page-spy-types';
 import ErrorSvg from '@/assets/image/error.svg?react';
 import InfoSvg from '@/assets/image/info.svg?react';
@@ -11,6 +10,13 @@ import './index.less';
 import { debounce } from 'lodash-es';
 import { useShallow } from 'zustand/react/shallow';
 import { SectionLogActions } from '@/pages/Devtools/SectionLogActions';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from '@/components/ui/tooltip';
 
 export const HeaderActions = () => {
   const [changeConsoleMsgFilter, setConsoleMsgKeywordFilter] =
@@ -21,86 +27,74 @@ export const HeaderActions = () => {
       ]),
     );
 
-  const logLevelList: Array<{
-    label: string | React.ReactNode;
-    value: SpyConsole.ProxyType;
-  }> = [
-    {
-      label: (
-        <div className="select-item">
-          <UserSvg style={{ height: 15, width: 15 }} />
-          <span className="select-item label-text">User messages</span>
-        </div>
-      ),
-      value: 'log',
-    },
-    {
-      label: (
-        <div className="select-item">
-          <ErrorSvg style={{ height: 15, width: 15 }} />
-          <span className="select-item label-text">Errors</span>
-        </div>
-      ),
-      value: 'error',
-    },
-    {
-      label: (
-        <div className="select-item">
-          <WarnSvg style={{ height: 15, width: 15 }} />
-          <span className="select-item label-text">Warnings</span>
-        </div>
-      ),
-      value: 'warn',
-    },
-    {
-      label: (
-        <div className="select-item">
-          <InfoSvg style={{ height: 15, width: 15 }} />
-          <span className="select-item label-text">Info</span>
-        </div>
-      ),
-      value: 'info',
-    },
-    {
-      label: (
-        <div className="select-item">
-          <DebugSvg style={{ height: 15, width: 15 }} />
-          <span className="select-item label-text">Verbose</span>
-        </div>
-      ),
-      value: 'debug',
-    },
-  ];
-
-  const debounceKeywordFilter = useCallback(
-    debounce((e) => {
-      setConsoleMsgKeywordFilter(e.target.value);
-    }, 300),
+  const [selectedLevels, setSelectedLevels] = useState<SpyConsole.ProxyType[]>(
     [],
   );
 
+  const toggleLevel = (level: SpyConsole.ProxyType) => {
+    const next = selectedLevels.includes(level)
+      ? selectedLevels.filter((l) => l !== level)
+      : [...selectedLevels, level];
+    setSelectedLevels(next);
+    changeConsoleMsgFilter(next);
+  };
+
+  const logLevelList: Array<{
+    label: string;
+    value: SpyConsole.ProxyType;
+    icon: React.ComponentType<{ className?: string }>;
+  }> = [
+    { label: 'User messages', value: 'log', icon: UserSvg },
+    { label: 'Errors', value: 'error', icon: ErrorSvg },
+    { label: 'Warnings', value: 'warn', icon: WarnSvg },
+    { label: 'Info', value: 'info', icon: InfoSvg },
+    { label: 'Verbose', value: 'debug', icon: DebugSvg },
+  ];
+
+  const debouncedKeywordFilter = useMemo(
+    () =>
+      debounce((val: string) => {
+        setConsoleMsgKeywordFilter(val);
+      }, 300),
+    [setConsoleMsgKeywordFilter],
+  );
+
   return (
-    <Row justify="end" className="console-header-actions">
-      <Col xs={24} sm={24} md="auto" style={{ width: '100%' }}>
-        <Space wrap style={{ width: '100%', justifyContent: 'flex-end' }}>
-          <Select
-            onChange={changeConsoleMsgFilter}
-            maxTagCount="responsive"
-            mode="multiple"
-            allowClear={true}
-            options={logLevelList}
-            placeholder="Log Level Filter"
-            className="console-filter-select"
-          />
-          <Input
-            onChange={debounceKeywordFilter}
-            placeholder="Keyword Filter"
-            allowClear={true}
-            className="console-filter-input"
-          />
-          <SectionLogActions section="console" />
-        </Space>
-      </Col>
-    </Row>
+    <div className="console-header-actions flex flex-wrap items-center justify-end gap-2 p-1.5 w-full">
+      <div className="flex items-center gap-1 overflow-x-auto">
+        {logLevelList.map(({ label, value, icon: IconComponent }) => {
+          const isActive = selectedLevels.includes(value);
+          return (
+            <Tooltip key={value}>
+              <TooltipTrigger render={<span />}>
+                <Button
+                  type="button"
+                  variant={isActive ? 'default' : 'outline'}
+                  size="xs"
+                  className={`h-7 px-2 text-xs flex items-center gap-1 ${
+                    isActive ? 'border-primary' : 'opacity-70 hover:opacity-100'
+                  }`}
+                  onClick={() => toggleLevel(value)}
+                >
+                  <IconComponent className="size-3.5" />
+                  <span className="hidden sm:inline">{label}</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{label}</TooltipContent>
+            </Tooltip>
+          );
+        })}
+      </div>
+
+      <div className="w-36 sm:w-48">
+        <Input
+          onChange={(e) => debouncedKeywordFilter(e.target.value)}
+          placeholder="Keyword Filter"
+          className="h-7 text-xs"
+        />
+      </div>
+
+      <SectionLogActions section="console" />
+    </div>
   );
 };

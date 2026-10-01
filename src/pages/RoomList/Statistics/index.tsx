@@ -1,5 +1,4 @@
 import { ClientRoomInfo } from '@/utils/brand';
-import { Row, Col } from 'antd';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -45,19 +44,25 @@ export const Statistics = memo(({ data }: Props) => {
   );
 
   return (
-    <Row justify="space-between" className="statistic">
-      <Col className="statistics-item">
-        <p>{t('active')}</p>
-        <p style={{ color: '#389e0d' }}>{active.length}</p>
-      </Col>
-      <Col className="statistics-item">
-        <p>{t('wait')}</p>
-        <p style={{ color: '#faad14' }}>{wait.length}</p>
-      </Col>
-      <Col className="statistics-item">
-        <p>{t('inactive')}</p>
-        <p style={{ color: '#bfbfbf' }}>{inactive.length}</p>
-      </Col>
-    </Row>
+    <div className="statistic flex justify-between items-center py-2 px-3 border border-border/50 rounded-lg bg-card/40 my-3">
+      <div className="statistics-item text-center">
+        <p className="text-xs text-muted-foreground m-0">{t('active')}</p>
+        <p className="text-base font-semibold text-emerald-500 m-0">
+          {active.length}
+        </p>
+      </div>
+      <div className="statistics-item text-center">
+        <p className="text-xs text-muted-foreground m-0">{t('wait')}</p>
+        <p className="text-base font-semibold text-amber-500 m-0">
+          {wait.length}
+        </p>
+      </div>
+      <div className="statistics-item text-center">
+        <p className="text-xs text-muted-foreground m-0">{t('inactive')}</p>
+        <p className="text-base font-semibold text-muted-foreground m-0">
+          {inactive.length}
+        </p>
+      </div>
+    </div>
   );
 });

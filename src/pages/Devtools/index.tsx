@@ -1,26 +1,3 @@
-import {
-  Button,
-  Col,
-  Divider,
-  Drawer,
-  Layout,
-  Menu,
-  message,
-  Popconfirm,
-  Row,
-  Space,
-  Skeleton,
-  Tag,
-  Tooltip,
-  Typography,
-} from 'antd';
-import {
-  ClearOutlined,
-  CopyOutlined,
-  DownloadOutlined,
-  SettingOutlined,
-  MenuOutlined,
-} from '@ant-design/icons';
 import copy from 'copy-to-clipboard';
 import React, { memo, useEffect, useMemo, useState } from 'react';
 import ConsolePanel from './ConsolePanel';
@@ -40,12 +17,7 @@ import '@huolala-tech/react-json-view/dist/style.css';
 import { throttle } from 'lodash-es';
 import { CUSTOM_EVENT } from '@/store/socket-message/socket';
 import { SpyClient } from '@huolala-tech/page-spy-types';
-import MPWarning from '@/components/MPWarning';
-import {
-  isBrowser,
-  isHarmonyApp,
-  isMiniProgram,
-} from '@/store/platform-config';
+import { isBrowser } from '@/store/platform-config';
 import { useShallow } from 'zustand/react/shallow';
 import {
   downloadDeviceSession,
@@ -53,9 +25,30 @@ import {
   suggestDeviceLogName,
 } from '@/utils/device-session';
 import { confirmLogFileName } from './save-log-dialog';
-
-const { Sider, Content } = Layout;
-const { Title } = Typography;
+import { message } from '@/utils/message';
+import { Button } from '@/components/ui/button';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Copy, Download, Trash2, Settings } from 'lucide-react';
 
 type MenuType = 'Console' | 'Network' | 'Page' | 'Storage' | 'System';
 
@@ -87,9 +80,7 @@ const MENU_COMPONENTS: Record<
   System: {
     component: SystemPanel,
     visible: ({ browser }) => {
-      return (
-        isBrowser(browser) || isHarmonyApp(browser) || isMiniProgram(browser)
-      );
+      return isBrowser(browser);
     },
   },
 };
@@ -162,13 +153,31 @@ const BadgeMenu = memo(({ active, badge }: BadgeMenuProps) => {
   );
   const visibleMenus = useVisibleMenus();
 
-  const menuItems = useMemo(() => {
-    if (!clientInfo) return;
-    return visibleMenus.map((key) => ({
-      key,
-      label: (
-        <div
-          className="sider-menu__item"
+  if (!clientInfo) {
+    return (
+      <div className="space-y-2 p-2">
+        {Object.keys(MENU_COMPONENTS).map((_, index) => (
+          <div
+            key={index}
+            className="h-8 bg-muted rounded animate-pulse w-[90%] mx-auto"
+          />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <nav className="sider-menu flex flex-col gap-1 p-2">
+      {visibleMenus.map((key) => (
+        <button
+          key={key}
+          type="button"
+          className={clsx(
+            'sider-menu__item w-full flex items-center justify-between px-3 py-2 text-sm rounded-md text-left transition-colors cursor-pointer',
+            active === key
+              ? 'bg-secondary text-foreground font-medium'
+              : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50',
+          )}
           onClick={() => {
             navigate({ search, hash: key });
           }}
@@ -179,32 +188,9 @@ const BadgeMenu = memo(({ active, badge }: BadgeMenuProps) => {
               show: badge[key as MenuType],
             })}
           />
-        </div>
-      ),
-    }));
-  }, [clientInfo, visibleMenus, badge, navigate, search, t]);
-
-  if (!clientInfo) {
-    return (
-      <>
-        {Object.keys(MENU_COMPONENTS).map((_, index) => (
-          <Skeleton.Button
-            key={index}
-            active
-            style={{ display: 'block', width: '90%', margin: '12px auto 0' }}
-          />
-        ))}
-      </>
-    );
-  }
-
-  return (
-    <Menu
-      className="sider-menu"
-      mode="inline"
-      selectedKeys={[active]}
-      items={menuItems}
-    />
+        </button>
+      ))}
+    </nav>
   );
 });
 
@@ -218,6 +204,7 @@ const ClientInfo = memo(() => {
   const clearDeviceSession = useSocketMessageStore(
     (state) => state.clearDeviceSession,
   );
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
 
   const copyAllLogs = () => {
     try {
@@ -253,82 +240,125 @@ const ClientInfo = memo(() => {
       type: 'debug',
       data: 'console.clear()',
     });
+    setClearConfirmOpen(false);
     message.success(t('clear-success'));
   };
 
   return (
-    <div className="client-info">
-      <Title level={4} style={{ marginBlock: 12 }}>
+    <div className="client-info p-3 text-center">
+      <h4 className="text-sm font-semibold tracking-tight my-2">
         {t('device')}
-      </Title>
-      <Row wrap={false} align="middle" style={{ textAlign: 'center' }}>
-        <Tooltip
-          title={
-            <>
-              <span>
-                {t('system')}: {clientInfo?.os.name}
-              </span>
-              <br />
-              <span>
-                {t('version')}: {clientInfo?.os.version}
-              </span>
-            </>
-          }
-        >
-          <Col span={11}>
-            <img className="client-info__logo" src={clientInfo?.os.logo} />
-          </Col>
+      </h4>
+      <div className="flex items-center justify-around py-2">
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <div className="cursor-pointer">
+                <img
+                  className="client-info__logo w-8 h-8 mx-auto"
+                  src={clientInfo?.os.logo}
+                  alt={clientInfo?.os.name}
+                />
+              </div>
+            }
+          />
+          <TooltipContent>
+            <span>
+              {t('system')}: {clientInfo?.os.name}
+            </span>
+            <br />
+            <span>
+              {t('version')}: {clientInfo?.os.version}
+            </span>
+          </TooltipContent>
         </Tooltip>
-        <Divider type="vertical" />
-        <Tooltip
-          title={
-            <>
-              <span>
-                {t('platform')}: {clientInfo?.browser.name}
-              </span>
-              <br />
-              <span>
-                {t('version')}: {clientInfo?.browser.version}
-              </span>
-            </>
-          }
-        >
-          <Col span={11}>
-            <img className="client-info__logo" src={clientInfo?.browser.logo} />
-          </Col>
+        <Separator orientation="vertical" className="h-6" />
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <div className="cursor-pointer">
+                <img
+                  className="client-info__logo w-8 h-8 mx-auto"
+                  src={clientInfo?.browser.logo}
+                  alt={clientInfo?.browser.name}
+                />
+              </div>
+            }
+          />
+          <TooltipContent>
+            <span>
+              {t('platform')}: {clientInfo?.browser.name}
+            </span>
+            <br />
+            <span>
+              {t('version')}: {clientInfo?.browser.version}
+            </span>
+          </TooltipContent>
         </Tooltip>
-      </Row>
-      <Divider type="horizontal" style={{ margin: '8px 0' }} />
-      <Tooltip title="Device ID">
-        <Row justify="center" className="page-spy-id">
-          <Col>
-            <b>{address.slice(0, 4)}</b>
-          </Col>
-        </Row>
+      </div>
+      <Separator className="my-2" />
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <div className="page-spy-id text-xs font-mono font-bold cursor-pointer my-1">
+              #{address.slice(0, 4)}
+            </div>
+          }
+        />
+        <TooltipContent>Device ID</TooltipContent>
       </Tooltip>
-      <Space className="client-info__actions" direction="vertical" size={8}>
-        <Button size="small" icon={<CopyOutlined />} onClick={copyAllLogs}>
+      <div className="client-info__actions flex flex-col gap-2 mt-2">
+        <Button
+          size="sm"
+          variant="outline"
+          className="w-full text-xs h-8"
+          onClick={copyAllLogs}
+        >
+          <Copy className="h-3.5 w-3.5 mr-1" />
           {t('copy-all')}
         </Button>
         <Button
-          size="small"
-          icon={<DownloadOutlined />}
+          size="sm"
+          variant="outline"
+          className="w-full text-xs h-8"
           onClick={downloadAllLogs}
         >
+          <Download className="h-3.5 w-3.5 mr-1" />
           {t('download')}
         </Button>
-        <Popconfirm
-          title={t('clear-confirm-title')}
-          description={t('clear-confirm-description')}
-          okText="Clear"
-          cancelText="Cancel"
-          onConfirm={clearPanelLogs}
+        <Button
+          size="sm"
+          variant="destructive"
+          className="w-full text-xs h-8"
+          onClick={() => setClearConfirmOpen(true)}
         >
-          <Button danger size="small" icon={<ClearOutlined />}>
-            {t('clear-panel-logs')}
-          </Button>
-        </Popconfirm>
-      </Space>
+          <Trash2 className="h-3.5 w-3.5 mr-1" />
+          {t('clear-panel-logs')}
+        </Button>
+      </div>
+
+      <Dialog open={clearConfirmOpen} onOpenChange={setClearConfirmOpen}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader>
+            <DialogTitle>{t('clear-confirm-title')}</DialogTitle>
+            <DialogDescription>
+              {t('clear-confirm-description')}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setClearConfirmOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button variant="destructive" size="sm" onClick={clearPanelLogs}>
+              Clear
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 });
@@ -371,31 +401,26 @@ export default function Devtools() {
   }
 
   return (
-    <div className="page-spy-devtools-root">
-      {/* Mobile Top Navigation (shown on mobile via CSS) */}
-
+    <div className="page-spy-devtools-root flex flex-col h-full overflow-hidden">
       {/* Main Layout (Sider on left on desktop, hidden on mobile via CSS) */}
-      <Layout className="page-spy-devtools">
-        <Sider theme="light" className="devtools-desktop-sider">
+      <div className="page-spy-devtools flex flex-1 overflow-hidden">
+        <aside className="devtools-desktop-sider w-56 shrink-0 border-r border-border bg-card flex flex-col overflow-y-auto">
           <div className="page-spy-devtools__sider">
             <ClientInfo />
-            {clientInfo?.plugins?.includes('MPEvalPlugin') && (
-              <MPWarning className="sider-warning" />
-            )}
             <BadgeMenu active={hashKey} badge={badge} />
           </div>
-        </Sider>
-        <Content className="page-spy-devtools__content">
+        </aside>
+        <main className="page-spy-devtools__content flex-1 flex flex-col min-w-0 overflow-hidden">
           <ConnectStatus />
-          <div className="page-spy-devtools__panel">
+          <div className="page-spy-devtools__panel flex-1 overflow-hidden">
             <ActiveContent />
           </div>
-        </Content>
-      </Layout>
+        </main>
+      </div>
 
       {/* Floating Action Button (FAB) for mobile */}
       <div
-        className="devtools-floating-fab"
+        className="devtools-floating-fab cursor-pointer flex items-center justify-center"
         onClick={() => setBottomSheetOpen(true)}
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') {
@@ -407,76 +432,53 @@ export default function Devtools() {
         tabIndex={0}
         title="Open Side Panel & Actions"
       >
-        <SettingOutlined style={{ fontSize: 20, color: '#fff' }} />
+        <Settings className="w-5 h-5 text-white" />
         {Object.values(badge).some(Boolean) && (
           <span className="fab-badge-dot" />
         )}
       </div>
 
       {/* Mobile BottomSheet Drawer for Side Panel */}
-      <Drawer
-        title={
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              width: '100%',
-              paddingRight: 16,
-            }}
-          >
-            <span>{t('device')} &amp; Side Panel</span>
-            <Tag
-              color="purple"
-              style={{ fontFamily: 'Monaco', fontWeight: 700 }}
-            >
-              #{address.slice(0, 4)}
-            </Tag>
-          </div>
-        }
-        placement="bottom"
-        open={bottomSheetOpen}
-        onClose={() => setBottomSheetOpen(false)}
-        height="80vh"
-        className="devtools-mobile-bottomsheet"
-      >
-        <div className="mobile-bottomsheet-body">
-          <div className="bottomsheet-panel-switcher">
-            <Typography.Text
-              type="secondary"
-              style={{ fontSize: 12, marginBottom: 8, display: 'block' }}
-            >
-              Switch Panel
-            </Typography.Text>
-            <div className="bottomsheet-panel-buttons">
-              {visibleMenus.map((key) => (
-                <Button
-                  key={key}
-                  type={key === hashKey ? 'primary' : 'default'}
-                  onClick={() => {
-                    navigate({ search, hash: key });
-                    setBottomSheetOpen(false);
-                  }}
-                  style={{ borderRadius: 16, margin: '2px 4px' }}
-                >
-                  {t(`menu.${key}`)}
-                  {badge[key] && (
-                    <span
-                      className="tab-circle-badge"
-                      style={{ marginLeft: 4 }}
-                    />
-                  )}
-                </Button>
-              ))}
+      <Sheet open={bottomSheetOpen} onOpenChange={setBottomSheetOpen}>
+        <SheetContent side="bottom" className="h-[80vh] overflow-y-auto p-4">
+          <SheetHeader className="pb-3 border-b border-border">
+            <SheetTitle className="flex items-center justify-between">
+              <span>{t('device')} &amp; Side Panel</span>
+              <Badge variant="secondary" className="font-mono font-bold">
+                #{address.slice(0, 4)}
+              </Badge>
+            </SheetTitle>
+          </SheetHeader>
+          <div className="mobile-bottomsheet-body py-4 space-y-4">
+            <div className="bottomsheet-panel-switcher">
+              <span className="text-xs text-muted-foreground block mb-2 font-medium">
+                Switch Panel
+              </span>
+              <div className="bottomsheet-panel-buttons flex flex-wrap gap-2">
+                {visibleMenus.map((key) => (
+                  <Button
+                    key={key}
+                    size="touch"
+                    variant={key === hashKey ? 'default' : 'outline'}
+                    onClick={() => {
+                      navigate({ search, hash: key });
+                      setBottomSheetOpen(false);
+                    }}
+                    className="rounded-full"
+                  >
+                    {t(`menu.${key}`)}
+                    {badge[key] && (
+                      <span className="tab-circle-badge ml-1 inline-block w-2 h-2 rounded-full bg-red-500" />
+                    )}
+                  </Button>
+                ))}
+              </div>
             </div>
+            <Separator />
+            <ClientInfo />
           </div>
-          <Divider style={{ margin: '12px 0' }} />
-          <ClientInfo />
-          {clientInfo?.plugins?.includes('MPEvalPlugin') && (
-            <MPWarning className="sider-warning" />
-          )}
-        </div>
-      </Drawer>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

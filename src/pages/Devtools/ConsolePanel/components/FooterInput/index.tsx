@@ -1,29 +1,28 @@
+import { ChevronRight, Play, Pause, AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import {
-  CaretRightOutlined,
-  PauseOutlined,
-  RightOutlined,
-  ExclamationCircleFilled,
-} from '@ant-design/icons';
-import { Input, Button, Tooltip } from 'antd';
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from '@/components/ui/tooltip';
 import { Shortcuts } from '../Shortcuts';
 import { useSocketMessageStore } from '@/store/socket-message';
-import { TextAreaRef } from 'antd/es/input/TextArea';
 import { useRef, useState, useEffect, useCallback, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { KeyboardEvent } from 'react';
 import { useMiscStore } from '@/store/misc';
-import { parse, Program } from 'acorn';
 import { useShallow } from 'zustand/react/shallow';
+
 const EXECUTE_HISTORY_ID = 'page_spy_execute_history';
 const EXECUTE_HISTORY_MAX_SIZE = 100;
 
 export const FooterInput = memo(() => {
   const { t } = useTranslation('translation', { keyPrefix: 'console' });
-  const [socket, clearRecord, clientInfo] = useSocketMessageStore(
-    useShallow((state) => [state.socket, state.clearRecord, state.clientInfo]),
+  const [socket, clearRecord] = useSocketMessageStore(
+    useShallow((state) => [state.socket, state.clearRecord]),
   );
 
-  const inputRef = useRef<TextAreaRef | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const [code, setCode] = useState<string>('');
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const executeHistory = useRef<string[]>(
@@ -33,7 +32,6 @@ export const FooterInput = memo(() => {
     state.isAutoScroll,
     state.setIsAutoScroll,
   ]);
-  const [showInputError, setShowInputError] = useState(false);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -53,35 +51,10 @@ export const FooterInput = memo(() => {
   const handleDebugCode = useCallback(() => {
     const trimedCode = code.trim();
     if (trimedCode) {
-      const browserType = clientInfo?.browser.type;
-      if (browserType?.startsWith('mp-') || browserType === 'uni-native') {
-        let nodes = {} as Program;
-        try {
-          nodes = parse(trimedCode, {
-            ecmaVersion: 5,
-            ranges: true,
-            locations: true,
-          });
-        } catch (e) {
-          setShowInputError(true);
-          setTimeout(() => {
-            setShowInputError(false);
-          }, 5000);
-          return;
-        }
-        socket?.unicastMessage({
-          type: 'debug',
-          data: {
-            code: trimedCode,
-            nodes,
-          },
-        });
-      } else {
-        socket?.unicastMessage({
-          type: 'debug',
-          data: trimedCode,
-        });
-      }
+      socket?.unicastMessage({
+        type: 'debug',
+        data: trimedCode,
+      });
 
       setCode('');
       const historyStorage = executeHistory.current;
@@ -189,53 +162,48 @@ export const FooterInput = memo(() => {
   );
 
   return (
-    <div className="console-item page-spy-input">
-      <RightOutlined className="icon" />
-      <Tooltip
-        open={showInputError}
-        title={
-          <span>
-            <ExclamationCircleFilled
-              style={{ color: '#f5222d', marginRight: 6 }}
-            />
-            {t('mp-code-error')}
-          </span>
-        }
-      >
-        <code style={{ flex: 1 }}>
-          <Input.TextArea
-            spellCheck="false"
-            placeholder={t('placeholder')!}
-            variant="borderless"
-            autoSize
-            ref={inputRef}
-            value={code}
-            onChange={(evt) => setCode(evt.target.value)}
-            className="mono-code"
-            onKeyDown={onTextareaKeyDown}
-          />
-        </code>
-      </Tooltip>
+    <div className="console-item page-spy-input flex items-center gap-2 p-2 border-t border-border bg-card">
+      <ChevronRight className="icon size-4 text-primary shrink-0" />
+      <div className="relative flex-1">
+        <textarea
+          ref={inputRef}
+          spellCheck="false"
+          placeholder={t('placeholder')!}
+          rows={1}
+          value={code}
+          onChange={(evt) => setCode(evt.target.value)}
+          className="mono-code w-full resize-none border-0 bg-transparent p-0 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:outline-none"
+          onKeyDown={onTextareaKeyDown}
+        />
+      </div>
       <Button
-        type="primary"
-        size="small"
-        style={{ marginTop: 4, marginRight: 8 }}
+        variant="default"
+        size="sm"
+        className="h-7 px-3 text-xs"
         onClick={handleDebugCode}
       >
         {t('run')}
       </Button>
-      <Tooltip
-        title={!isAutoScroll ? t('auto-scroll-on') : t('auto-scroll-off')}
-      >
-        <Button
-          onClick={() => {
-            setIsAutoScroll(!isAutoScroll);
-          }}
-          size="small"
-          style={{ marginTop: 4 }}
-        >
-          {!isAutoScroll ? <CaretRightOutlined /> : <PauseOutlined />}
-        </Button>
+      <Tooltip>
+        <TooltipTrigger render={<span />}>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => {
+              setIsAutoScroll(!isAutoScroll);
+            }}
+            aria-label="Toggle auto scroll"
+          >
+            {!isAutoScroll ? (
+              <Play className="size-3.5" />
+            ) : (
+              <Pause className="size-3.5" />
+            )}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          {!isAutoScroll ? t('auto-scroll-on') : t('auto-scroll-off')}
+        </TooltipContent>
       </Tooltip>
       <Shortcuts />
     </div>

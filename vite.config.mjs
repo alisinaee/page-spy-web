@@ -1,17 +1,10 @@
 import { defineConfig } from 'vite';
 import path from 'path';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 import svgr from 'vite-plugin-svgr';
-import mdx from '@mdx-js/rollup';
-import remarkGfm from 'remark-gfm';
-import remarkDirective from 'remark-directive';
-import {
-  remarkMdxCodeGroup,
-  rehypeMdxSlug,
-} from './scripts/unified/custom-plugin.mjs';
 
-export default ({ mode, command }) => {
-  const buildDoc = mode === 'doc';
+export default ({ command }) => {
   const isProd = command === 'build';
 
   return defineConfig({
@@ -19,7 +12,7 @@ export default ({ mode, command }) => {
     build: {
       target: ['chrome100'],
       sourcemap: isProd ? 'hidden' : true,
-      outDir: buildDoc ? 'docs-dist' : 'dist',
+      outDir: 'dist',
       rollupOptions: {
         onwarn(warning, defaultHandler) {
           if (warning.code === 'SOURCEMAP_ERROR') {
@@ -51,11 +44,8 @@ export default ({ mode, command }) => {
       },
     },
     plugins: [
-      mdx({
-        remarkPlugins: [remarkGfm, remarkDirective, remarkMdxCodeGroup],
-        rehypePlugins: [rehypeMdxSlug],
-      }),
       react(),
+      tailwindcss(),
       svgr(),
     ],
     server: {

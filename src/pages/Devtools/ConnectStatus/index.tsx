@@ -1,13 +1,12 @@
 import { SpySocket } from '@huolala-tech/page-spy-types';
-import { Row, Col, Space, Divider } from 'antd';
 import { memo, useEffect, useState } from 'react';
 import './index.less';
 import UserSvg from '@/assets/image/user-1.svg?react';
-import Icon from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useSocketMessageStore } from '@/store/socket-message';
 import { CUSTOM_EVENT } from '@/store/socket-message/socket';
 import { useShallow } from 'zustand/react/shallow';
+import { Separator } from '@/components/ui/separator';
 
 interface ConnectionStatus {
   client?: SpySocket.Connection | null;
@@ -16,11 +15,10 @@ interface ConnectionStatus {
 
 const UserStatus = ({ online }: { online: boolean }) => {
   return (
-    <Icon
-      component={UserSvg}
+    <UserSvg
+      className="size-4"
       style={{
         color: online ? '#2fbf2f' : '#aaa',
-        fontSize: 16,
       }}
     />
   );
@@ -47,22 +45,18 @@ export const ConnectStatus = memo(() => {
   }, [socket]);
 
   return (
-    <Row justify="center" className="connect-status">
-      <Col>
-        <div className="connect-status-widget">
-          <Space>
-            <Space>
-              <UserStatus online={!!connections.debug} />
-              {t('socket.debug-name')}
-            </Space>
-            <Divider type="vertical" />
-            <Space>
-              <UserStatus online={!!connections.client} />
-              {t('socket.client-name')}
-            </Space>
-          </Space>
+    <div className="connect-status flex justify-center items-center py-1">
+      <div className="connect-status-widget flex items-center gap-3 px-3 py-1 bg-card/60 border border-border/40 rounded-full text-xs text-muted-foreground">
+        <div className="flex items-center gap-1.5">
+          <UserStatus online={!!connections.debug} />
+          <span>{t('socket.debug-name')}</span>
         </div>
-      </Col>
-    </Row>
+        <Separator orientation="vertical" className="h-3.5 bg-border/60" />
+        <div className="flex items-center gap-1.5">
+          <UserStatus online={!!connections.client} />
+          <span>{t('socket.client-name')}</span>
+        </div>
+      </div>
+    </div>
   );
 });

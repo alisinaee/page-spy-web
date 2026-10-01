@@ -1,11 +1,9 @@
 import { Column, TableCellRenderer } from 'react-virtualized';
 import { MessageTable } from '.';
-import { Typography } from 'antd';
 import dayjs from 'dayjs';
 import { useCallback, useMemo } from 'react';
 import { isNil } from 'lodash-es';
-
-const { Text } = Typography;
+import React from 'react';
 
 interface EventsourceData {
   id: string;
@@ -17,20 +15,30 @@ export const EventsourceTable = ({ data }: { data: EventsourceData[] }) => {
   const tableData = useMemo(() => {
     return data.filter((item) => !isNil(item.data));
   }, [data]);
+
   const IdColumn = useCallback<TableCellRenderer>(({ rowData }) => {
-    return <Text ellipsis={{ tooltip: true }}>{rowData.id}</Text>;
+    return (
+      <span className="truncate block font-mono text-xs" title={rowData.id}>
+        {rowData.id}
+      </span>
+    );
   }, []);
+
   const DataColumn = useCallback<TableCellRenderer>(({ rowData }) => {
-    return <Text ellipsis>{rowData.data}</Text>;
+    return (
+      <span className="truncate block font-mono text-xs" title={rowData.data}>
+        {rowData.data}
+      </span>
+    );
   }, []);
 
   const TimeColumn = useCallback<TableCellRenderer>(({ rowData }) => {
     return (
-      <Text ellipsis>
+      <span className="truncate block font-mono text-xs text-muted-foreground">
         {rowData.timestamp
           ? dayjs(rowData.timestamp).format('HH:mm:ss:SSS')
           : ''}
-      </Text>
+      </span>
     );
   }, []);
 

@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
-import { Form, Input, Button, Card, Spin, Flex, Tooltip } from 'antd';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 import {
-  InfoCircleOutlined,
-  LockOutlined,
-  LoginOutlined,
-} from '@ant-design/icons';
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { Info, Lock, LogIn } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/utils/AuthContext';
 import './style.less';
@@ -13,66 +17,82 @@ const AuthLogin: React.FC = () => {
   const { t } = useTranslation();
   const { login, loading } = useAuth();
   const [submitting, setSubmitting] = useState(false);
+  const [password, setPassword] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
 
-  // 处理登录表单提交
-  const handleSubmit = async (values: { password: string }) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!password.trim()) {
+      setErrorMsg(t('auth.please_enter_password') as string);
+      return;
+    }
+    setErrorMsg('');
     setSubmitting(true);
     try {
-      await login(values.password);
+      await login(password);
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="auth-login-container">
-      <Spin spinning={loading}>
-        <Card
-          title={
-            <Flex align="center" gap={8}>
+    <div className="auth-login-container flex items-center justify-center min-h-[60vh] p-4">
+      {loading ? (
+        <Spinner className="h-8 w-8 text-primary" />
+      ) : (
+        <Card className="auth-login-card w-full max-w-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
               <span>{t('auth.login_title')}</span>
-              <Tooltip
-                title={t('auth.login_title_desc') as string}
-                placement="bottom"
-              >
-                <InfoCircleOutlined />
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <span className="text-muted-foreground hover:text-foreground cursor-pointer inline-flex">
+                      <Info className="h-4 w-4" />
+                    </span>
+                  }
+                />
+                <TooltipContent>
+                  {t('auth.login_title_desc') as string}
+                </TooltipContent>
               </Tooltip>
-            </Flex>
-          }
-          className="auth-login-card"
-        >
-          <Form name="login" onFinish={handleSubmit} layout="vertical">
-            <Form.Item
-              name="password"
-              rules={[
-                {
-                  required: true,
-                  message: t('auth.please_enter_password') as string,
-                },
-              ]}
-            >
-              <Input.Password
-                prefix={<LockOutlined />}
-                placeholder={t('auth.password') as string}
-                size="large"
-              />
-            </Form.Item>
-
-            <Form.Item>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="password"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (errorMsg) setErrorMsg('');
+                  }}
+                  placeholder={t('auth.password') as string}
+                  className="pl-9 h-11"
+                />
+              </div>
+              {errorMsg && (
+                <p className="text-xs text-destructive">{errorMsg}</p>
+              )}
               <Button
-                type="primary"
-                htmlType="submit"
-                loading={submitting}
-                block
-                size="large"
-                icon={<LoginOutlined />}
+                type="submit"
+                size="touch"
+                disabled={submitting}
+                className="w-full"
               >
+                {submitting ? (
+                  <Spinner className="h-4 w-4 mr-2" />
+                ) : (
+                  <LogIn className="h-4 w-4 mr-2" />
+                )}
                 {t('auth.login_button') as string}
               </Button>
-            </Form.Item>
-          </Form>
+            </form>
+          </CardContent>
         </Card>
-      </Spin>
+      )}
     </div>
   );
 };

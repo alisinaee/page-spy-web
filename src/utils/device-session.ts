@@ -30,9 +30,9 @@ const normalizeValue = (
   if (valueType === 'string' || valueType === 'boolean') return value;
   if (valueType === 'number')
     return Number.isFinite(value as number) ? value : null;
-  if (valueType === 'bigint') return value.toString();
+  if (valueType === 'bigint') return (value as bigint).toString();
   if (valueType === 'undefined' || valueType === 'function') return undefined;
-  if (valueType === 'symbol') return value.toString();
+  if (valueType === 'symbol') return (value as symbol).toString();
 
   if (value instanceof Error) {
     return {

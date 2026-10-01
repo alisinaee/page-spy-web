@@ -1,13 +1,22 @@
-import { PropsWithChildren, ReactNode, useMemo, useRef, useState } from 'react';
+import { PropsWithChildren, useMemo, useRef, useState } from 'react';
 import { AutoSizer, Table } from 'react-virtualized';
-import { Select, Input, Empty, Drawer } from 'antd';
-import { FilterOutlined } from '@ant-design/icons';
+import { Input } from '@/components/ui/input';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
+import { Filter } from 'lucide-react';
 import clsx from 'clsx';
 import ReactJsonView from '@huolala-tech/react-json-view';
 import { useThrottle } from 'ahooks';
+import React from 'react';
 
 const NoData = () => (
-  <Empty description={false} className="empty-table-placeholder" />
+  <div className="empty-table-placeholder text-center py-8 text-muted-foreground text-xs">
+    No messages
+  </div>
 );
 
 interface DataItem {
@@ -64,37 +73,30 @@ export const MessageTable = ({
   const [activeRow, setActiveRow] = useState<DataItem | null>(null);
 
   return (
-    <div className="message-table">
-      <div className="message-table-header">
+    <div className="message-table flex flex-col h-full">
+      <div className="message-table-header flex items-center gap-2 p-2 border-b border-border">
         {type === 'websocket' && (
-          <Select
-            size="small"
-            style={{ width: 100 }}
-            variant="borderless"
+          <select
             value={filterType}
-            options={[
-              { label: 'All', value: 'all' },
-              { label: 'Send', value: 'send' },
-              { label: 'Receive', value: 'receive' },
-            ]}
-            onChange={(value) => {
-              setFilterType(value);
-            }}
-          />
+            onChange={(e) => setFilterType(e.target.value)}
+            className="text-xs bg-secondary border border-border rounded px-2 py-1 w-24"
+          >
+            <option value="all">All</option>
+            <option value="send">Send</option>
+            <option value="receive">Receive</option>
+          </select>
         )}
-        <Input
-          size="small"
-          style={{ width: 400 }}
-          variant="filled"
-          value={filterKeyword}
-          prefix={<FilterOutlined style={{ color: '#999' }} />}
-          placeholder="Filter using regexp (example: (web)?socket)"
-          onChange={(e) => {
-            setFilterKeyword(e.target.value);
-          }}
-        />
+        <div className="relative flex-1 max-w-sm">
+          <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            value={filterKeyword}
+            onChange={(e) => setFilterKeyword(e.target.value)}
+            placeholder="Filter using regexp (example: (web)?socket)"
+            className="pl-8 h-7 text-xs"
+          />
+        </div>
       </div>
-      <div className="message-table-body">
+      <div className="message-table-body flex-1 overflow-hidden">
         <AutoSizer>
           {({ width, height }) => {
             return (
@@ -125,19 +127,26 @@ export const MessageTable = ({
           }}
         </AutoSizer>
       </div>
-      <Drawer
+
+      <Sheet
         open={!!activeRow}
-        onClose={() => setActiveRow(null)}
-        title="Data"
-        placement="bottom"
-        getContainer={false}
+        onOpenChange={(open) => !open && setActiveRow(null)}
       >
-        {activeRow?.data ? (
-          <ReactJsonView source={activeRow.data} />
-        ) : (
-          <Empty description={false} />
-        )}
-      </Drawer>
+        <SheetContent side="bottom" className="h-[40vh] overflow-y-auto">
+          <SheetHeader className="pb-2 border-b border-border">
+            <SheetTitle>Data</SheetTitle>
+          </SheetHeader>
+          <div className="p-3 font-mono text-xs">
+            {activeRow?.data ? (
+              <ReactJsonView source={activeRow.data} />
+            ) : (
+              <div className="text-muted-foreground text-center py-4">
+                No data
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };

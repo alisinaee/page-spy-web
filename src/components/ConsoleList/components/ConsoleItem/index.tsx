@@ -1,4 +1,3 @@
-import { Row, Col, Tag, Button } from 'antd';
 import copy from 'copy-to-clipboard';
 import ConsoleNode from '../ConsoleNode';
 import {
@@ -18,12 +17,9 @@ import { useMemo, useRef, useEffect, useState, useCallback } from 'react';
 import ReactJsonView from '@huolala-tech/react-json-view';
 import { useTranslation } from 'react-i18next';
 import { useSize } from 'ahooks';
-import {
-  RightOutlined,
-  DownOutlined,
-  CopyOutlined,
-  CheckOutlined,
-} from '@ant-design/icons';
+import { ChevronRight, ChevronDown, Copy, Check } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { GroupedConsoleItem } from '../../index';
 
 interface Props {
@@ -78,6 +74,19 @@ export const ConsoleItem = ({ data, onHeightChange }: Props) => {
 
   const groupFullText = useMemo(() => {
     if (!data.isGroup || !data.groupItems) return '';
+    const BOX_CHARS_REGEX = /[┌┐└┘│├┤┬┴┼─]/;
+    const isBoxSeparator = (line: string) => {
+      const stripped = line.replace(/\u001b\[[0-9;]*m/g, '').trim();
+      if (!stripped) return false;
+      return (
+        /^[┌┐└┘│├┤┬┴┼─\s_\-]+$/.test(stripped) && BOX_CHARS_REGEX.test(stripped)
+      );
+    };
+    const stripBoxBorder = (line: string) => {
+      const cleaned = line.replace(/\u001b\[[0-9;]*m/g, '');
+      return cleaned.replace(/^[ \t]*│ ?/, '').replace(/ ?│[ \t]*$/, '');
+    };
+
     return data.groupItems
       .map((it) => {
         const line =
@@ -88,8 +97,10 @@ export const ConsoleItem = ({ data, onHeightChange }: Props) => {
                 : JSON.stringify(l.value ?? ''),
             )
             .join(' ') || '';
-        return line.replace(/\u001b\[[0-9;]*m/g, '');
+        return line;
       })
+      .filter((line) => !isBoxSeparator(line))
+      .map((line) => stripBoxBorder(line))
       .join('\n');
   }, [data]);
 
@@ -109,9 +120,9 @@ export const ConsoleItem = ({ data, onHeightChange }: Props) => {
       return (
         <div className="console-group">
           <div className="console-group__row">
-            <Tag color="purple" className="console-group__tag">
+            <Badge variant="secondary" className="console-group__tag">
               GROUP ({data.groupItems?.length})
-            </Tag>
+            </Badge>
             <span
               className={
                 'console-group__title console-group__title--' + data.logType
@@ -129,12 +140,16 @@ export const ConsoleItem = ({ data, onHeightChange }: Props) => {
                   {data.groupItems?.length} grouped lines
                 </span>
                 <Button
-                  size="small"
-                  type="text"
-                  className="console-group-details__copy"
-                  icon={copied ? <CheckOutlined /> : <CopyOutlined />}
+                  size="sm"
+                  variant="ghost"
+                  className="console-group-details__copy h-7 px-2 text-xs"
                   onClick={onCopyGroup}
                 >
+                  {copied ? (
+                    <Check className="h-3 w-3 mr-1" />
+                  ) : (
+                    <Copy className="h-3 w-3 mr-1" />
+                  )}
                   {copied ? 'Copied' : 'Copy'}
                 </Button>
               </div>
@@ -184,39 +199,30 @@ export const ConsoleItem = ({ data, onHeightChange }: Props) => {
         <LogType type={data.logType} />
       </div>
       <div className="console-item__content">
-        <Row gutter={8} wrap={false} align="top">
-          <Col
-            style={{
-              flexShrink: 0,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-            }}
-          >
+        <div className="flex items-start gap-2 flex-nowrap w-full">
+          <div className="shrink-0 flex items-center gap-1">
             {isClickable && (
-              <span
-                className="console-item__toggle-icon"
-                style={{ fontSize: 10, color: '#888' }}
-              >
-                {expanded ? <DownOutlined /> : <RightOutlined />}
+              <span className="console-item__toggle-icon text-muted-foreground">
+                {expanded ? (
+                  <ChevronDown className="h-3 w-3" />
+                ) : (
+                  <ChevronRight className="h-3 w-3" />
+                )}
               </span>
             )}
             <Timestamp time={data.time} />
-          </Col>
-          <Col
-            flex={1}
+          </div>
+          <div
+            className="flex-1 flex flex-wrap overflow-hidden"
             style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              overflow: 'hidden',
               maxHeight: expanded ? 'none' : '26px',
               textOverflow: expanded ? 'initial' : 'ellipsis',
               whiteSpace: expanded ? 'pre-wrap' : 'nowrap',
             }}
           >
             {content}
-          </Col>
-        </Row>
+          </div>
+        </div>
       </div>
       <div className="console-item__url hidden-xs" title={data.url}>
         {getLogUrl(data.url)}

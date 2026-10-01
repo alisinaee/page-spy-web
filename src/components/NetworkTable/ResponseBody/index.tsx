@@ -1,54 +1,75 @@
 import { ResolvedNetworkInfo } from '@/utils';
 import { dataUrlToBlob, downloadFile, semanticSize } from '../utils';
 import { withPopup, usePopupRef } from '@/utils/withPopup';
-import { DownloadOutlined } from '@ant-design/icons';
+import { Download } from 'lucide-react';
 import { ColoredJson } from '../ColoredJson';
-import { Form, message, Modal, Input, Alert, Button, Empty } from 'antd';
-import { useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { EventsourceTable } from './MessageTable/EventsourceTable';
 import { WebsocketTable } from './MessageTable/WebsocketTable';
 import { isPlainObject } from 'lodash-es';
 import { PLACEHOLDER_RESPONSE } from '@/utils/constants';
 import { decodeDataUrl, isTextLike, parseMediaSummary } from '../body-codec';
+import { message } from '@/utils/message';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import React from 'react';
 
 const FilenameModal = withPopup<void, string | false>(
   ({ visible, resolve }) => {
-    const [form] = Form.useForm();
+    const [filename, setFilename] = useState('');
+
     const ok = () => {
-      form.validateFields().then(({ filename }) => {
-        const val = filename.trim();
-        if (val) {
-          resolve(val);
-        } else {
-          message.error('File name cannot be empty');
-        }
-      });
+      const val = filename.trim();
+      if (val) {
+        resolve(val);
+      } else {
+        message.error('File name cannot be empty');
+      }
     };
 
     return (
-      <Modal
-        title="Download"
-        visible={visible}
-        onOk={ok}
-        onCancel={() => {
-          resolve(false);
+      <Dialog
+        open={visible}
+        onOpenChange={(open) => {
+          if (!open) resolve(false);
         }}
       >
-        <Form
-          labelCol={{ span: 5 }}
-          form={form}
-          autoComplete="off"
-          preserve={false}
-        >
-          <Form.Item
-            label="Save as"
-            name="filename"
-            rules={[{ required: true, message: 'File name is required' }]}
-          >
-            <Input placeholder="Input file name" onPressEnter={ok} />
-          </Form.Item>
-        </Form>
-      </Modal>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Download</DialogTitle>
+          </DialogHeader>
+          <div className="py-2 space-y-2">
+            <label className="text-xs text-muted-foreground font-medium">
+              Save as
+            </label>
+            <Input
+              value={filename}
+              onChange={(e) => setFilename(e.target.value)}
+              placeholder="Input file name"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') ok();
+              }}
+              autoFocus
+            />
+          </div>
+          <DialogFooter className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => resolve(false)}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={ok}>
+              OK
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     );
   },
 );
@@ -58,21 +79,19 @@ interface MediaWidgetProps {
 }
 const MediaWidget = ({ dataUrl }: MediaWidgetProps) => {
   const popupRef = usePopupRef<void, string | false>();
+
   // response ==> Blob
   const { blob, mime, data } = dataUrlToBlob(dataUrl);
 
   if (!blob || !mime) {
     return (
-      <Alert
-        message={
-          <>
-            <span>Auto load failed. Following is the origin data:</span>
-            <br />
-            <span>{String(data)}</span>
-          </>
-        }
-        type="error"
-      />
+      <Alert className="border-destructive/40 bg-destructive/10 text-destructive">
+        <AlertDescription className="text-xs">
+          <span>Auto load failed. Following is the origin data:</span>
+          <br />
+          <span>{String(data)}</span>
+        </AlertDescription>
+      </Alert>
     );
   }
 
@@ -88,10 +107,16 @@ const MediaWidget = ({ dataUrl }: MediaWidgetProps) => {
 
   // image/jpeg / image/png .etc.
   if (mime.indexOf('image') > -1) {
-    return <img src={dataUrl} className="response-blob-image" />;
+    return (
+      <img
+        src={dataUrl}
+        className="response-blob-image max-w-full"
+        alt="Response"
+      />
+    );
   }
   return (
-    <div className="media-widget">
+    <div className="media-widget space-y-2">
       {[
         { label: 'File type: ', content: mime },
         {
@@ -101,20 +126,17 @@ const MediaWidget = ({ dataUrl }: MediaWidgetProps) => {
         {
           label: 'Save as: ',
           content: (
-            <Button
-              type="primary"
-              onClick={showModal}
-              size="small"
-              icon={<DownloadOutlined />}
-              style={{ marginLeft: 12 }}
-            >
+            <Button onClick={showModal} size="sm" className="ml-3 h-7 text-xs">
+              <Download className="h-3.5 w-3.5 mr-1" />
               Download
             </Button>
           ),
         },
       ].map(({ label, content }) => (
-        <div className="content-item" key={label}>
-          <b className="content-item__label">{label}</b>
+        <div className="content-item flex items-center text-xs" key={label}>
+          <b className="content-item__label text-muted-foreground mr-2">
+            {label}
+          </b>
           <span className="content-item__value">{content}</span>
         </div>
       ))}
@@ -133,12 +155,9 @@ export const ResponseBody = ({ data }: ResponseBodyProps) => {
 
     if (!response || response === PLACEHOLDER_RESPONSE)
       return (
-        <Empty
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description={false}
-          style={{ margin: '40px 0' }}
-          imageStyle={{ height: 40 }}
-        />
+        <div className="text-center py-10 text-muted-foreground text-xs">
+          No response content
+        </div>
       );
     if (requestType === 'eventsource') {
       return (
@@ -162,12 +181,16 @@ export const ResponseBody = ({ data }: ResponseBodyProps) => {
         }
       }
       if (responseReason) {
-        return <Alert type="error" message={responseReason} />;
+        return (
+          <Alert className="border-destructive/40 bg-destructive/10 text-destructive text-xs">
+            <AlertDescription>{responseReason}</AlertDescription>
+          </Alert>
+        );
       }
       const mediaSummary = parseMediaSummary(response);
       if (mediaSummary) {
         return (
-          <div className="media-widget">
+          <div className="media-widget space-y-2">
             {[
               { label: 'File type: ', content: mediaSummary.type },
               {
@@ -175,8 +198,13 @@ export const ResponseBody = ({ data }: ResponseBodyProps) => {
                 content: semanticSize(mediaSummary.size),
               },
             ].map(({ label, content }) => (
-              <div className="content-item" key={label}>
-                <b className="content-item__label">{label}</b>
+              <div
+                className="content-item flex items-center text-xs"
+                key={label}
+              >
+                <b className="content-item__label text-muted-foreground mr-2">
+                  {label}
+                </b>
                 <span className="content-item__value">{content}</span>
               </div>
             ))}
@@ -189,5 +217,5 @@ export const ResponseBody = ({ data }: ResponseBodyProps) => {
     return <ColoredJson value={response} />;
   }, [data]);
 
-  return <div className="response-body">{bodyContent}</div>;
+  return <div className="response-body p-2">{bodyContent}</div>;
 };

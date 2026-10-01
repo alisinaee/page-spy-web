@@ -1,5 +1,10 @@
-import { message, Tooltip } from 'antd';
-import { CopyOutlined } from '@ant-design/icons';
+import { message } from '@/utils/message';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { Copy } from 'lucide-react';
 import { Fragment, useCallback, useMemo } from 'react';
 import copy from 'copy-to-clipboard';
 import React from 'react';
@@ -37,12 +42,22 @@ const CopyContent: React.FC<Props> = ({ content, rows = 3, length = 120 }) => {
     return React.createElement(Fragment, null, content);
 
   return (
-    <span className="copyable">
+    <span className="copyable inline-flex items-center gap-1">
       <span className="copyable-content">{computedContent}</span>
-      <Tooltip title="Copy">
-        <span className="copyable-icon" onClick={onCopy}>
-          <CopyOutlined />
-        </span>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <button
+              type="button"
+              className="copyable-icon inline-flex items-center text-muted-foreground hover:text-foreground cursor-pointer"
+              onClick={onCopy}
+              aria-label="Copy"
+            >
+              <Copy className="h-3.5 w-3.5" />
+            </button>
+          }
+        />
+        <TooltipContent>Copy</TooltipContent>
       </Tooltip>
     </span>
   );

@@ -1,7 +1,11 @@
 import { usePopupRef, withPopup } from '@/utils/withPopup';
 import KeyboardSvg from '@/assets/image/keyboard.svg?react';
-import Icon from '@ant-design/icons';
-import { Col, Modal, Row, Space } from 'antd';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Fragment, memo, useMemo } from 'react';
 import './index.less';
 import { useTranslation } from 'react-i18next';
@@ -47,37 +51,43 @@ const ShortcutsModal = withPopup(({ resolve, visible }) => {
   }, [t]);
 
   return (
-    <Modal open={visible} title={t('title')} onCancel={resolve} onOk={resolve}>
-      {shortcuts.map(({ keys, relation = 'intersection', description }) => {
-        const relationSymbol = relation === 'union' ? 'or' : '+';
-        const keySize = keys.length;
-        return (
-          <Row
-            align="middle"
-            key={keys.join('')}
-            gutter={20}
-            wrap={false}
-            className="shortcuts-item"
-          >
-            <Col className="shortcuts-item__desc">
-              <span>{description}</span>
-            </Col>
-            <Col>
-              <Space>
-                {keys.map((k, index) => {
-                  return (
+    <Dialog open={visible} onOpenChange={(open) => !open && resolve(null)}>
+      <DialogContent className="sm:max-w-md bg-card border-border">
+        <DialogHeader>
+          <DialogTitle>{t('title')}</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-3 py-2">
+          {shortcuts.map(({ keys, relation = 'intersection', description }) => {
+            const relationSymbol = relation === 'union' ? 'or' : '+';
+            const keySize = keys.length;
+            return (
+              <div
+                key={keys.join('')}
+                className="shortcuts-item flex items-center justify-between gap-4 py-1.5 border-b border-border/40 last:border-0"
+              >
+                <span className="shortcuts-item__desc text-sm text-muted-foreground">
+                  {description}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  {keys.map((k, index) => (
                     <Fragment key={k}>
-                      <div className="keyboard-button">{k}</div>
-                      {keySize > 1 && index !== keySize - 1 && relationSymbol}
+                      <kbd className="keyboard-button px-2 py-1 text-xs font-mono font-semibold rounded bg-muted text-foreground border border-border">
+                        {k}
+                      </kbd>
+                      {keySize > 1 && index !== keySize - 1 && (
+                        <span className="text-xs text-muted-foreground">
+                          {relationSymbol}
+                        </span>
+                      )}
                     </Fragment>
-                  );
-                })}
-              </Space>
-            </Col>
-          </Row>
-        );
-      })}
-    </Modal>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 });
 
@@ -87,14 +97,17 @@ export const Shortcuts = memo(() => {
 
   return (
     <div className="console-keyboard-shortcuts">
-      <Icon
+      <button
+        type="button"
         title={t('title')!}
-        component={KeyboardSvg}
-        style={{ fontSize: 24, color: '#666' }}
+        className="p-1 text-muted-foreground hover:text-foreground bg-transparent border-0 cursor-pointer inline-flex items-center"
         onClick={() => {
           modalRef.current?.popup();
         }}
-      />
+        aria-label="Keyboard shortcuts"
+      >
+        <KeyboardSvg className="size-5" />
+      </button>
       <ShortcutsModal ref={modalRef} />
     </div>
   );
