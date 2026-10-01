@@ -7,7 +7,7 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { getStatusInfo, getTime } from './utils';
 import { buildCurlCommand, responseLogText } from './body-codec';
 import { useTranslation } from 'react-i18next';
-import './index.less';
+import './index.css';
 import { NetworkDetail } from './NetworkDetail';
 import { ResolvedNetworkInfo } from '@/utils';
 import { ChevronDown, Info, ChevronUp } from 'lucide-react';
@@ -41,7 +41,7 @@ const columnField = [
 type ColumnField = (typeof columnField)[number];
 
 const NoData = () => (
-  <div className="empty-table-placeholder text-center py-12 text-muted-foreground text-xs">
+  <div className="empty-table-placeholder absolute left-1/2 top-20 -translate-x-1/2 text-center py-12 text-muted-foreground text-xs">
     No data
   </div>
 );
@@ -351,7 +351,10 @@ export const NetworkTable = ({
   }, []);
 
   return (
-    <div className="network-table" ref={containerRef}>
+    <div
+      className="network-table h-full overflow-hidden bg-card text-card-foreground"
+      ref={containerRef}
+    >
       <AutoSizer>
         {({ width, height }) => {
           containerWidth.current = width;
@@ -367,11 +370,19 @@ export const NetworkTable = ({
               noRowsRenderer={NoData}
               rowClassName={({ index }) => {
                 if (index < 0) return '';
+                const status = getStatusInfo(data[index]).status;
+                const active = data[index].id === activeRow?.id;
                 return clsx(
+                  'cursor-default',
                   index % 2 ? 'odd' : 'even',
-                  getStatusInfo(data[index]).status,
+                  status,
                   {
-                    active: data[index].id === activeRow?.id,
+                    active,
+                    'text-destructive': status === 'error',
+                    'bg-destructive/15': active && status === 'error',
+                    'bg-primary/15': active && status !== 'error',
+                    'bg-muted/40': !active && index % 2 === 1,
+                    'hover:bg-muted': !active,
                   },
                 );
               }}
@@ -476,7 +487,7 @@ export const NetworkTable = ({
 
       {showDetail && activeRow && (
         <div
-          className="network-detail"
+          className="network-detail absolute inset-y-0 right-0 grid grid-rows-[auto_1fr] border-l border-border bg-popover max-md:z-[100] max-md:w-full max-md:border-l-0 max-md:left-0!"
           style={{
             left: leftDistance,
           }}

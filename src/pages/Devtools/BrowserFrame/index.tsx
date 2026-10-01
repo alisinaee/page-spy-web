@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import CellularSVG from '@/assets/image/cellular.svg?react';
 import BatterySVG from '@/assets/image/battery.svg?react';
 import DeviceSVG from '@/assets/image/device.svg?react';
-import './index.less';
+import './index.css';
 import { ElementPanel } from '../ElementPanel';
 import { useTranslation } from 'react-i18next';
 import { useSocketMessageStore } from '@/store/socket-message';
@@ -124,15 +124,18 @@ export const PCFrame = ({
   }, [clientInfo]);
 
   return (
-    <div className="pc-frame" ref={containerRef}>
-      <div className="pc-frame__top flex justify-between items-center px-3 py-1.5 border-b border-border/50">
+    <div
+      className="pc-frame flex flex-col w-full h-full overflow-hidden"
+      ref={containerRef}
+    >
+      <div className="pc-frame__top flex shrink-0 grow-0 min-h-12 justify-between items-center px-5 py-2 bg-popover border border-border rounded-t-md">
         <div className="pc-frame__top-left flex items-center gap-1.5">
-          <div className="function-circle close" />
-          <div className="function-circle mini" />
-          <div className="function-circle fullscreen" />
+          <div className="function-circle close size-3 rounded-full bg-destructive" />
+          <div className="function-circle mini size-3 rounded-full bg-warning" />
+          <div className="function-circle fullscreen size-3 rounded-full bg-success" />
         </div>
         <div
-          className="pc-frame__top-center text-xs truncate max-w-sm px-2 text-muted-foreground"
+          className="pc-frame__top-center text-xs truncate max-w-sm px-3 text-muted-foreground"
           title={pageLocation?.href}
         >
           {pageLocation?.href || ''}
@@ -175,31 +178,33 @@ export const PCFrame = ({
           </Button>
         </div>
       </div>
-      <div className="pc-frame__body spin-container relative">
+      <div className="pc-frame__body spin-container relative flex flex-1 h-0 overflow-hidden border border-t-0 border-border rounded-b-md bg-popover [&>div]:h-full [&>div]:overflow-auto">
         {loading && (
-          <div className="absolute inset-0 bg-background/50 z-20 flex items-center justify-center backdrop-blur-xs">
+          <div className="absolute inset-0 bg-background/50 z-20 flex items-center justify-center">
             <Loader2 className="size-8 animate-spin text-primary" />
           </div>
         )}
         {enableDevice ? (
-          <div className="mobile-frame">
-            <div className="mobile-frame__body-content">{children}</div>
+          <div className="mobile-frame flex flex-1 justify-center items-center">
+            <div className="mobile-frame__body-content relative h-[90%] aspect-[375/667]">
+              {children}
+            </div>
           </div>
         ) : (
-          <div className="pc-frame__body-content">{children}</div>
+          <div className="pc-frame__body-content flex-1">{children}</div>
         )}
         {elementVisible && (
           <>
             <div
-              className="pc-frame__body-divider cursor-col-resize select-none"
+              className="pc-frame__body-divider relative w-0.5 cursor-col-resize select-none touch-none bg-border transition-colors hover:bg-ring after:absolute after:inset-y-0 after:-left-[21px] after:-right-[21px] after:min-w-11 after:cursor-col-resize after:content-['']"
               ref={dividerRef}
             />
             <div
-              className="pc-frame__body-utils"
+              className="pc-frame__body-utils relative"
               ref={utilsRef}
               style={{ width }}
             >
-              <div>
+              <div className="absolute inset-0 py-2 pr-2 pl-1">
                 <ElementPanel />
               </div>
             </div>
@@ -216,27 +221,34 @@ const IOSFrame = ({ children }: PropsWithChildren<unknown>) => {
     useShallow((state) => state.pageMsg.location),
   );
   return (
-    <div className="ios-frame">
+    <div className="ios-frame relative flex flex-col w-[282px] h-[609px] rounded-[40px] overflow-hidden border-[10px] border-muted [&_::-webkit-scrollbar]:w-0.5 [&_::-webkit-scrollbar-thumb]:bg-muted-foreground">
       <div className="ios-frame__hair">
-        <div className="ios-top flex justify-between items-center">
-          <p className="ios-top-left m-0">{time}</p>
-          <div className="ios-top-center">
-            <div className="ios-top-forehead" />
+        <div className="ios-top flex justify-between items-center h-[34px] bg-popover border-b border-border">
+          <p className="ios-top-left m-0 basis-1/4 text-center text-xs font-bold text-foreground">
+            {time}
+          </p>
+          <div className="ios-top-center basis-1/2 h-full">
+            <div className="ios-top-forehead h-6 bg-muted rounded-b-[18px]" />
           </div>
-          <div className="ios-top-right flex items-center gap-1">
+          <div className="ios-top-right basis-1/4 h-full flex justify-center items-center gap-1 text-foreground">
             <CellularSVG className="size-3.5" />
-            <BatterySVG className="ios-battery size-4" />
+            <BatterySVG className="ios-battery ml-2 size-4" />
           </div>
         </div>
-        <div className="ios-url">
-          <div className="ios-url-input truncate" title={pageLocation?.href}>
+        <div className="ios-url bg-popover p-1">
+          <div
+            className="ios-url-input truncate p-2 rounded-lg bg-muted text-muted-foreground text-xs"
+            title={pageLocation?.href}
+          >
             {pageLocation?.href}
           </div>
         </div>
       </div>
-      <div className="ios-frame__content">{children}</div>
-      <div className="ios-frame__bottom">
-        <div className="ios-home" />
+      <div className="ios-frame__content flex-1 h-0 overflow-auto">
+        {children}
+      </div>
+      <div className="ios-frame__bottom absolute left-0 bottom-0 w-full h-5 text-center z-10">
+        <div className="ios-home inline-block w-20 h-1 rounded bg-muted-foreground" />
       </div>
     </div>
   );
@@ -249,24 +261,31 @@ const AndroidFrame = ({ children }: PropsWithChildren<unknown>) => {
   );
 
   return (
-    <div className="android-frame">
-      <div className="android-frame__camera" />
-      <div className="android-frame__top flex justify-between items-center">
-        <p className="android-frame__top-left m-0">{time}</p>
-        <div className="android-frame__top-right flex items-center gap-1">
+    <div className="android-frame relative flex flex-col w-[282px] h-[609px] rounded-[40px] overflow-hidden border-[12px] border-x-4 border-muted [&_::-webkit-scrollbar]:w-0.5 [&_::-webkit-scrollbar-thumb]:bg-muted-foreground">
+      <div className="android-frame__camera absolute right-3 top-3 z-10 flex justify-around items-center w-[50px] h-5 rounded-[22px] bg-muted before:size-2 before:rounded-full before:bg-muted-foreground before:content-[''] after:size-2 after:rounded-full after:bg-muted-foreground after:content-['']" />
+      <div className="android-frame__top flex justify-between items-center h-[34px] pt-2.5 pr-[25%] pl-2.5 bg-popover border-b border-border">
+        <p className="android-frame__top-left m-0 text-center text-foreground">
+          {time}
+        </p>
+        <div className="android-frame__top-right basis-1/4 h-full flex justify-center items-center gap-1 text-foreground">
           <CellularSVG className="size-3.5" />
-          <BatterySVG className="android-battery size-4" />
+          <BatterySVG className="android-battery ml-2 size-4" />
         </div>
       </div>
 
-      <div className="android-url">
-        <div className="android-url-input truncate" title={pageLocation?.href}>
+      <div className="android-url bg-popover p-1">
+        <div
+          className="android-url-input truncate p-2 rounded-lg bg-muted text-muted-foreground text-xs"
+          title={pageLocation?.href}
+        >
           {pageLocation?.href}
         </div>
       </div>
-      <div className="android-frame__content">{children}</div>
-      <div className="android-frame__bottom">
-        <div className="android-home" />
+      <div className="android-frame__content flex-1 h-0 overflow-auto">
+        {children}
+      </div>
+      <div className="android-frame__bottom h-[30px] text-center z-10 bg-popover border-t border-border">
+        <div className="android-home inline-block size-3.5 rounded border-2 border-muted-foreground align-bottom" />
       </div>
     </div>
   );
@@ -282,16 +301,16 @@ export const MobileFrame = ({
 
   const PhoneFrame = os === 'iOS' ? IOSFrame : AndroidFrame;
   return (
-    <div className="mobile-frame flex flex-col md:flex-row h-full">
-      <div className="mobile-frame__left spin-container relative flex-1">
+    <div className="mobile-frame flex flex-col md:flex-row items-center h-full px-[50px] [&>div]:relative">
+      <div className="mobile-frame__left spin-container relative z-10 flex-1">
         {loading && (
-          <div className="absolute inset-0 bg-background/50 z-20 flex items-center justify-center backdrop-blur-xs">
+          <div className="absolute inset-0 bg-background/50 z-20 flex items-center justify-center">
             <Loader2 className="size-8 animate-spin text-primary" />
           </div>
         )}
         <PhoneFrame>{children}</PhoneFrame>
       </div>
-      <div className="mobile-frame__middle p-2 flex items-center justify-center">
+      <div className="mobile-frame__middle p-2 mx-[30px] flex items-center justify-center">
         <Button
           variant="outline"
           size="touch"
@@ -303,9 +322,9 @@ export const MobileFrame = ({
           {ct('refresh')}
         </Button>
       </div>
-      <div className="mobile-frame__right spin-container relative flex-1">
+      <div className="mobile-frame__right spin-container relative z-10 flex-1 h-[609px] overflow-auto p-2 bg-card rounded-sm border border-border">
         {loading && (
-          <div className="absolute inset-0 bg-background/50 z-20 flex items-center justify-center backdrop-blur-xs">
+          <div className="absolute inset-0 bg-background/50 z-20 flex items-center justify-center">
             <Loader2 className="size-8 animate-spin text-primary" />
           </div>
         )}

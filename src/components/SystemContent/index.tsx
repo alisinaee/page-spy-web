@@ -1,6 +1,5 @@
 import { memo, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import './index.less';
 import { useTranslation } from 'react-i18next';
 import { parseUserAgent } from '@/utils/brand';
 import { SpySystem } from '@huolala-tech/page-spy-types';
@@ -13,7 +12,7 @@ interface SystemContentProps {
 const FeatureItem = ({ title, supported }: SpySystem.FeatureDescriptor) => (
   <div className="flex items-center justify-between gap-2 text-sm">
     <span>{title}</span>
-    <span className={supported ? 'text-green-600' : 'text-destructive'}>
+    <span className={supported ? 'text-success' : 'text-destructive'}>
       {supported ? '\u2713' : '\u2717'}
     </span>
   </div>
@@ -48,7 +47,7 @@ const SystemContent = memo(({ data }: SystemContentProps) => {
     );
   }
   return (
-    <div className="system-content space-y-6">
+    <div className="system-content space-y-6 overflow-y-auto">
       <div className="system-info">
         <h3 className="text-base font-semibold mb-2">{t('overview')}</h3>
         <Card>

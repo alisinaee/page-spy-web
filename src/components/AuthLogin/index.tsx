@@ -11,7 +11,6 @@ import {
 import { Info, Lock, LogIn } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/utils/AuthContext';
-import './style.less';
 
 const AuthLogin: React.FC = () => {
   const { t } = useTranslation();
@@ -36,11 +35,11 @@ const AuthLogin: React.FC = () => {
   };
 
   return (
-    <div className="auth-login-container flex items-center justify-center min-h-[60vh] p-4">
+    <div className="auth-login-container absolute inset-0 z-10 box-border flex items-center justify-center bg-background p-4 pt-[50px]">
       {loading ? (
         <Spinner className="h-8 w-8 text-primary" />
       ) : (
-        <Card className="auth-login-card w-full max-w-sm">
+        <Card className="auth-login-card m-auto w-full max-w-sm overflow-hidden rounded-xl border-none">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <span>{t('auth.login_title')}</span>

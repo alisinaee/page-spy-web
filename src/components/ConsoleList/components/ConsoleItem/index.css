@@ -1,0 +1,8 @@
+/* Third-party react-json-view DOM inside a console row. */
+.console-item .rjv {
+  font-size: 12px;
+}
+.console-item .rjv svg.rjv-ref-arrow {
+  width: 8px;
+  height: 8px;
+}

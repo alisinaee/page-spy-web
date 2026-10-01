@@ -1,0 +1,47 @@
+/* Styles for third-party highlighted source HTML; cannot be utility classes. */
+.error-detail-drawer,
+.error-detail-drawer .source-code-fragments pre {
+  scrollbar-width: thin;
+  scrollbar-color: var(--muted) transparent;
+}
+.error-stack-item .source-code-fragments pre {
+  padding: 50px 12px 8px;
+  border-radius: 4px;
+  overflow: auto;
+}
+.error-stack-item .source-code-fragments code {
+  counter-reset: step;
+  counter-increment: step calc(var(--start, 1) - 1);
+}
+.error-stack-item .source-code-fragments code .line {
+  color: var(--muted-foreground);
+  opacity: 0.5;
+}
+.error-stack-item .source-code-fragments code .line::before {
+  content: counter(step);
+  counter-increment: step;
+  width: 1rem;
+  margin-right: 1rem;
+  display: inline-block;
+  text-align: right;
+}
+.error-stack-item .source-code-fragments code .line:nth-child(5) {
+  opacity: 1;
+}
+.error-stack-item .source-code-fragments code .line:nth-child(5)::before {
+  color: var(--foreground);
+  font-weight: 700;
+}
+.error-stack-item .source-code-fragments code .error-line {
+  display: inline-block;
+  margin-bottom: 1em;
+  position: relative;
+  font-size: 14px;
+}
+.error-stack-item .source-code-fragments code .error-line::after {
+  content: '^';
+  color: var(--destructive);
+  position: absolute;
+  left: calc(2rem + var(--position) * 1ch);
+  top: 100%;
+}

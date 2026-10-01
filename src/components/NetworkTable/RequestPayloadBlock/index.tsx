@@ -15,7 +15,7 @@ export const RequestPayloadBlock: React.FC<{
     if (isString(data)) {
       if (LOST_REQUEST_BODIES.has(data)) {
         return (
-          <Alert className="border-amber-500/50 bg-amber-500/10 text-amber-500">
+          <Alert className="border-warning/50 bg-warning/10 text-warning">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Request body not captured</AlertTitle>
             <AlertDescription className="text-xs text-muted-foreground mt-1">
@@ -35,9 +35,13 @@ export const RequestPayloadBlock: React.FC<{
     return <EntriesBody data={data} />;
   }, [data, urlencoded]);
   return (
-    <div className="detail-block">
-      <b className="detail-block__label">Request Payload</b>
-      <div className="detail-block__content">{content}</div>
+    <div className="detail-block break-words border-b border-border px-3 py-1 text-[13px] last:border-b-0">
+      <b className="detail-block__label font-bold leading-loose text-foreground">
+        Request Payload
+      </b>
+      <div className="detail-block__content mb-5 whitespace-pre-wrap pl-3 text-muted-foreground">
+        {content}
+      </div>
     </div>
   );
 };

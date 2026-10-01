@@ -1,6 +1,5 @@
 import { HTMLAttributes } from 'react';
 import { Resizable, ResizableProps } from 'react-resizable';
-import './index.less';
 
 export type ResizableTitleProps = HTMLAttributes<any> & {
   onResizeStart?: ResizableProps['onResizeStart'];
@@ -34,14 +33,14 @@ export const ResizableTitle = (props: ResizableTitleProps) => {
   ];
   return (
     <Resizable
-      className="resizable-title"
+      className="resizable-title relative bg-clip-padding"
       minConstraints={minConstraints}
       maxConstraints={maxConstraints}
       width={width}
       height={0}
       handle={
         <span
-          className="resizable-handle"
+          className="resizable-handle absolute -right-[5px] bottom-0 z-[1] h-full w-2.5 cursor-col-resize"
           onClick={(e) => {
             e.stopPropagation();
           }}

@@ -20,7 +20,7 @@ import { message } from '@/utils/message';
 import clsx from 'clsx';
 import { memo, useMemo, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import './index.less';
+import './index.css';
 import { BlockTitle } from '@/components/BlockTitle';
 
 export type RequiredFrames = Required<StackFrame>[];
@@ -61,7 +61,7 @@ const ErrorStackItem = ({ frame }: { frame: Required<StackFrame> }) => {
     if (error) {
       return (
         <div className="flex flex-col items-center justify-center p-6 text-center space-y-4">
-          <Frown className="w-12 h-12 text-amber-500" />
+          <Frown className="w-12 h-12 text-warning" />
           <h4 className="text-base font-semibold">{t('failed-title')}</h4>
           <div className="text-sm text-muted-foreground space-y-2">
             <p className="font-medium text-foreground">{t('failed-advice')}</p>
@@ -83,9 +83,9 @@ const ErrorStackItem = ({ frame }: { frame: Required<StackFrame> }) => {
     }
 
     return (
-      <div className="source-code-fragments">
-        <div className="fragments-header flex items-center justify-between flex-nowrap py-1">
-          <div className="origin-filename text-xs">
+      <div className="source-code-fragments relative">
+        <div className="fragments-header absolute inset-x-3 top-2.5 flex flex-nowrap items-center justify-between py-1">
+          <div className="origin-filename mr-2 inline-flex h-9 items-center overflow-x-auto overflow-y-hidden whitespace-nowrap text-xs text-muted-foreground">
             <code>
               <span>{t('source-filename')}: </span>
               <span>
@@ -123,8 +123,8 @@ const ErrorStackItem = ({ frame }: { frame: Required<StackFrame> }) => {
   }, [data, error, loading, t, tabSize]);
 
   return (
-    <div className="error-stack-item">
-      <div className="flex items-center gap-3 stack-filename flex-nowrap mb-2">
+    <div className="error-stack-item [&~.error-stack-item]:mt-3">
+      <div className="stack-filename mb-3 flex flex-nowrap items-center gap-3 overflow-hidden">
         <Tooltip>
           <TooltipTrigger
             render={
@@ -137,7 +137,7 @@ const ErrorStackItem = ({ frame }: { frame: Required<StackFrame> }) => {
         </Tooltip>
         <Crosshair
           className={clsx(
-            'locate-icon w-4 h-4 cursor-pointer text-muted-foreground hover:text-foreground shrink-0',
+            'locate-icon w-4 h-4 cursor-pointer text-primary-text hover:text-foreground shrink-0',
             {
               'animate-spin': loading,
             },
@@ -179,7 +179,7 @@ export const ErrorDetailDrawer = memo(() => {
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetContent
         side="right"
-        className="w-full sm:max-w-2xl overflow-y-auto flex flex-col justify-between"
+        className="error-detail-drawer w-full sm:max-w-2xl overflow-y-auto flex flex-col justify-between"
       >
         <div>
           <SheetHeader className="pb-4">
@@ -188,7 +188,7 @@ export const ErrorDetailDrawer = memo(() => {
           <div className="space-y-4">
             <BlockTitle title={t('message-title')} />
             {errorMessage ? (
-              <div className="error-message-box p-3 bg-secondary/50 rounded-md text-xs font-mono overflow-x-auto">
+              <div className="error-message-box overflow-auto rounded-md bg-destructive/10 px-3 py-2 font-mono text-xs leading-snug text-destructive">
                 <pre>
                   <code>{errorMessage}</code>
                 </pre>

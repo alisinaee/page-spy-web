@@ -6,7 +6,6 @@ import SystemPanel from './SystemPanel';
 import { useNavigate, useLocation } from 'react-router-dom';
 import PagePanel from './PagePanel';
 import clsx from 'clsx';
-import './index.less';
 import { StoragePanel } from './StoragePanel';
 import useSearch from '@/utils/useSearch';
 import { useEventListener } from '@/utils/useEventListener';
@@ -184,9 +183,10 @@ const BadgeMenu = memo(({ active, badge }: BadgeMenuProps) => {
         >
           <span>{t(`menu.${key}`)}</span>
           <div
-            className={clsx('circle-badge', {
-              show: badge[key as MenuType],
-            })}
+            className={clsx(
+              'circle-badge relative -top-1.5 left-1 inline-block size-1.5 rounded-full bg-destructive transition-transform duration-300 ease-out',
+              badge[key as MenuType] ? 'show scale-100' : 'scale-0',
+            )}
           />
         </button>
       ))}
@@ -300,14 +300,14 @@ const ClientInfo = memo(() => {
       <Tooltip>
         <TooltipTrigger
           render={
-            <div className="page-spy-id text-xs font-mono font-bold cursor-pointer my-1">
+            <div className="page-spy-id mx-auto my-1 w-fit cursor-pointer rounded-md bg-muted px-2 py-0.5 font-mono text-xs font-bold text-primary-text">
               #{address.slice(0, 4)}
             </div>
           }
         />
         <TooltipContent>Device ID</TooltipContent>
       </Tooltip>
-      <div className="client-info__actions flex flex-col gap-2 mt-2">
+      <div className="client-info__actions flex flex-col gap-2 mt-3 w-full">
         <Button
           size="sm"
           variant="outline"
@@ -401,18 +401,18 @@ export default function Devtools() {
   }
 
   return (
-    <div className="page-spy-devtools-root flex flex-col h-full overflow-hidden">
+    <div className="page-spy-devtools-root relative flex flex-col h-full overflow-hidden">
       {/* Main Layout (Sider on left on desktop, hidden on mobile via CSS) */}
-      <div className="page-spy-devtools flex flex-1 overflow-hidden">
-        <aside className="devtools-desktop-sider w-56 shrink-0 border-r border-border bg-card flex flex-col overflow-y-auto">
-          <div className="page-spy-devtools__sider">
+      <div className="page-spy-devtools flex flex-1 h-full overflow-hidden max-md:flex-col">
+        <aside className="devtools-desktop-sider w-56 shrink-0 border-r border-border bg-card flex flex-col overflow-y-auto max-md:hidden">
+          <div className="page-spy-devtools__sider flex flex-col h-full overflow-hidden">
             <ClientInfo />
             <BadgeMenu active={hashKey} badge={badge} />
           </div>
         </aside>
-        <main className="page-spy-devtools__content flex-1 flex flex-col min-w-0 overflow-hidden">
+        <main className="page-spy-devtools__content relative flex-1 flex flex-col h-full min-w-0 overflow-hidden max-md:h-0 max-md:w-full max-md:max-w-full">
           <ConnectStatus />
-          <div className="page-spy-devtools__panel flex-1 overflow-hidden">
+          <div className="page-spy-devtools__panel flex-1 h-0 overflow-auto p-5 pt-2 max-md:p-2 [&>div]:h-full">
             <ActiveContent />
           </div>
         </main>
@@ -420,7 +420,7 @@ export default function Devtools() {
 
       {/* Floating Action Button (FAB) for mobile */}
       <div
-        className="devtools-floating-fab cursor-pointer flex items-center justify-center"
+        className="devtools-floating-fab fixed right-5 bottom-6 z-50 hidden size-12 cursor-pointer items-center justify-center rounded-full bg-primary shadow-sm transition-transform active:scale-90 max-md:flex"
         onClick={() => setBottomSheetOpen(true)}
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') {
@@ -432,9 +432,9 @@ export default function Devtools() {
         tabIndex={0}
         title="Open Side Panel & Actions"
       >
-        <Settings className="w-5 h-5 text-white" />
+        <Settings className="w-5 h-5 text-primary-foreground" />
         {Object.values(badge).some(Boolean) && (
-          <span className="fab-badge-dot" />
+          <span className="fab-badge-dot absolute top-1 right-1 size-2 rounded-full border border-background bg-destructive" />
         )}
       </div>
 
@@ -449,7 +449,7 @@ export default function Devtools() {
               </Badge>
             </SheetTitle>
           </SheetHeader>
-          <div className="mobile-bottomsheet-body py-4 space-y-4">
+          <div className="mobile-bottomsheet-body pt-4 pb-5 space-y-4">
             <div className="bottomsheet-panel-switcher">
               <span className="text-xs text-muted-foreground block mb-2 font-medium">
                 Switch Panel
@@ -468,7 +468,7 @@ export default function Devtools() {
                   >
                     {t(`menu.${key}`)}
                     {badge[key] && (
-                      <span className="tab-circle-badge ml-1 inline-block w-2 h-2 rounded-full bg-red-500" />
+                      <span className="tab-circle-badge ml-1 inline-block w-2 h-2 rounded-full bg-destructive" />
                     )}
                   </Button>
                 ))}

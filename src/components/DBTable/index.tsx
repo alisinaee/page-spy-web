@@ -3,7 +3,6 @@ import { useMemo, useCallback, useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
 import ReactJsonView from '@huolala-tech/react-json-view';
 import { useTranslation } from 'react-i18next';
-import './index.less';
 import { useEventListener } from '@/utils/useEventListener';
 import { CUSTOM_EVENT } from '@/store/socket-message/socket';
 import { ResizeCallbackData } from 'react-resizable';
@@ -137,7 +136,7 @@ export const DBTable = () => {
   }, [dbMsg]);
 
   return (
-    <div className="database-info flex flex-col h-full">
+    <div className="database-info flex h-full flex-col overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 p-3 sticky top-0 z-10 bg-background border-b border-border">
         <form
           onSubmit={onGetIndexedDB}
@@ -190,7 +189,7 @@ export const DBTable = () => {
 
         <div className="flex items-center gap-2">
           {isStale && (
-            <div className="flex items-center gap-1 text-xs text-amber-500">
+            <div className="flex items-center gap-1 text-xs text-warning">
               <Tooltip>
                 <TooltipTrigger
                   render={
@@ -227,7 +226,7 @@ export const DBTable = () => {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto">
+      <div className="database-table flex-1 overflow-auto">
         <Table className="text-xs">
           <TableHeader>
             <TableRow>
@@ -290,7 +289,7 @@ export const DBTable = () => {
           </TableBody>
         </Table>
       </div>
-      <div className="database-total-entries p-2 border-t border-border text-xs text-muted-foreground">
+      <div className="database-total-entries z-10 border-t border-border p-2 text-xs text-muted-foreground">
         {t('total-entries')}: {dbMsg?.total || 0}
       </div>
     </div>

@@ -7,7 +7,6 @@ import {
 } from '@/components/ui/tooltip';
 import { SectionLogActions } from '../SectionLogActions';
 import { useEffect, useState } from 'react';
-import './index.less';
 import { useSocketMessageStore } from '@/store/socket-message';
 import { RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -41,7 +40,7 @@ export const StoragePanel = () => {
   }, [storageTypes, activeTab]);
 
   return (
-    <div className="storage-panel flex flex-col h-full">
+    <div className="storage-panel relative flex flex-col h-full bg-background">
       <div className="flex justify-end p-2 border-b border-border">
         <div className="flex items-center gap-2">
           <SectionLogActions section="storage" />
@@ -64,8 +63,8 @@ export const StoragePanel = () => {
           </Tooltip>
         </div>
       </div>
-      <div className="storage-panel__layout flex flex-1 overflow-hidden">
-        <div className="storage-panel__sider w-44 shrink-0 border-r border-border p-2 space-y-1 overflow-y-auto">
+      <div className="storage-panel__layout flex flex-1 h-0 max-md:flex-col overflow-hidden bg-background">
+        <div className="storage-panel__sider w-44 shrink-0 border-r border-border p-2 space-y-1 overflow-y-auto bg-background max-md:flex max-md:w-full max-md:space-y-0 max-md:gap-1 max-md:overflow-x-auto max-md:overflow-y-hidden max-md:whitespace-nowrap max-md:border-r-0 max-md:border-b">
           {storageTypes.map((st) => {
             const IconComp = st.icon;
             return (
@@ -73,7 +72,7 @@ export const StoragePanel = () => {
                 key={st.name}
                 type="button"
                 className={clsx(
-                  'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md text-left transition-colors cursor-pointer',
+                  'w-full max-md:w-auto max-md:shrink-0 flex items-center gap-2 px-3 py-2 text-sm rounded-md text-left transition-colors cursor-pointer',
                   activeTab === st.name
                     ? 'bg-secondary text-foreground font-medium'
                     : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50',
@@ -87,7 +86,7 @@ export const StoragePanel = () => {
           })}
         </div>
         <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="storage-panel__content flex-1 overflow-auto">
+          <div className="storage-panel__content flex-1 overflow-auto bg-background [&_thead]:sticky [&_thead]:top-0 [&_thead]:z-10">
             {activeTab === 'indexedDB' ? (
               <DBTable />
             ) : (

@@ -101,7 +101,7 @@ export const MainContent = memo(() => {
   }, [consoleDataList]);
 
   return (
-    <div className="main-content">
+    <div className="main-content flex-1 h-0 overflow-auto pt-2">
       <ConsoleList
         data={consoleDataList}
         ref={consoleListRef}

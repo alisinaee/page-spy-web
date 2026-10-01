@@ -33,16 +33,6 @@ export default ({ command }) => {
     resolve: {
       alias: [{ find: '@', replacement: path.join(__dirname, './src') }],
     },
-    css: {
-      preprocessorOptions: {
-        less: {
-          javascriptEnabled: true,
-          modifyVars: {
-            hack: `true; @import "${process.cwd()}/src/assets/style/variable.less";`,
-          },
-        },
-      },
-    },
     plugins: [
       react(),
       tailwindcss(),

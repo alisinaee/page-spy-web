@@ -10,7 +10,6 @@ import {
 import { useRequest } from 'ahooks';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import './index.less';
 import { Search, RotateCcw, Filter, Inbox } from 'lucide-react';
 import { RoomCard } from './RoomCard';
 import { Statistics } from './Statistics';
@@ -223,10 +222,10 @@ const RoomList = () => {
   }, [connectionList, conditions]);
 
   return (
-    <div className="room-list flex-1 flex flex-col md:flex-row h-full min-h-0 bg-background text-foreground">
+    <div className="flex-1 flex flex-col md:flex-row h-full min-h-0 bg-background text-foreground">
       {/* Desktop Sider */}
-      <aside className="room-list-desktop-sider hidden md:flex flex-col w-[350px] shrink-0 border-r border-border p-6 overflow-y-auto bg-card/30">
-        <div className="room-list-sider flex flex-col gap-6">
+      <aside className="hidden md:flex flex-col w-[350px] shrink-0 border-r border-border p-6 overflow-y-auto bg-card/30">
+        <div className="flex flex-col gap-6">
           <h3 className="text-xl font-bold tracking-tight text-foreground m-0">
             {t('common.connections')}
           </h3>
@@ -276,7 +275,7 @@ const RoomList = () => {
               </label>
               <select
                 aria-label={t('common.os')!}
-                className="flex h-9 w-full rounded-md border border-input bg-card px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
+                className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm text-foreground transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
                 value={formState.os}
                 onChange={(e) =>
                   setFormState((s) => ({ ...s, os: e.target.value }))
@@ -297,7 +296,7 @@ const RoomList = () => {
               </label>
               <select
                 aria-label={t('devtool.platform')!}
-                className="flex h-9 w-full rounded-md border border-input bg-card px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
+                className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm text-foreground transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
                 value={formState.browser}
                 onChange={(e) =>
                   setFormState((s) => ({ ...s, browser: e.target.value }))
@@ -339,7 +338,7 @@ const RoomList = () => {
             </div>
 
             {showMaximumAlert && (
-              <div className="maximum-alert text-xs text-amber-500 bg-amber-500/10 p-2.5 rounded border border-amber-500/20">
+              <div className="text-xs text-warning bg-warning/10 p-2.5 rounded border border-warning/20">
                 {t('connections.maximum-alert')}
               </div>
             )}
@@ -349,13 +348,16 @@ const RoomList = () => {
       </aside>
 
       {/* Main Content Area */}
-      <main className="room-list-content flex-1 flex flex-col overflow-y-auto">
-        <div className="room-list-mobile-header flex md:hidden items-center justify-between p-4 border-b border-border bg-card/40">
-          <div className="room-list-mobile-header__title flex items-center gap-2">
+      <main className="flex-1 flex flex-col overflow-y-auto">
+        <div className="flex md:hidden items-center justify-between p-4 border-b border-border bg-card/40">
+          <div className="flex items-center gap-2">
             <h4 className="text-base font-semibold m-0 text-foreground">
               {t('common.connections')}
             </h4>
-            <Badge variant="secondary" className="bg-primary/20 text-primary">
+            <Badge
+              variant="secondary"
+              className="bg-primary/15 text-primary-text"
+            >
               {filterConnections(connectionList, conditions).length}
             </Badge>
           </div>
@@ -372,7 +374,7 @@ const RoomList = () => {
           </Button>
         </div>
 
-        <div className="room-list-cards-wrapper flex-1">{mainContent}</div>
+        <div className="flex-1">{mainContent}</div>
 
         {/* Mobile Filter Sheet */}
         <Sheet open={mobileFilterOpen} onOpenChange={setMobileFilterOpen}>
@@ -438,7 +440,7 @@ const RoomList = () => {
                 </label>
                 <select
                   aria-label={t('common.os')!}
-                  className="flex h-11 min-h-[44px] w-full rounded-md border border-input bg-card px-3 text-base text-foreground"
+                  className="h-11 min-h-[44px] w-full rounded-lg border border-input bg-transparent px-2.5 text-base text-foreground transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
                   value={formState.os}
                   onChange={(e) =>
                     setFormState((s) => ({ ...s, os: e.target.value }))
@@ -459,7 +461,7 @@ const RoomList = () => {
                 </label>
                 <select
                   aria-label={t('devtool.platform')!}
-                  className="flex h-11 min-h-[44px] w-full rounded-md border border-input bg-card px-3 text-base text-foreground"
+                  className="h-11 min-h-[44px] w-full rounded-lg border border-input bg-transparent px-2.5 text-base text-foreground transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
                   value={formState.browser}
                   onChange={(e) =>
                     setFormState((s) => ({ ...s, browser: e.target.value }))

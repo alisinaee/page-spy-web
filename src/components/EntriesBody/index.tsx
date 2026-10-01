@@ -7,9 +7,11 @@ export const EntriesBody = ({ data }: Props) => {
     <div className="entries-body">
       {data.map(([label, value]) => {
         return (
-          <div className="entries-item" key={label + value}>
-            <b className="entries-item__label">{label}: &nbsp;</b>
-            <span className="entries-item__value">
+          <div className="entries-item leading-[1.7]" key={label + value}>
+            <b className="entries-item__label whitespace-nowrap">
+              {label}: &nbsp;
+            </b>
+            <span className="entries-item__value break-all">
               <code>{value}</code>
             </span>
           </div>

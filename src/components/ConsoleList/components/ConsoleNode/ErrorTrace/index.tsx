@@ -1,6 +1,5 @@
 import { SpyConsole } from '@huolala-tech/page-spy-types';
 import ErrorStackSvg from '@/assets/image/error-stack.svg?react';
-import './index.less';
 import { useCallback, useMemo } from 'react';
 import ErrorStackParser from 'error-stack-parser';
 
@@ -85,13 +84,13 @@ export const ErrorTraceNode = ({ data }: Props) => {
   }, [data]);
 
   return (
-    <div className="error-trace">
+    <div className="error-trace flex flex-nowrap items-start">
       <ErrorStackSvg
-        className="error-trace-icon"
+        className="error-trace-icon cursor-pointer text-muted-foreground hover:text-foreground"
         onClick={onPopupDetail}
         style={{ width: 16, height: 16, cursor: 'pointer' }}
       />
-      <div className="error-trace-node">
+      <div className="error-trace-node flex-1 px-2 text-xs">
         <code>{errorMessage}</code>
       </div>
     </div>

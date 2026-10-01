@@ -6,7 +6,6 @@ import DebugOriginSvg from '@/assets/image/debug-origin.svg?react';
 import DebugEvalSvg from '@/assets/image/debug-eval.svg?react';
 import UserSvg from '@/assets/image/user.svg?react';
 import DebugSvg from '@/assets/image/debug.svg?react';
-import './index.less';
 import type { SpyConsole } from '@huolala-tech/page-spy-types';
 
 interface ThemeItem {
@@ -21,31 +20,31 @@ type Theme = Record<SpyConsole.DataType | 'default', ThemeItem>;
 
 const Type2Theme: Partial<Theme> = {
   info: {
-    color: '#3683F9',
+    color: 'var(--info)',
     icon: InfoSvg,
   },
   error: {
-    color: '#D7423F',
+    color: 'var(--destructive)',
     icon: ErrorSvg,
   },
   warn: {
-    color: '#E9994B',
+    color: 'var(--warning)',
     icon: WarnSvg,
   },
   debug: {
-    color: '#8236CB',
+    color: 'var(--primary-text)',
     icon: DebugSvg,
   },
   'debug-origin': {
-    color: '#8236CB',
+    color: 'var(--primary-text)',
     icon: DebugOriginSvg,
   },
   'debug-eval': {
-    color: '#8236CB',
+    color: 'var(--primary-text)',
     icon: DebugEvalSvg,
   },
   default: {
-    color: '#000000',
+    color: 'var(--foreground)',
     icon: UserSvg,
   },
 };
@@ -62,9 +61,9 @@ const LogType = ({ type }: Props) => {
   }
   const IconComp = theme?.icon;
   return (
-    <div className="log-type">
+    <div className="log-type inline-block w-5">
       <div
-        className="log-type__icon flex items-center justify-center"
+        className="log-type__icon flex items-center justify-center text-[0px]"
         title={logType}
       >
         {IconComp && <IconComp style={{ width: 14, height: 14 }} />}

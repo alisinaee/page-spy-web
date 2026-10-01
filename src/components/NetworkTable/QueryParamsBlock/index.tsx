@@ -21,8 +21,8 @@ export const QueryParamsBlock: React.FC<{ data: [string, string][] }> = ({
   }, [decoded]);
 
   return (
-    <div className="detail-block">
-      <div className="detail-block__label flex items-center gap-2">
+    <div className="detail-block break-words border-b border-border px-3 py-1 text-[13px] last:border-b-0">
+      <div className="detail-block__label flex items-center gap-2 font-bold leading-loose text-foreground">
         <span>Query String Parameters</span>
         <span
           onClick={() => setDecoded(!decoded)}
@@ -31,7 +31,7 @@ export const QueryParamsBlock: React.FC<{ data: [string, string][] }> = ({
           {toggleText}
         </span>
       </div>
-      <div className="detail-block__content">
+      <div className="detail-block__content mb-5 whitespace-pre-wrap pl-3 text-muted-foreground">
         <EntriesBody data={decodedData} />
       </div>
     </div>

@@ -46,24 +46,30 @@ const TABS: TabItem[] = [
       return (
         <>
           {/* General */}
-          <div className="detail-block">
-            <div className="detail-block__label">General Info</div>
-            <div className="detail-block__content">
+          <div className="detail-block break-words border-b border-border px-3 py-1 text-[13px] last:border-b-0">
+            <div className="detail-block__label font-bold leading-loose text-foreground">
+              General Info
+            </div>
+            <div className="detail-block__content mb-5 whitespace-pre-wrap pl-3 text-muted-foreground">
               {getObjectKeys(generalFieldMap).map((label) => {
                 const field = generalFieldMap[label];
                 return (
-                  <div className="entries-item" key={label}>
-                    <b className="entries-item__label">{label}: &nbsp;</b>
-                    <span className="entries-item__value">
+                  <div className="entries-item leading-[1.7]" key={label}>
+                    <b className="entries-item__label whitespace-nowrap">
+                      {label}: &nbsp;
+                    </b>
+                    <span className="entries-item__value break-all">
                       <code>{data[field]}</code>
                     </span>
                   </div>
                 );
               })}
 
-              <div className="entries-item">
-                <b className="entries-item__label">Status Code: &nbsp;</b>
-                <span className="entries-item__value">
+              <div className="entries-item leading-[1.7]">
+                <b className="entries-item__label whitespace-nowrap">
+                  Status Code: &nbsp;
+                </b>
+                <span className="entries-item__value break-all">
                   <code>
                     <StatusCode data={data} />
                   </code>
@@ -74,12 +80,15 @@ const TABS: TabItem[] = [
           {/* Header Content */}
           {headerContent.map((item) => {
             return (
-              <div className="detail-block" key={item.label}>
-                <div className="detail-block__label flex items-center gap-2">
+              <div
+                className="detail-block break-words border-b border-border px-3 py-1 text-[13px] last:border-b-0"
+                key={item.label}
+              >
+                <div className="detail-block__label flex items-center gap-2 font-bold leading-loose text-foreground">
                   <span>{item.label}</span>
                   <PartOfHeader />
                 </div>
-                <div className="detail-block__content">
+                <div className="detail-block__content mb-5 whitespace-pre-wrap pl-3 text-muted-foreground">
                   {item.data?.length ? (
                     <EntriesBody data={item.data} />
                   ) : (
@@ -179,21 +188,22 @@ export const NetworkDetail = memo(({ data, onClose }: Props) => {
 
   return (
     <>
-      <div className="network-detail-header flex items-center justify-between">
+      <div className="network-detail-header relative flex h-[30px] items-center justify-between border-b border-border bg-card">
         <div
-          className="network-detail-close cursor-pointer p-1 text-muted-foreground hover:text-foreground"
+          className="network-detail-close flex w-8 cursor-pointer justify-center p-1 text-muted-foreground hover:text-foreground"
           onClick={onClose}
         >
           <X className="w-5 h-5" />
         </div>
-        <ul className="network-detail-tabs">
+        <ul className="network-detail-tabs flex list-none">
           {TABS.filter((t) => t.visible(data)).map((i) => {
             return (
               <li
                 key={i.title}
                 data-tab-id={i.title}
-                className={clsx({
+                className={clsx('cursor-pointer px-3 py-1.5 hover:bg-muted', {
                   active: activeTab === i.title,
+                  'text-primary-text': activeTab === i.title,
                 })}
                 onClick={() => {
                   setActiveTab(i.title);
@@ -205,7 +215,9 @@ export const NetworkDetail = memo(({ data, onClose }: Props) => {
           })}
         </ul>
       </div>
-      <div className="network-detail-content">{activeContent}</div>
+      <div className="network-detail-content overflow-auto">
+        {activeContent}
+      </div>
     </>
   );
 });

@@ -33,7 +33,7 @@ export const WebsocketTable = ({ data }: { data: WebsocketData[] }) => {
       <div className="flex items-center gap-2 h-full">
         <ArrowComp
           style={{
-            color: isSend ? '#156C2E' : '#B3261F',
+            color: isSend ? 'var(--success)' : 'var(--destructive)',
             width: 16,
             height: 16,
           }}

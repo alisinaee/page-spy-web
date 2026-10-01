@@ -1,6 +1,5 @@
 import React from 'react';
 import { Spinner } from '@/components/ui/spinner';
-import './index.less';
 
 export const LoadingFallback = ({
   style = {},
@@ -11,7 +10,7 @@ export const LoadingFallback = ({
 }) => {
   return (
     <div
-      className={`loading-fallback flex items-center justify-center p-8 ${className}`}
+      className={`loading-fallback flex h-full min-h-[100px] items-center justify-center p-8 ${className}`}
       style={style}
     >
       <Spinner className="h-8 w-8 text-primary" />

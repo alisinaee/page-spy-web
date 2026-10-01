@@ -44,20 +44,20 @@ export const Statistics = memo(({ data }: Props) => {
   );
 
   return (
-    <div className="statistic flex justify-between items-center py-2 px-3 border border-border/50 rounded-lg bg-card/40 my-3">
-      <div className="statistics-item text-center">
+    <div className="flex justify-between items-center py-2 px-3 border border-border/50 rounded-lg bg-card/40 my-3">
+      <div className="text-center">
         <p className="text-xs text-muted-foreground m-0">{t('active')}</p>
-        <p className="text-base font-semibold text-emerald-500 m-0">
+        <p className="text-base font-semibold text-success m-0">
           {active.length}
         </p>
       </div>
-      <div className="statistics-item text-center">
+      <div className="text-center">
         <p className="text-xs text-muted-foreground m-0">{t('wait')}</p>
-        <p className="text-base font-semibold text-amber-500 m-0">
+        <p className="text-base font-semibold text-warning m-0">
           {wait.length}
         </p>
       </div>
-      <div className="statistics-item text-center">
+      <div className="text-center">
         <p className="text-xs text-muted-foreground m-0">{t('inactive')}</p>
         <p className="text-base font-semibold text-muted-foreground m-0">
           {inactive.length}

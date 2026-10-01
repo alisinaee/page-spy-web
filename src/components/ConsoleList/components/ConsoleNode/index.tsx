@@ -2,7 +2,7 @@
 import type { MouseEventHandler, ReactNode } from 'react';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
-import './index.less';
+import './index.css';
 import clsx from 'clsx';
 import type { SpyAtom } from '@huolala-tech/page-spy-types';
 import { LoadMore } from './LoadMore';
@@ -17,6 +17,21 @@ import { Trans } from 'react-i18next';
 import CopyContent from '@/components/CopyContent';
 import { useShallow } from 'zustand/react/shallow';
 import { Link } from 'react-router-dom';
+const CONSOLE_NODE = 'console-node mr-[7px] break-words text-xs leading-[18px]';
+const TYPE_CLASS: Record<string, string> = {
+  origin: 'text-foreground',
+  number: 'text-info',
+  string: 'text-warning',
+  boolean: 'text-primary-text',
+  symbol: 'text-warning',
+  error: 'text-destructive',
+  function: 'text-foreground',
+  object: 'cursor-pointer whitespace-nowrap text-muted-foreground',
+  null: 'text-muted-foreground',
+  undefined: 'text-muted-foreground',
+  bigint: 'text-success',
+};
+
 function isAtomNode(data: SpyAtom.Overview) {
   return data && data.type === 'atom' && data.__atomId !== undefined;
 }
@@ -73,11 +88,17 @@ function GetterNode({ id, parentId, instanceId, keyName }: GetterNodeProps) {
 
   return (
     <div className="atom-node">
-      <code className="console-node">
-        <span className="property-key" style={{ fontStyle: 'normal' }}>
+      <code className="console-node mr-[7px] break-words text-xs leading-[18px]">
+        <span
+          className="property-key font-bold text-primary-text"
+          style={{ fontStyle: 'normal' }}
+        >
           {keyName}:{' '}
         </span>
-        <span className="property-value ellipsis" onClick={getPropertyValue}>
+        <span
+          className="property-value ellipsis cursor-pointer not-italic hover:underline"
+          onClick={getPropertyValue}
+        >
           (...)
         </span>
       </code>
@@ -98,7 +119,10 @@ const PropertyItem = React.memo<{
     if (typeof propertyContent === 'string') {
       content = (
         <>
-          <span className="property-key" style={{ fontStyle: 'normal' }}>
+          <span
+            className="property-key font-bold text-primary-text"
+            style={{ fontStyle: 'normal' }}
+          >
             {keyName}:{' '}
           </span>
           <span className="property-value">
@@ -124,7 +148,7 @@ const PropertyItem = React.memo<{
               value: (
                 <>
                   <span
-                    className="property-key"
+                    className="property-key font-bold text-primary-text"
                     style={{ fontStyle: 'normal' }}
                   >
                     {keyName}:{' '}
@@ -146,7 +170,7 @@ const PropertyItem = React.memo<{
   return (
     <div key={keyName}>
       <code>
-        <span className="property-key">
+        <span className="property-key font-bold text-primary-text">
           {keyName === '___proto___' ? '__proto__' : keyName}:{' '}
         </span>
         <span className="property-value">
@@ -226,12 +250,12 @@ function AtomNode({ id, value, showArrow = true }: AtomNodeProps) {
   }, [offline, id, socket, property, spread]);
 
   const codeEl = (
-    <code className="console-node atom" onClick={getAtomDetail}>
+    <code className={`${CONSOLE_NODE} atom`} onClick={getAtomDetail}>
       {showArrow && (
         <ChevronRight
           className={clsx([
-            'spread-controller inline w-3 h-3',
-            spread && 'spread',
+            'spread-controller inline w-3 h-3 transition-transform duration-100 ease-linear',
+            spread ? 'spread rotate-90' : 'rotate-0',
           ])}
         />
       )}
@@ -241,8 +265,8 @@ function AtomNode({ id, value, showArrow = true }: AtomNodeProps) {
 
   return (
     <div
-      className={clsx('atom-node', {
-        disabled: offline,
+      className={clsx('atom-node cursor-default', {
+        'disabled cursor-not-allowed text-muted-foreground': offline,
       })}
     >
       {offline ? (
@@ -256,7 +280,7 @@ function AtomNode({ id, value, showArrow = true }: AtomNodeProps) {
                   to="/docs/pagespy#config-serializeData"
                   target="_blank"
                   style={{
-                    color: '#fff',
+                    color: 'var(--popover-foreground)',
                     textDecoration: 'underline',
                     textUnderlineOffset: 4,
                   }}
@@ -289,7 +313,7 @@ const ConsoleNode = React.memo<ConsoleNodeProps>(({ data }) => {
   if (type === 'object') {
     const superName = value.constructor.name;
     return (
-      <code className="console-node object">
+      <code className={clsx(CONSOLE_NODE, TYPE_CLASS.object, 'object')}>
         <ChevronRight className="inline w-3 h-3" />
         <i>
           {`${superName} {`}
@@ -299,7 +323,7 @@ const ConsoleNode = React.memo<ConsoleNodeProps>(({ data }) => {
               type: superName.toLowerCase() as SpyAtom.Overview['type'],
             }}
           />
-          <span className="right-mustache">{'}'}</span>
+          <span className="right-mustache -ml-1.5">{'}'}</span>
         </i>
       </code>
     );
@@ -320,7 +344,11 @@ const ConsoleNode = React.memo<ConsoleNodeProps>(({ data }) => {
     }
   }
 
-  return <code className={`console-node ${className}`}>{node || '""'}</code>;
+  return (
+    <code className={clsx(CONSOLE_NODE, TYPE_CLASS[className], className)}>
+      {node || '""'}
+    </code>
+  );
 });
 
 export default ConsoleNode;

@@ -8,7 +8,6 @@ import { Copy } from 'lucide-react';
 import { Fragment, useCallback, useMemo } from 'react';
 import copy from 'copy-to-clipboard';
 import React from 'react';
-import './index.less';
 
 interface Props {
   content: string;
@@ -43,13 +42,13 @@ const CopyContent: React.FC<Props> = ({ content, rows = 3, length = 120 }) => {
 
   return (
     <span className="copyable inline-flex items-center gap-1">
-      <span className="copyable-content">{computedContent}</span>
+      <span className="copyable-content hover:bg-muted">{computedContent}</span>
       <Tooltip>
         <TooltipTrigger
           render={
             <button
               type="button"
-              className="copyable-icon inline-flex items-center text-muted-foreground hover:text-foreground cursor-pointer"
+              className="copyable-icon ml-2 inline-flex cursor-pointer items-center text-primary-text hover:text-foreground"
               onClick={onCopy}
               aria-label="Copy"
             >

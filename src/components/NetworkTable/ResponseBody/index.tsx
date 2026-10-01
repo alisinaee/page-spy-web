@@ -110,7 +110,7 @@ const MediaWidget = ({ dataUrl }: MediaWidgetProps) => {
     return (
       <img
         src={dataUrl}
-        className="response-blob-image max-w-full"
+        className="response-blob-image mx-auto block max-w-[80%]"
         alt="Response"
       />
     );
@@ -217,5 +217,5 @@ export const ResponseBody = ({ data }: ResponseBodyProps) => {
     return <ColoredJson value={response} />;
   }, [data]);
 
-  return <div className="response-body p-2">{bodyContent}</div>;
+  return <div className="response-body h-full p-2">{bodyContent}</div>;
 };

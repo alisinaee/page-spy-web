@@ -6,7 +6,6 @@ import InfoSvg from '@/assets/image/info.svg?react';
 import WarnSvg from '@/assets/image/warn.svg?react';
 import UserSvg from '@/assets/image/user.svg?react';
 import DebugSvg from '@/assets/image/debug.svg?react';
-import './index.less';
 import { debounce } from 'lodash-es';
 import { useShallow } from 'zustand/react/shallow';
 import { SectionLogActions } from '@/pages/Devtools/SectionLogActions';

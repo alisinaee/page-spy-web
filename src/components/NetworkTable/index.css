@@ -1,0 +1,64 @@
+/* Overrides for third-party DOM (react-virtualized, react-draggable) and the
+   animated tab underline that relies on --width/--left set from JS. */
+.network-table {
+  scrollbar-width: thin;
+  scrollbar-color: var(--muted) transparent;
+}
+
+.network-table .network-detail-tabs::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: var(--width);
+  height: 1.5px;
+  background-color: var(--primary);
+  transform: translateX(calc(var(--left) + 32px)) translateZ(0);
+  transition: transform ease-in-out 150ms, width ease-in-out 150ms;
+}
+
+.network-table .ReactVirtualized__Table__headerRow {
+  background-color: var(--muted);
+  color: var(--muted-foreground);
+  text-align: left;
+  text-transform: none;
+  border-bottom: 1px solid var(--border);
+}
+
+.network-table .ReactVirtualized__Table__headerColumn {
+  display: flex;
+  align-items: center;
+  position: relative;
+  height: 100%;
+  margin: 0 !important;
+  padding-inline: 10px;
+}
+.network-table .ReactVirtualized__Table__headerColumn > div {
+  flex: 1;
+}
+.network-table .ReactVirtualized__Table__headerColumn .DragHandle {
+  position: absolute;
+  right: -3px;
+  top: 0;
+  bottom: 0;
+  padding-inline: 2px;
+  cursor: col-resize;
+  color: var(--primary-text);
+}
+.network-table .ReactVirtualized__Table__headerColumn .DragHandle::after {
+  content: '';
+  display: block;
+  width: 1px;
+  height: 100%;
+  background-color: var(--border);
+}
+
+.network-table .ReactVirtualized__Table__rowColumn {
+  margin: 0 !important;
+  padding-inline: 10px;
+  height: 100%;
+  line-height: 30px;
+}
+.network-table .ReactVirtualized__Table__rowColumn:nth-child(6) {
+  text-align: right;
+}

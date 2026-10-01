@@ -14,7 +14,7 @@ import { useThrottle } from 'ahooks';
 import React from 'react';
 
 const NoData = () => (
-  <div className="empty-table-placeholder text-center py-8 text-muted-foreground text-xs">
+  <div className="empty-table-placeholder absolute left-1/2 top-20 -translate-x-1/2 text-center py-8 text-muted-foreground text-xs">
     No messages
   </div>
 );
@@ -73,8 +73,8 @@ export const MessageTable = ({
   const [activeRow, setActiveRow] = useState<DataItem | null>(null);
 
   return (
-    <div className="message-table flex flex-col h-full">
-      <div className="message-table-header flex items-center gap-2 p-2 border-b border-border">
+    <div className="message-table flex h-full flex-col">
+      <div className="message-table-header flex h-10 shrink-0 items-center gap-2 px-2">
         {type === 'websocket' && (
           <select
             value={filterType}
@@ -96,7 +96,7 @@ export const MessageTable = ({
           />
         </div>
       </div>
-      <div className="message-table-body flex-1 overflow-hidden">
+      <div className="message-table-body flex-1 overflow-hidden border-t border-border">
         <AutoSizer>
           {({ width, height }) => {
             return (
@@ -113,8 +113,12 @@ export const MessageTable = ({
                 noRowsRenderer={NoData}
                 rowClassName={({ index }) => {
                   if (index < 0) return '';
-                  return clsx(index % 2 ? 'odd' : 'even', {
-                    active: tableData[index].id === activeRow?.id,
+                  const active = tableData[index].id === activeRow?.id;
+                  return clsx('cursor-default', index % 2 ? 'odd' : 'even', {
+                    active,
+                    'bg-primary/15': active,
+                    'bg-muted/40': !active && index % 2 === 1,
+                    'hover:bg-muted': !active,
                   });
                 }}
                 onRowClick={({ rowData }) => {

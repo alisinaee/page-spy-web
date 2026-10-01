@@ -163,7 +163,7 @@ export const FooterInput = memo(() => {
 
   return (
     <div className="console-item page-spy-input flex items-center gap-2 p-2 border-t border-border bg-card">
-      <ChevronRight className="icon size-4 text-primary shrink-0" />
+      <ChevronRight className="icon size-4 text-primary-text shrink-0" />
       <div className="relative flex-1">
         <textarea
           ref={inputRef}

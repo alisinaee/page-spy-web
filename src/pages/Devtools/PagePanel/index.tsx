@@ -1,7 +1,6 @@
 import { SectionLogActions } from '../SectionLogActions';
 import { useEffect, useRef, useState } from 'react';
 import { PCFrame } from '../BrowserFrame';
-import './index.less';
 import { useSocketMessageStore } from '@/store/socket-message';
 import { useShallow } from 'zustand/react/shallow';
 import { FileQuestion } from 'lucide-react';
@@ -49,10 +48,10 @@ const PagePanel = () => {
           height: 10px;
         }
         ::-webkit-scrollbar-thumb {
-          background: rgba(0, 0, 0, 0.15);
+          background: rgba(255, 255, 255, 0.15);
         }
         ::-webkit-scrollbar-thumb:active {
-          background: rgba(0, 0, 0, 0.25);
+          background: rgba(255, 255, 255, 0.25);
         }
       `,
       );
@@ -78,11 +77,11 @@ const PagePanel = () => {
   }, [html]);
 
   return (
-    <div className="page-panel flex flex-col h-full">
+    <div className="page-panel flex flex-col w-full h-full">
       <div className="flex justify-end p-1.5 border-b border-border/40">
         <SectionLogActions section="page" />
       </div>
-      <div className="page-panel__content flex-1 min-h-0">
+      <div className="page-panel__content flex-1 min-h-0 mt-2">
         {!html ? (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
             <FileQuestion className="size-10 opacity-30" />
@@ -97,7 +96,7 @@ const PagePanel = () => {
             }}
           >
             <iframe
-              className="client-iframe"
+              className="client-iframe block border-0"
               ref={frameRef}
               width="100%"
               height="100%"

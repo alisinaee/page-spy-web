@@ -10,7 +10,7 @@ export const PartOfHeader = () => (
   <Tooltip>
     <TooltipTrigger
       render={
-        <span className="cursor-pointer inline-flex items-center text-amber-500">
+        <span className="cursor-pointer inline-flex items-center text-warning">
           <AlertCircle className="w-3.5 h-3.5" />
         </span>
       }

@@ -11,7 +11,8 @@ import {
 } from '../ConsoleNode/PlaceholderNode';
 import LogType from '../LogType';
 import { getLogUrl } from '@/utils';
-import './index.less';
+import './index.css';
+import clsx from 'clsx';
 import Timestamp from '../Timestamp';
 import { useMemo, useRef, useEffect, useState, useCallback } from 'react';
 import ReactJsonView from '@huolala-tech/react-json-view';
@@ -118,15 +119,25 @@ export const ConsoleItem = ({ data, onHeightChange }: Props) => {
   const content = useMemo(() => {
     if (data.isGroup) {
       return (
-        <div className="console-group">
-          <div className="console-group__row">
-            <Badge variant="secondary" className="console-group__tag">
+        <div className="console-group flex w-full flex-col">
+          <div className="console-group__row flex w-full min-w-0 flex-nowrap items-center gap-1.5">
+            <Badge
+              variant="secondary"
+              className="console-group__tag m-0 shrink-0 rounded px-1.5 text-[11px] font-semibold leading-[18px]"
+            >
               GROUP ({data.groupItems?.length})
             </Badge>
             <span
-              className={
-                'console-group__title console-group__title--' + data.logType
-              }
+              className={clsx(
+                'console-group__title console-group__title--' + data.logType,
+                'max-w-[calc(100vw-160px)] truncate font-semibold',
+                {
+                  'text-foreground':
+                    data.logType !== 'error' && data.logType !== 'warn',
+                  'text-destructive': data.logType === 'error',
+                  'text-warning': data.logType === 'warn',
+                },
+              )}
               title={data.groupTitle}
             >
               {data.groupTitle}
@@ -134,15 +145,15 @@ export const ConsoleItem = ({ data, onHeightChange }: Props) => {
           </div>
 
           {expanded && (
-            <div className="console-group-details">
-              <div className="console-group-details__bar">
-                <span className="console-group-details__count">
+            <div className="console-group-details mt-2 max-h-[450px] w-full overflow-y-auto whitespace-pre-wrap break-all rounded-md border border-border bg-background px-3 py-2 font-mono text-xs leading-relaxed text-foreground">
+              <div className="console-group-details__bar mb-1.5 flex items-center justify-between border-b border-border pb-1">
+                <span className="console-group-details__count text-[11px] text-muted-foreground">
                   {data.groupItems?.length} grouped lines
                 </span>
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="console-group-details__copy h-7 px-2 text-xs"
+                  className="console-group-details__copy h-[22px] px-2 text-[11px] text-muted-foreground"
                   onClick={onCopyGroup}
                 >
                   {copied ? (
@@ -175,7 +186,10 @@ export const ConsoleItem = ({ data, onHeightChange }: Props) => {
       if (log.type === 'json') {
         if (log.value === null) {
           return (
-            <code key={log.id} className="non-serializable">
+            <code
+              key={log.id}
+              className="non-serializable text-xs text-muted-foreground"
+            >
               {t('console.non-serializable')}
             </code>
           );
@@ -188,21 +202,28 @@ export const ConsoleItem = ({ data, onHeightChange }: Props) => {
 
   return (
     <div
-      className={`console-item ${data.logType} ${
-        expanded ? 'expanded' : 'collapsed'
-      }`}
+      className={clsx(
+        'console-item flex min-h-[27px] whitespace-pre-wrap border-t border-border px-2 py-1 text-xs transition-colors first:border-t-0 last:border-b hover:bg-muted',
+        data.logType,
+        expanded ? 'expanded' : 'collapsed',
+        {
+          'text-primary-text': data.logType === 'debug',
+          'bg-warning/10 text-warning': data.logType === 'warn',
+          'bg-destructive/10 text-destructive': data.logType === 'error',
+        },
+      )}
       ref={ref}
       onClick={isClickable ? toggleExpand : undefined}
       style={{ cursor: isClickable ? 'pointer' : 'default' }}
     >
-      <div className="console-item__title">
+      <div className="console-item__title mt-0.5">
         <LogType type={data.logType} />
       </div>
-      <div className="console-item__content">
+      <div className="console-item__content min-w-0 flex-1">
         <div className="flex items-start gap-2 flex-nowrap w-full">
           <div className="shrink-0 flex items-center gap-1">
             {isClickable && (
-              <span className="console-item__toggle-icon text-muted-foreground">
+              <span className="console-item__toggle-icon inline-flex size-3.5 cursor-pointer select-none items-center justify-center text-muted-foreground">
                 {expanded ? (
                   <ChevronDown className="h-3 w-3" />
                 ) : (
@@ -224,7 +245,10 @@ export const ConsoleItem = ({ data, onHeightChange }: Props) => {
           </div>
         </div>
       </div>
-      <div className="console-item__url hidden-xs" title={data.url}>
+      <div
+        className="console-item__url hidden-xs max-w-[150px] overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground underline transition-colors hover:text-foreground max-[992px]:hidden"
+        title={data.url}
+      >
         {getLogUrl(data.url)}
       </div>
     </div>

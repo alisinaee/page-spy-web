@@ -7,7 +7,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Fragment, memo, useMemo } from 'react';
-import './index.less';
 import { useTranslation } from 'react-i18next';
 
 const ShortcutsModal = withPopup(({ resolve, visible }) => {
@@ -63,7 +62,7 @@ const ShortcutsModal = withPopup(({ resolve, visible }) => {
             return (
               <div
                 key={keys.join('')}
-                className="shortcuts-item flex items-center justify-between gap-4 py-1.5 border-b border-border/40 last:border-0"
+                className="shortcuts-item flex items-center justify-between gap-4 py-1.5 border-b border-border last:border-0"
               >
                 <span className="shortcuts-item__desc text-sm text-muted-foreground">
                   {description}
@@ -71,7 +70,7 @@ const ShortcutsModal = withPopup(({ resolve, visible }) => {
                 <div className="flex items-center gap-1.5">
                   {keys.map((k, index) => (
                     <Fragment key={k}>
-                      <kbd className="keyboard-button px-2 py-1 text-xs font-mono font-semibold rounded bg-muted text-foreground border border-border">
+                      <kbd className="keyboard-button px-3 py-0.5 text-xs font-mono font-semibold rounded bg-muted text-foreground border border-border">
                         {k}
                       </kbd>
                       {keySize > 1 && index !== keySize - 1 && (
@@ -96,7 +95,7 @@ export const Shortcuts = memo(() => {
   const modalRef = usePopupRef();
 
   return (
-    <div className="console-keyboard-shortcuts">
+    <div className="console-keyboard-shortcuts mx-3">
       <button
         type="button"
         title={t('title')!}

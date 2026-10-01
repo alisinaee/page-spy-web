@@ -36,7 +36,6 @@
     "eslint-config-alloy": "^4.9.0",
     "eslint-plugin-react": "^7.32.2",
     "eslint-plugin-react-hooks": "^4.6.0",
-    "less": "^4.1.2",
     "lint-staged": "^12.3.3",
     "prettier": "^2.5.1",
     "tailwindcss": "^4.3.3",
@@ -88,7 +87,7 @@
     "pre-commit": "lint-staged && node ./scripts/check-i18n.mjs"
   },
   "lint-staged": {
-    "*.{js,jsx,less,md,json}": [
+    "*.{js,jsx,css,md,json}": [
       "prettier --write"
     ],
     "*.ts?(x)": [
