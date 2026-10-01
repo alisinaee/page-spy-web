@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 import { useSocketMessageStore } from '@/store/socket-message';
 import { CUSTOM_EVENT } from '@/store/socket-message/socket';
 import { useShallow } from 'zustand/react/shallow';
-import { Separator } from '@/components/ui/separator';
 import clsx from 'clsx';
 
 interface ConnectionStatus {
@@ -12,22 +11,7 @@ interface ConnectionStatus {
   debug?: SpySocket.Connection | null;
 }
 
-const StatusItem = ({ online, name }: { online: boolean; name: string }) => {
-  return (
-    <div
-      className={clsx(
-        'flex items-center gap-1.5',
-        online ? 'text-success' : 'text-muted-foreground',
-      )}
-    >
-      <span className="size-2 rounded-full bg-current" />
-      <span>{name}</span>
-    </div>
-  );
-};
-
-export const ConnectStatus = memo(() => {
-  const { t } = useTranslation();
+const useConnections = () => {
   const socket = useSocketMessageStore(useShallow((state) => state.socket));
   const [connections, setConnections] = useState<ConnectionStatus>(() => ({
     client: socket?.clientConnection,
@@ -46,19 +30,49 @@ export const ConnectStatus = memo(() => {
     };
   }, [socket]);
 
+  return connections;
+};
+
+const StatusItem = ({ online, name }: { online: boolean; name: string }) => (
+  <div
+    className={clsx(
+      'flex items-center gap-2 text-sm',
+      online ? 'text-success' : 'text-muted-foreground',
+    )}
+  >
+    <span className="size-2 rounded-full bg-current" />
+    <span>{name}</span>
+  </div>
+);
+
+/** Compact "Live / Offline" pill for the top bar. */
+export const ConnectStatus = memo(() => {
+  const { t } = useTranslation();
+  const { client, debug } = useConnections();
+  const live = !!client && !!debug;
+
   return (
-    <div className="connect-status flex justify-center items-center py-1 shrink-0">
-      <div className="connect-status-widget flex items-center gap-3 px-3 py-1 bg-card border border-border rounded-full text-xs">
-        <StatusItem
-          online={!!connections.debug}
-          name={t('socket.debug-name')}
-        />
-        <Separator orientation="vertical" className="h-3.5" />
-        <StatusItem
-          online={!!connections.client}
-          name={t('socket.client-name')}
-        />
-      </div>
+    <div
+      className={clsx(
+        'flex shrink-0 items-center gap-1 text-xs font-medium',
+        live ? 'text-success' : 'text-muted-foreground',
+      )}
+    >
+      <span className="size-2 rounded-full bg-current" />
+      <span>{live ? t('devtool.live') : t('devtool.offline')}</span>
+    </div>
+  );
+});
+
+/** You / Client detail, shown inside the device info sheet. */
+export const ConnectDetail = memo(() => {
+  const { t } = useTranslation();
+  const { client, debug } = useConnections();
+
+  return (
+    <div className="flex flex-col gap-2">
+      <StatusItem online={!!debug} name={t('socket.debug-name')} />
+      <StatusItem online={!!client} name={t('socket.client-name')} />
     </div>
   );
 });

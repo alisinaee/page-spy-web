@@ -3,14 +3,14 @@ import React, { memo, useEffect, useMemo, useState } from 'react';
 import ConsolePanel from './ConsolePanel';
 import NetworkPanel from './NetworkPanel';
 import SystemPanel from './SystemPanel';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import PagePanel from './PagePanel';
 import clsx from 'clsx';
 import { StoragePanel } from './StoragePanel';
 import useSearch from '@/utils/useSearch';
 import { useEventListener } from '@/utils/useEventListener';
 import { useTranslation } from 'react-i18next';
-import { ConnectStatus } from './ConnectStatus';
+import { ConnectStatus, ConnectDetail } from './ConnectStatus';
 import { useSocketMessageStore } from '@/store/socket-message';
 import '@huolala-tech/react-json-view/dist/style.css';
 import { throttle } from 'lodash-es';
@@ -27,15 +27,17 @@ import { confirmLogFileName } from './save-log-dialog';
 import { message } from '@/utils/message';
 import { Button } from '@/components/ui/button';
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import { Badge } from '@/components/ui/badge';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Separator } from '@/components/ui/separator';
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
@@ -47,7 +49,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Copy, Download, Trash2, Settings } from 'lucide-react';
+import {
+  ChevronLeft,
+  Copy,
+  Cpu,
+  Database,
+  Download,
+  Globe,
+  MonitorSmartphone,
+  MoreHorizontal,
+  MoreVertical,
+  Terminal,
+  Trash2,
+  type LucideIcon,
+} from 'lucide-react';
 
 type MenuType = 'Console' | 'Network' | 'Page' | 'Storage' | 'System';
 
@@ -138,63 +153,169 @@ const useVisibleMenus = () => {
   }, [clientInfo]);
 };
 
-interface BadgeMenuProps {
+const MENU_ICONS: Record<MenuType, LucideIcon> = {
+  Console: Terminal,
+  Network: Globe,
+  Storage: Database,
+  System: Cpu,
+  Page: MonitorSmartphone,
+};
+const TAB_MENUS: MenuType[] = ['Console', 'Network', 'Storage', 'System'];
+
+const UnreadDot = ({
+  label,
+  className,
+}: {
+  label: string;
+  className?: string;
+}) => (
+  <>
+    <span
+      className={clsx('size-2 shrink-0 rounded-full bg-destructive', className)}
+      aria-hidden
+    />
+    <span className="sr-only">{label}</span>
+  </>
+);
+
+interface MenuProps {
   active: MenuType;
   badge: Record<MenuType, boolean>;
+  menus: MenuType[];
+  onSelect: (key: MenuType) => void;
 }
-const BadgeMenu = memo(({ active, badge }: BadgeMenuProps) => {
+
+const SideNav = memo(({ active, badge, menus, onSelect }: MenuProps) => {
   const { t } = useTranslation('translation', { keyPrefix: 'devtool' });
-  const navigate = useNavigate();
-  const { search } = useLocation();
-
-  const clientInfo = useSocketMessageStore(
-    useShallow((state) => state.clientInfo),
-  );
-  const visibleMenus = useVisibleMenus();
-
-  if (!clientInfo) {
-    return (
-      <div className="space-y-2 p-2">
-        {Object.keys(MENU_COMPONENTS).map((_, index) => (
-          <div
-            key={index}
-            className="h-8 bg-muted rounded animate-pulse w-[90%] mx-auto"
-          />
-        ))}
-      </div>
-    );
-  }
-
   return (
-    <nav className="sider-menu flex flex-col gap-1 p-2">
-      {visibleMenus.map((key) => (
-        <button
-          key={key}
-          type="button"
-          className={clsx(
-            'sider-menu__item w-full flex items-center justify-between px-3 py-2 text-sm rounded-md text-left transition-colors cursor-pointer',
-            active === key
-              ? 'bg-secondary text-foreground font-medium'
-              : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50',
-          )}
-          onClick={() => {
-            navigate({ search, hash: key });
-          }}
-        >
-          <span>{t(`menu.${key}`)}</span>
-          <div
+    <nav className="hidden w-52 shrink-0 flex-col gap-1 border-r border-border bg-card p-2 md:flex">
+      {menus.map((key) => {
+        const Icon = MENU_ICONS[key];
+        const isActive = active === key;
+        return (
+          <button
+            key={key}
+            type="button"
+            aria-current={isActive ? 'page' : undefined}
             className={clsx(
-              'circle-badge relative -top-1.5 left-1 inline-block size-1.5 rounded-full bg-destructive transition-transform duration-300 ease-out',
-              badge[key as MenuType] ? 'show scale-100' : 'scale-0',
+              'relative flex h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+              isActive
+                ? 'bg-muted font-medium text-foreground'
+                : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
             )}
-          />
-        </button>
-      ))}
+            onClick={() => onSelect(key)}
+          >
+            {isActive && (
+              <span className="absolute inset-y-1 left-0 w-0.5 rounded-full bg-primary" />
+            )}
+            <Icon className="size-4 shrink-0" />
+            <span className="flex-1 truncate">{t(`menu.${key}`)}</span>
+            {badge[key] && <UnreadDot label={t('new-activity')} />}
+          </button>
+        );
+      })}
     </nav>
   );
 });
 
-const ClientInfo = memo(() => {
+const tabClass = (isActive: boolean) =>
+  clsx(
+    'relative flex min-h-[44px] flex-1 flex-col items-center justify-center gap-1 text-xs outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+    isActive ? 'text-primary-text' : 'text-muted-foreground',
+  );
+
+const TabBar = memo(({ active, badge, menus, onSelect }: MenuProps) => {
+  const { t } = useTranslation('translation', { keyPrefix: 'devtool' });
+  const tabs = menus.filter((key) => TAB_MENUS.includes(key));
+  const more = menus.filter((key) => !TAB_MENUS.includes(key));
+  const moreActive = more.includes(active);
+  const moreBadge = more.some((key) => badge[key]);
+
+  return (
+    <nav className="flex h-[calc(3.5rem+env(safe-area-inset-bottom))] shrink-0 border-t border-border bg-card pb-[env(safe-area-inset-bottom)] md:hidden">
+      {tabs.map((key) => {
+        const Icon = MENU_ICONS[key];
+        const isActive = active === key;
+        return (
+          <button
+            key={key}
+            type="button"
+            aria-current={isActive ? 'page' : undefined}
+            className={tabClass(isActive)}
+            onClick={() => onSelect(key)}
+          >
+            {isActive && (
+              <span className="absolute inset-x-3 top-0 h-0.5 bg-primary" />
+            )}
+            <span className="relative">
+              <Icon className="size-5" />
+              {badge[key] && (
+                <UnreadDot
+                  label={t('new-activity')}
+                  className="absolute -right-1 -top-1"
+                />
+              )}
+            </span>
+            <span>{t(`menu.${key}`)}</span>
+          </button>
+        );
+      })}
+      {more.length > 0 && (
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            className={tabClass(moreActive)}
+            aria-label={String(t('more'))}
+          >
+            {moreActive && (
+              <span className="absolute inset-x-3 top-0 h-0.5 bg-primary" />
+            )}
+            <span className="relative">
+              <MoreHorizontal className="size-5" />
+              {moreBadge && (
+                <UnreadDot
+                  label={t('new-activity')}
+                  className="absolute -right-1 -top-1"
+                />
+              )}
+            </span>
+            <span>{t('more')}</span>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" side="top" className="min-w-40">
+            {more.map((key) => {
+              const Icon = MENU_ICONS[key];
+              return (
+                <DropdownMenuItem
+                  key={key}
+                  className="min-h-[44px] gap-3 px-3 text-sm"
+                  onClick={() => onSelect(key)}
+                >
+                  <Icon />
+                  <span className="flex-1">{t(`menu.${key}`)}</span>
+                  {badge[key] && <UnreadDot label={t('new-activity')} />}
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+    </nav>
+  );
+});
+
+const useIsDesktop = () => {
+  const [desktop, setDesktop] = useState(
+    () => window.matchMedia('(min-width: 768px)').matches,
+  );
+  useEffect(() => {
+    const mql = window.matchMedia('(min-width: 768px)');
+    const listener = (e: MediaQueryListEvent) => setDesktop(e.matches);
+    mql.addEventListener('change', listener);
+    return () => mql.removeEventListener('change', listener);
+  }, []);
+  return desktop;
+};
+
+const TopBar = memo(() => {
   const { t } = useTranslation('translation', { keyPrefix: 'devtool' });
   const { address = '' } = useSearch();
   const clientInfo = useSocketMessageStore(
@@ -205,6 +326,8 @@ const ClientInfo = memo(() => {
     (state) => state.clearDeviceSession,
   );
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
+  const isDesktop = useIsDesktop();
 
   const copyAllLogs = () => {
     try {
@@ -244,98 +367,193 @@ const ClientInfo = memo(() => {
     message.success(t('clear-success'));
   };
 
+  const os = clientInfo?.os;
+  const browser = clientInfo?.browser;
+
   return (
-    <div className="client-info p-3 text-center">
-      <h4 className="text-sm font-semibold tracking-tight my-2">
-        {t('device')}
-      </h4>
-      <div className="flex items-center justify-around py-2">
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <div className="cursor-pointer">
-                <img
-                  className="client-info__logo w-8 h-8 mx-auto"
-                  src={clientInfo?.os.logo}
-                  alt={clientInfo?.os.name}
-                />
-              </div>
-            }
-          />
-          <TooltipContent>
-            <span>
-              {t('system')}: {clientInfo?.os.name}
-            </span>
-            <br />
-            <span>
-              {t('version')}: {clientInfo?.os.version}
-            </span>
-          </TooltipContent>
-        </Tooltip>
-        <Separator orientation="vertical" className="h-6" />
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <div className="cursor-pointer">
-                <img
-                  className="client-info__logo w-8 h-8 mx-auto"
-                  src={clientInfo?.browser.logo}
-                  alt={clientInfo?.browser.name}
-                />
-              </div>
-            }
-          />
-          <TooltipContent>
-            <span>
-              {t('platform')}: {clientInfo?.browser.name}
-            </span>
-            <br />
-            <span>
-              {t('version')}: {clientInfo?.browser.version}
-            </span>
-          </TooltipContent>
-        </Tooltip>
-      </div>
-      <Separator className="my-2" />
-      <Tooltip>
-        <TooltipTrigger
+    <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border bg-background px-2">
+      <Button
+        variant="ghost"
+        size="icon-touch"
+        className="md:size-9"
+        aria-label={String(t('back'))}
+        render={<Link to="/room-list" />}
+      >
+        <ChevronLeft />
+      </Button>
+
+      <button
+        type="button"
+        className="min-w-0 flex-1 rounded-lg px-1 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        onClick={() => setInfoOpen(true)}
+        aria-label={String(t('device-info'))}
+      >
+        <div className="truncate font-mono text-sm font-semibold">
+          {address}
+        </div>
+        <div className="truncate text-xs text-muted-foreground">
+          {os && browser
+            ? `${os.name} ${os.version} · ${browser.name} ${browser.version}`
+            : '\u00a0'}
+        </div>
+      </button>
+
+      <ConnectStatus />
+
+      <DropdownMenu>
+        <DropdownMenuTrigger
           render={
-            <div className="page-spy-id mx-auto my-1 w-fit cursor-pointer rounded-md bg-muted px-2 py-0.5 font-mono text-xs font-bold text-primary-text">
-              #{address.slice(0, 4)}
-            </div>
+            <Button
+              variant="ghost"
+              size="icon-touch"
+              className="md:size-9"
+              aria-label={String(t('more-actions'))}
+            />
           }
-        />
-        <TooltipContent>Device ID</TooltipContent>
-      </Tooltip>
-      <div className="client-info__actions flex flex-col gap-2 mt-3 w-full">
-        <Button
-          size="sm"
-          variant="outline"
-          className="w-full text-xs h-8"
-          onClick={copyAllLogs}
         >
-          <Copy className="h-3.5 w-3.5 mr-1" />
-          {t('copy-all')}
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          className="w-full text-xs h-8"
-          onClick={downloadAllLogs}
+          <MoreVertical />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-48">
+          <DropdownMenuItem
+            className="min-h-[44px] gap-3 px-3 md:min-h-8"
+            onClick={copyAllLogs}
+          >
+            <Copy />
+            {t('copy-all')}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="min-h-[44px] gap-3 px-3 md:min-h-8"
+            onClick={downloadAllLogs}
+          >
+            <Download />
+            {t('download')}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            variant="destructive"
+            className="min-h-[44px] gap-3 px-3 md:min-h-8"
+            onClick={() => setClearConfirmOpen(true)}
+          >
+            <Trash2 />
+            {t('clear-panel-logs')}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <Sheet open={infoOpen} onOpenChange={setInfoOpen}>
+        <SheetContent
+          side={isDesktop ? 'right' : 'bottom'}
+          className="max-h-[85dvh] overflow-y-auto p-4"
         >
-          <Download className="h-3.5 w-3.5 mr-1" />
-          {t('download')}
-        </Button>
-        <Button
-          size="sm"
-          variant="destructive"
-          className="w-full text-xs h-8"
-          onClick={() => setClearConfirmOpen(true)}
-        >
-          <Trash2 className="h-3.5 w-3.5 mr-1" />
-          {t('clear-panel-logs')}
-        </Button>
-      </div>
+          <SheetHeader className="p-0">
+            <SheetTitle className="text-base font-semibold">
+              {t('device-info')}
+            </SheetTitle>
+            <SheetDescription className="sr-only">
+              {t('device')}
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="flex flex-col gap-4 pb-[env(safe-area-inset-bottom)]">
+            <div className="flex items-center gap-4">
+              {os && (
+                <div className="flex min-w-0 items-center gap-2">
+                  <img
+                    className="size-8 shrink-0"
+                    src={os.logo}
+                    alt={`${t('system')}: ${os.name}`}
+                  />
+                  <div className="min-w-0 text-sm">
+                    <div className="truncate font-medium">{os.name}</div>
+                    <div className="truncate text-xs text-muted-foreground">
+                      {os.version}
+                    </div>
+                  </div>
+                </div>
+              )}
+              {browser && (
+                <div className="flex min-w-0 items-center gap-2">
+                  <img
+                    className="size-8 shrink-0"
+                    src={browser.logo}
+                    alt={`${t('platform')}: ${browser.name}`}
+                  />
+                  <div className="min-w-0 text-sm">
+                    <div className="truncate font-medium">{browser.name}</div>
+                    <div className="truncate text-xs text-muted-foreground">
+                      {browser.version}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <div className="text-xs font-medium text-muted-foreground">
+                {t('device-id')}
+              </div>
+              <div className="break-all font-mono text-sm">{address}</div>
+            </div>
+
+            {clientInfo && (
+              <div>
+                <div className="text-xs font-medium text-muted-foreground">
+                  SDK
+                </div>
+                <div className="text-sm">
+                  {[clientInfo.sdk, clientInfo.framework]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </div>
+                {clientInfo.plugins.length > 0 && (
+                  <div className="break-words text-xs text-muted-foreground">
+                    {clientInfo.plugins.join(', ')}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div>
+              <div className="mb-2 text-xs font-medium text-muted-foreground">
+                {t('connection')}
+              </div>
+              <ConnectDetail />
+            </div>
+
+            <Separator />
+
+            <div className="flex flex-col gap-2">
+              <Button
+                variant="outline"
+                size="touch"
+                className="w-full md:h-9 md:text-sm"
+                onClick={copyAllLogs}
+              >
+                <Copy />
+                {t('copy-all')}
+              </Button>
+              <Button
+                variant="outline"
+                size="touch"
+                className="w-full md:h-9 md:text-sm"
+                onClick={downloadAllLogs}
+              >
+                <Download />
+                {t('download')}
+              </Button>
+              <Button
+                variant="destructive"
+                size="touch"
+                className="w-full md:h-9 md:text-sm"
+                onClick={() => setClearConfirmOpen(true)}
+              >
+                <Trash2 />
+                {t('clear-panel-logs')}
+              </Button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <Dialog open={clearConfirmOpen} onOpenChange={setClearConfirmOpen}>
         <DialogContent className="max-w-xs">
@@ -348,31 +566,35 @@ const ClientInfo = memo(() => {
           <DialogFooter className="flex gap-2">
             <Button
               variant="outline"
-              size="sm"
+              size="touch"
+              className="md:h-9 md:text-sm"
               onClick={() => setClearConfirmOpen(false)}
             >
               Cancel
             </Button>
-            <Button variant="destructive" size="sm" onClick={clearPanelLogs}>
+            <Button
+              variant="destructive"
+              size="touch"
+              className="md:h-9 md:text-sm"
+              onClick={clearPanelLogs}
+            >
               Clear
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </header>
   );
 });
 
 export default function Devtools() {
   const { hash = '#Console' } = useLocation();
   const { address = '', secret = '' } = useSearch();
-  const { t } = useTranslation('translation', { keyPrefix: 'devtool' });
   const navigate = useNavigate();
   const { search } = useLocation();
-  const [bottomSheetOpen, setBottomSheetOpen] = useState(false);
 
-  const [socket, initSocket, clientInfo] = useSocketMessageStore(
-    useShallow((state) => [state.socket, state.initSocket, state.clientInfo]),
+  const [socket, initSocket] = useSocketMessageStore(
+    useShallow((state) => [state.socket, state.initSocket]),
   );
 
   useEffect(() => {
@@ -400,85 +622,28 @@ export default function Devtools() {
     return null;
   }
 
+  const onSelect = (key: MenuType) => navigate({ search, hash: key });
+
   return (
-    <div className="page-spy-devtools-root relative flex flex-col h-full overflow-hidden">
-      {/* Main Layout (Sider on left on desktop, hidden on mobile via CSS) */}
-      <div className="page-spy-devtools flex flex-1 h-full overflow-hidden max-md:flex-col">
-        <aside className="devtools-desktop-sider w-56 shrink-0 border-r border-border bg-card flex flex-col overflow-y-auto max-md:hidden">
-          <div className="page-spy-devtools__sider flex flex-col h-full overflow-hidden">
-            <ClientInfo />
-            <BadgeMenu active={hashKey} badge={badge} />
-          </div>
-        </aside>
-        <main className="page-spy-devtools__content relative flex-1 flex flex-col h-full min-w-0 overflow-hidden max-md:h-0 max-md:w-full max-md:max-w-full">
-          <ConnectStatus />
-          <div className="page-spy-devtools__panel flex-1 h-0 overflow-auto p-5 pt-2 max-md:p-2 [&>div]:h-full">
-            <ActiveContent />
-          </div>
+    <div className="flex h-full flex-col overflow-hidden bg-background">
+      <TopBar />
+      <div className="flex min-h-0 flex-1">
+        <SideNav
+          active={hashKey}
+          badge={badge}
+          menus={visibleMenus}
+          onSelect={onSelect}
+        />
+        <main className="min-h-0 min-w-0 flex-1 overflow-hidden [&>div]:h-full">
+          <ActiveContent />
         </main>
       </div>
-
-      {/* Floating Action Button (FAB) for mobile */}
-      <div
-        className="devtools-floating-fab fixed right-5 bottom-6 z-50 hidden size-12 cursor-pointer items-center justify-center rounded-full bg-primary shadow-sm transition-transform active:scale-90 max-md:flex"
-        onClick={() => setBottomSheetOpen(true)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            setBottomSheetOpen(true);
-          }
-        }}
-        role="button"
-        tabIndex={0}
-        title="Open Side Panel & Actions"
-      >
-        <Settings className="w-5 h-5 text-primary-foreground" />
-        {Object.values(badge).some(Boolean) && (
-          <span className="fab-badge-dot absolute top-1 right-1 size-2 rounded-full border border-background bg-destructive" />
-        )}
-      </div>
-
-      {/* Mobile BottomSheet Drawer for Side Panel */}
-      <Sheet open={bottomSheetOpen} onOpenChange={setBottomSheetOpen}>
-        <SheetContent side="bottom" className="h-[80vh] overflow-y-auto p-4">
-          <SheetHeader className="pb-3 border-b border-border">
-            <SheetTitle className="flex items-center justify-between">
-              <span>{t('device')} &amp; Side Panel</span>
-              <Badge variant="secondary" className="font-mono font-bold">
-                #{address.slice(0, 4)}
-              </Badge>
-            </SheetTitle>
-          </SheetHeader>
-          <div className="mobile-bottomsheet-body pt-4 pb-5 space-y-4">
-            <div className="bottomsheet-panel-switcher">
-              <span className="text-xs text-muted-foreground block mb-2 font-medium">
-                Switch Panel
-              </span>
-              <div className="bottomsheet-panel-buttons flex flex-wrap gap-2">
-                {visibleMenus.map((key) => (
-                  <Button
-                    key={key}
-                    size="touch"
-                    variant={key === hashKey ? 'default' : 'outline'}
-                    onClick={() => {
-                      navigate({ search, hash: key });
-                      setBottomSheetOpen(false);
-                    }}
-                    className="rounded-full"
-                  >
-                    {t(`menu.${key}`)}
-                    {badge[key] && (
-                      <span className="tab-circle-badge ml-1 inline-block w-2 h-2 rounded-full bg-destructive" />
-                    )}
-                  </Button>
-                ))}
-              </div>
-            </div>
-            <Separator />
-            <ClientInfo />
-          </div>
-        </SheetContent>
-      </Sheet>
+      <TabBar
+        active={hashKey}
+        badge={badge}
+        menus={visibleMenus}
+        onSelect={onSelect}
+      />
     </div>
   );
 }

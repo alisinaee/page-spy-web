@@ -1,14 +1,9 @@
 import React, { useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import { Info, Lock, LogIn } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/utils/AuthContext';
 
@@ -18,9 +13,11 @@ const AuthLogin: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [visible, setVisible] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
     if (!password.trim()) {
       setErrorMsg(t('auth.please_enter_password') as string);
       return;
@@ -35,61 +32,86 @@ const AuthLogin: React.FC = () => {
   };
 
   return (
-    <div className="auth-login-container absolute inset-0 z-10 box-border flex items-center justify-center bg-background p-4 pt-[50px]">
+    <div className="flex h-full min-h-dvh w-full items-center justify-center bg-background">
       {loading ? (
-        <Spinner className="h-8 w-8 text-primary" />
+        <Spinner className="size-8 text-primary" />
       ) : (
-        <Card className="auth-login-card m-auto w-full max-w-sm overflow-hidden rounded-xl border-none">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <span>{t('auth.login_title')}</span>
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <span className="text-muted-foreground hover:text-foreground cursor-pointer inline-flex">
-                      <Info className="h-4 w-4" />
-                    </span>
-                  }
-                />
-                <TooltipContent>
-                  {t('auth.login_title_desc') as string}
-                </TooltipContent>
-              </Tooltip>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+        <Card className="mx-4 w-full max-w-sm p-6">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1">
+              <h1 className="m-0 text-lg font-semibold text-foreground">
+                Spy Tobank
+              </h1>
+              <p className="m-0 text-sm text-muted-foreground">
+                {t('auth.login_subtitle', {
+                  defaultValue: 'Enter the debugger password',
+                })}
+              </p>
+            </div>
+            <div className="flex flex-col gap-2">
+              <label
+                htmlFor="auth-password"
+                className="text-sm font-medium text-foreground"
+              >
+                {t('auth.password')}
+              </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  type="password"
+                  id="auth-password"
+                  type={visible ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  autoFocus
                   value={password}
                   onChange={(e) => {
                     setPassword(e.target.value);
                     if (errorMsg) setErrorMsg('');
                   }}
-                  placeholder={t('auth.password') as string}
-                  className="pl-9 h-11"
+                  aria-invalid={!!errorMsg}
+                  aria-describedby={
+                    errorMsg ? 'auth-password-error' : undefined
+                  }
+                  className="h-11 pr-12 text-base md:h-9 md:text-sm"
                 />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-touch"
+                  className="absolute inset-y-0 right-0 md:size-9 md:min-h-0 md:min-w-0"
+                  aria-label={
+                    visible
+                      ? (t('auth.hide_password', {
+                          defaultValue: 'Hide password',
+                        }) as string)
+                      : (t('auth.show_password', {
+                          defaultValue: 'Show password',
+                        }) as string)
+                  }
+                  aria-pressed={visible}
+                  onClick={() => setVisible((v) => !v)}
+                >
+                  {visible ? <EyeOff /> : <Eye />}
+                </Button>
               </div>
               {errorMsg && (
-                <p className="text-xs text-destructive">{errorMsg}</p>
+                <p
+                  id="auth-password-error"
+                  role="alert"
+                  className="m-0 text-sm text-destructive"
+                >
+                  {errorMsg}
+                </p>
               )}
-              <Button
-                type="submit"
-                size="touch"
-                disabled={submitting}
-                className="w-full"
-              >
-                {submitting ? (
-                  <Spinner className="h-4 w-4 mr-2" />
-                ) : (
-                  <LogIn className="h-4 w-4 mr-2" />
-                )}
-                {t('auth.login_button') as string}
-              </Button>
-            </form>
-          </CardContent>
+            </div>
+            <Button
+              type="submit"
+              size="touch"
+              disabled={submitting}
+              className="w-full md:h-9 md:text-sm"
+            >
+              {submitting && <Spinner className="size-4" />}
+              {t('auth.login_button') as string}
+            </Button>
+          </form>
         </Card>
       )}
     </div>

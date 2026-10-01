@@ -50,7 +50,10 @@
     "o-spy": "oSpy",
     "toc": "Table of Contents",
     "filter": "Filter",
-    "back": "Back"
+    "back": "Back",
+    "online": "online",
+    "retry": "Retry",
+    "join": "Join"
   },
   "error": {
     "oops": "Oops! Errors happened~",
@@ -59,56 +62,17 @@
     "report": "Report",
     "no-frames": "No valid error information found"
   },
-  "inject": {
-    "web": {
-      "title": "WEB",
-      "load-sdk": "Load a <script> in the test project;",
-      "init-sdk": "<0>Then, initialize it and check the</0> <1>configuration options</1>:",
-      "plugins": "<0>PageSpy can integrate plugins on demand to extend the capabilities of the SDK, such as:</0> <1>DOM recording</1>, <2>offline caching</2>, <3>and more. If needed, you can check the</3> <4>plugin details</4>;"
-    },
-    "mp": {
-      "title": "Mini Program",
-      "request-host": "Add the page-spy server domain to the whitelist of the miniprogram http and websocket requests. Note that the miniprogram requires https and wss protocols, except for the development environment.",
-      "install-sdk": "First, install dependencies in the project. We provide SDKs for different platforms, you may choose the one you need:",
-      "init-sdk": "<0>Import the SDK in the entry file and initialize it，check the </0> <1>configuration options</1>："
-    },
-    "harmony": {
-      "title": "Harmony",
-      "install-sdk": "Install dependencies in the target HAP directory:",
-      "init-sdk": "<0>Import and initialize the SDK at the appropriate location, using EntryAbility as an example. Check the</0> <1>configuration options</1>:"
-    },
-    "rn": {
-      "title": "React Native",
-      "install-sdk": "First, install dependencies in the project:",
-      "init-sdk": "<0>Import and initialize the SDK at the appropriate location. Check the</0> <1>configuration options</1>:",
-      "storage-plugin": "<0>If you use the official recommended storage library @react-native-async-storage/async-storage, we provide an independent plugin for you:</0> <1>Async Storage plugin</1>"
-    },
-
-    "end": "That's ALL.",
-    "start-debug": "Start debugging by clicking the <1>Connections</1> menu at the top!"
-  },
-  "banner": {
-    "title": "All-In-One<br />Remote Debugging Tool",
-    "desc": "Debug remotely and easily with a range of features like chrome devtool.",
-    "get-start": "Get Started",
-    "badge": "No Deploy"
-  },
-  "intro": {
-    "does": "What PageSpy does",
-    "doesTitle": "Inspect Runtime,<br/>Remote!",
-    "provides": "What we provide",
-    "providesTitle": "Out-of-box <1>SDK</1> and<br /> <4>debugger client</4>",
-    "load-script": "First, load the file",
-    "init-instance": "Then, configure (optional) and initialize",
-    "community-comments": "<0>Loved by the community</0><1>Don't just take our word for it<br />Hear from real users in the PageSpy community</1>"
-  },
-  "selConn": {
-    "title": "Select the connection",
-    "label": "Connections",
-    "placeholder": "Select the connection"
-  },
   "devtool": {
     "device": "Device",
+    "back": "Back to connections",
+    "more-actions": "More actions",
+    "device-info": "Device info",
+    "device-id": "Device ID",
+    "connection": "Connection",
+    "live": "Live",
+    "offline": "Offline",
+    "more": "More",
+    "new-activity": "new activity",
     "system": "System",
     "browser": "Browser",
     "platform": "Platform",
@@ -189,9 +153,6 @@
     "data-be-stale": "Data may be stale",
     "total-entries": "Total entries"
   },
-  "mp-page": {
-    "page-stack": "Page Stack"
-  },
   "socket": {
     "client-name": "Client",
     "client-not-in-connection": "No client in the current connection. Please check the WebSocket of the client.",
@@ -208,7 +169,8 @@
     "room-secret": "Room Secret",
     "secret": "Secret",
     "secret-placeholder": "Please enter a 6-digit room password",
-    "invalid-secret": "Invalid Password"
+    "invalid-secret": "Invalid Password",
+    "cancel": "Cancel"
   },
   "connections": {
     "select-os": "Select OS",
@@ -219,7 +181,20 @@
       "active": "Debugging",
       "wait": "Pending Debug",
       "inactive": "Unable to Debug"
-    }
+    },
+    "load-failed": "Could not load devices",
+    "no-match": "No matching devices",
+    "no-devices": "No devices connected",
+    "no-devices-hint": "Open the app with debugging enabled, then refresh",
+    "clear-filters": "Clear filters",
+    "remove-filter": "Remove filter {{name}}",
+    "search-label": "Search devices",
+    "search-placeholder": "Search device ID, project or title",
+    "active-filters": "active filters",
+    "device-count_one": "{{count}} device",
+    "device-count_other": "{{count}} devices",
+    "filter-desc": "Filter devices by OS and platform",
+    "apply": "Apply"
   },
   "replay": {
     "list-title": "Replay List",
@@ -259,40 +234,6 @@
       "remark": "Remark"
     }
   },
-  "oSpy": {
-    "slogan": "Offline Recording<br />Complete Replay",
-    "desc": "Program never lies, replay restores the scene.",
-    "domestic": "China",
-    "quick-start": "Get Started",
-    "drop-file": "Drop to replay",
-    "unknown-type-warning": "Uploaded non .json file, trying to process...",
-    "import-use": "Integrate O-Spy",
-    "select-log": "Select Log",
-    "take-try": "Try Demo",
-    "install": "Install",
-    "install-title": "Choose Preferred Integration",
-    "install-desc": "Framework agnostic. Choose any method to integrate into your project.",
-    "comment-title": "Title displayed on floating ball and popup",
-    "comment-logo": "Path to the logo image",
-    "comment-primaryColor": "Customize theme color",
-    "comment-autoRender": "Call $oSpy.open() to open the popup if set to false",
-    "comment-exportButtonText": "Custom text on the button inside the popup",
-    "comment-onExportButtonClick": "Custom callback after clicking the button inside the popup",
-    "comment-default-params": "All parameters are optional, use them as needed.",
-    "install-1st": "First, install the dependency:",
-    "install-2nd": "Next, create an instance:",
-    "install-result": "After installation, a widget will appear in the bottom right corner. Click to open the popup, enter a note, and export the log.",
-    "replay": "Replay",
-    "guide": "Back to Guide",
-    "only-pc": "Please visit on PC :)",
-    "console-output": "Console Output",
-    "network-request": "Network Request",
-    "modify-storage": "Modify Storage"
-  },
-  "docSearch": {
-    "empty": "No results found.",
-    "placeholder": "Search docs"
-  },
   "auth": {
     "login_title": "Access Authentication",
     "login_title_desc": "This access requires password authentication. If you don't know the password, please contact the administrator.",
@@ -303,6 +244,9 @@
     "password": "Password",
     "please_enter_password": "Please enter password",
     "session_expired": "Session expired, please login again",
-    "server_error": "Server error, please try again later"
+    "server_error": "Server error, please try again later",
+    "login_subtitle": "Enter the debugger password",
+    "show_password": "Show password",
+    "hide_password": "Hide password"
   }
 }

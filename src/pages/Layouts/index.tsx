@@ -1,28 +1,23 @@
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { Suspense } from 'react';
 import { LoadingFallback } from '@/components/LoadingFallback';
-import { NavMenuOnPc, NavMenuOnMobile } from './NavMenu';
 import { Logo } from './Logo';
 import { useTitle } from 'ahooks';
 import { BRAND_NAME } from '@/utils/brand';
 
 export const Layouts = () => {
   useTitle(BRAND_NAME);
+  const { pathname } = useLocation();
+  const isDevtools = pathname.includes('/devtools');
 
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground">
-      <header className="sticky top-0 z-40 border-b border-border bg-background">
-        <div className="flex justify-between items-center px-4 md:px-6 h-14">
-          <div className="flex items-center gap-4">
-            <Logo />
-          </div>
-          <div className="flex items-center">
-            <NavMenuOnPc />
-            <NavMenuOnMobile />
-          </div>
-        </div>
-      </header>
-      <main className="flex-1 flex flex-col min-h-0">
+    <div className="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
+      {!isDevtools && (
+        <header className="flex h-12 shrink-0 items-center border-b border-border bg-background px-4">
+          <Logo />
+        </header>
+      )}
+      <main className="flex min-h-0 flex-1 flex-col">
         <Suspense fallback={<LoadingFallback />}>
           <Outlet />
         </Suspense>

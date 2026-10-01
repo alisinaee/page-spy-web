@@ -40,7 +40,7 @@ export const DebugButton = ({ room }: Props) => {
       variant="default"
       size="touch"
       disabled={!client}
-      className="w-full rounded-full flex items-center justify-center gap-2 font-medium"
+      className="w-full md:h-9 md:text-sm"
       onClick={startDebug}
     >
       {room.useSecret && <LockSvg className="size-4" />}
@@ -53,7 +53,9 @@ export const DebugButton = ({ room }: Props) => {
       {!client ? (
         <Tooltip>
           <TooltipTrigger
-            render={<span className="block w-full cursor-not-allowed" />}
+            render={
+              <span tabIndex={0} className="block w-full cursor-not-allowed" />
+            }
           >
             {buttonElement}
           </TooltipTrigger>

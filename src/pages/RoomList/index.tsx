@@ -3,24 +3,47 @@ import {
   AllBrowserTypes,
   ClientRoomInfo,
   OS_CONFIG,
-  getBrowserLogo,
   getBrowserName,
   parseUserAgent,
 } from '@/utils/brand';
 import { useRequest } from 'ahooks';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Search, RotateCcw, Filter, Inbox } from 'lucide-react';
+import {
+  AlertTriangle,
+  CircleAlert,
+  Inbox,
+  ListFilter,
+  Search,
+  X,
+} from 'lucide-react';
 import { RoomCard } from './RoomCard';
-import { Statistics } from './Statistics';
-import { LoadingFallback } from '@/components/LoadingFallback';
-import { debug } from '@/utils/debug';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Card } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
+  SheetFooter,
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
@@ -58,46 +81,59 @@ const sortConnections = (data: ClientRoomInfo[]) => {
   return [...ascWithCreatedAtForInvalid, ...ascWithActiveAtForInvalid];
 };
 
+const ALL = 'all';
+
+interface Filters {
+  os: string;
+  browser: string;
+}
+const EMPTY_FILTERS: Filters = { os: '', browser: '' };
+
 const filterConnections = (
   data: ClientRoomInfo[],
-  condition: Record<'title' | 'address' | 'os' | 'browser', string>,
+  query: string,
+  { os, browser }: Filters,
 ) => {
-  const { title = '', address = '', os = '', browser = '' } = condition;
-  const lowerCaseTitle = String(title).trim().toLowerCase();
-  return data
-    .filter(({ tags }) => {
-      return String(tags.title).toLowerCase().includes(lowerCaseTitle);
-    })
-    .filter((i) => {
-      const query = String(address || '')
-        .trim()
-        .toLowerCase();
-      if (!query) return true;
-      return String(i.address || '')
-        .toLowerCase()
-        .includes(query);
-    })
-    .filter((clientInfo) => {
-      return (
-        (!os || clientInfo.os.type === os) &&
-        (!browser || clientInfo.browser.type.includes(browser))
+  const q = query.trim().toLowerCase();
+  return data.filter((i) => {
+    if (q) {
+      const hit = [i.address, decodeURI(i.group || ''), i.tags.title].some(
+        (v) =>
+          String(v ?? '')
+            .toLowerCase()
+            .includes(q),
       );
-    });
+      if (!hit) return false;
+    }
+    return (
+      (!os || i.os.type === os) &&
+      (!browser || i.browser.type.toLowerCase().includes(browser))
+    );
+  });
+};
+
+const useIsDesktop = () => {
+  const [matches, setMatches] = useState(
+    () => window.matchMedia('(min-width: 768px)').matches,
+  );
+  useEffect(() => {
+    const mql = window.matchMedia('(min-width: 768px)');
+    const onChange = () => setMatches(mql.matches);
+    mql.addEventListener('change', onChange);
+    return () => mql.removeEventListener('change', onChange);
+  }, []);
+  return matches;
 };
 
 const RoomList = () => {
   const { t } = useTranslation();
+  const isDesktop = useIsDesktop();
 
-  const [formState, setFormState] = useState({
-    title: '',
-    address: '',
-    project: '',
-    os: '',
-    browser: '',
-  });
+  const [query, setQuery] = useState('');
+  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+  const [draft, setDraft] = useState<Filters>(EMPTY_FILTERS);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
-  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
-  const [showMaximumAlert, setMaximumAlert] = useState(false);
   const showLoadingRef = useRef(false);
   const {
     loading,
@@ -129,384 +165,355 @@ const RoomList = () => {
     },
   );
 
-  const BrowserOptions = useMemo(() => {
+  const browserOptions = useMemo(() => {
     return AllBrowserTypes.filter((browser) => {
       return connectionList?.some(
         (conn) => conn.browser.type.toLocaleLowerCase() === browser,
       );
-    }).map((name) => {
-      return {
-        name,
-        label: getBrowserName(name),
-        logo: getBrowserLogo(name),
-      };
-    });
+    }).map((name) => ({ value: name as string, label: getBrowserName(name) }));
   }, [connectionList]);
 
-  const [conditions, setConditions] = useState({
-    title: '',
-    address: '',
-    project: '',
-    os: '',
-    browser: '',
-  });
-
-  const activeFilterCount = useMemo(() => {
-    let count = 0;
-    if (conditions.title) count++;
-    if (conditions.address) count++;
-    if (conditions.project) count++;
-    if (conditions.os) count++;
-    if (conditions.browser) count++;
-    return count;
-  }, [conditions]);
-  const hasActiveFilters = activeFilterCount > 0;
-
-  const handleSearch = useCallback(
-    async (e?: React.FormEvent) => {
-      if (e) e.preventDefault();
-      try {
-        await requestConnections(formState.project);
-        setConditions(formState);
-      } catch (e: any) {
-        message.error(e.message);
-      }
-    },
-    [formState, requestConnections],
+  const osItems = useMemo(
+    () => [
+      { value: ALL, label: t('connections.select-os') as string },
+      ...Object.entries(OS_CONFIG).map(([value, conf]) => ({
+        value,
+        label: conf.label,
+      })),
+    ],
+    [t],
+  );
+  const browserItems = useMemo(
+    () => [
+      { value: ALL, label: t('connections.select-browser') as string },
+      ...browserOptions,
+    ],
+    [browserOptions, t],
   );
 
-  const handleReset = useCallback(() => {
-    const emptyState = {
-      title: '',
-      address: '',
-      project: '',
-      os: '',
-      browser: '',
-    };
-    setFormState(emptyState);
-    setConditions(emptyState);
-    requestConnections('');
-  }, [requestConnections]);
+  const activeFilterCount = (filters.os ? 1 : 0) + (filters.browser ? 1 : 0);
+  const hasActiveFilters = activeFilterCount > 0 || !!query.trim();
 
-  const mainContent = useMemo(() => {
+  const matched = useMemo(
+    () => filterConnections(connectionList, query, filters),
+    [connectionList, query, filters],
+  );
+  const showMaximumAlert = matched.length > MAXIMUM_CONNECTIONS;
+  const list = useMemo(
+    () => sortConnections(matched.slice(0, MAXIMUM_CONNECTIONS)),
+    [matched],
+  );
+
+  const retry = () => {
+    requestConnections('').catch((e: any) => message.error(e.message));
+  };
+  const clearAll = () => {
+    setQuery('');
+    setFilters(EMPTY_FILTERS);
+    setDraft(EMPTY_FILTERS);
+  };
+  const openSheet = (open: boolean) => {
+    if (open) setDraft(filters);
+    setSheetOpen(open);
+  };
+
+  const osLabel = filters.os
+    ? OS_CONFIG[filters.os as keyof typeof OS_CONFIG]?.label || filters.os
+    : '';
+  const browserLabel = filters.browser ? getBrowserName(filters.browser) : '';
+
+  const renderBody = () => {
     if (loading && !showLoadingRef.current) {
-      return <LoadingFallback />;
-    }
-    const matchedConnections = filterConnections(connectionList, conditions);
-    if (error || matchedConnections.length === 0) {
       return (
-        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-2">
-          <Inbox className="size-12 opacity-30" />
-          <p className="text-sm">
-            {t('common.empty', { defaultValue: 'No connections' })}
-          </p>
+        <div className="grid gap-3 p-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Card key={i} className="gap-3 p-4" aria-hidden="true">
+              <Skeleton className="h-5 w-16" />
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-4 w-1/2" />
+              <Skeleton className="h-11 w-full md:h-9" />
+            </Card>
+          ))}
         </div>
       );
     }
-    const list = sortConnections(
-      matchedConnections.slice(0, MAXIMUM_CONNECTIONS),
-    );
-
+    if (error) {
+      return (
+        <div className="flex min-h-full p-3">
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <CircleAlert className="text-destructive" />
+              </EmptyMedia>
+              <EmptyTitle>
+                {t('connections.load-failed', {
+                  defaultValue: 'Could not load devices',
+                })}
+              </EmptyTitle>
+              <EmptyDescription>{error.message}</EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button
+                size="touch"
+                variant="outline"
+                className="md:h-9 md:text-sm"
+                onClick={retry}
+              >
+                {t('common.retry', { defaultValue: 'Retry' })}
+              </Button>
+            </EmptyContent>
+          </Empty>
+        </div>
+      );
+    }
+    if (list.length === 0) {
+      return (
+        <div className="flex min-h-full p-3">
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <Inbox />
+              </EmptyMedia>
+              <EmptyTitle>
+                {hasActiveFilters
+                  ? t('connections.no-match', {
+                      defaultValue: 'No matching devices',
+                    })
+                  : t('connections.no-devices', {
+                      defaultValue: 'No devices connected',
+                    })}
+              </EmptyTitle>
+              {!hasActiveFilters && (
+                <EmptyDescription>
+                  {t('connections.no-devices-hint', {
+                    defaultValue:
+                      'Open the app with debugging enabled, then refresh',
+                  })}
+                </EmptyDescription>
+              )}
+            </EmptyHeader>
+            {hasActiveFilters && (
+              <EmptyContent>
+                <Button
+                  size="touch"
+                  variant="outline"
+                  className="md:h-9 md:text-sm"
+                  onClick={clearAll}
+                >
+                  {t('connections.clear-filters', {
+                    defaultValue: 'Clear filters',
+                  })}
+                </Button>
+              </EmptyContent>
+            )}
+          </Empty>
+        </div>
+      );
+    }
     return (
-      <div className="flex flex-wrap p-4 w-full">
+      <div className="grid gap-3 p-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         {list.map((room) => (
           <RoomCard key={room.address} room={room} />
         ))}
       </div>
     );
-  }, [conditions, connectionList, error, loading, t]);
+  };
 
-  useEffect(() => {
-    const matchedConnections = filterConnections(connectionList, conditions);
-    setMaximumAlert(matchedConnections.length > MAXIMUM_CONNECTIONS);
-  }, [connectionList, conditions]);
+  const chip = (label: string, onRemove: () => void) => (
+    <Button
+      key={label}
+      type="button"
+      variant="secondary"
+      size="touch"
+      className="h-8 min-h-8 min-w-0 gap-1 px-3 text-xs md:h-6 md:min-h-6"
+      aria-label={
+        t('connections.remove-filter', {
+          defaultValue: 'Remove filter {{name}}',
+          name: label,
+        }) as string
+      }
+      onClick={onRemove}
+    >
+      {label}
+      <X className="size-3" />
+    </Button>
+  );
 
   return (
-    <div className="flex-1 flex flex-col md:flex-row h-full min-h-0 bg-background text-foreground">
-      {/* Desktop Sider */}
-      <aside className="hidden md:flex flex-col w-[350px] shrink-0 border-r border-border p-6 overflow-y-auto bg-card/30">
-        <div className="flex flex-col gap-6">
-          <h3 className="text-xl font-bold tracking-tight text-foreground m-0">
-            {t('common.connections')}
-          </h3>
-          <form onSubmit={handleSearch} className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground">
-                {t('common.device-id')}
-              </label>
-              <Input
-                placeholder={t('common.device-id')!}
-                value={formState.address}
-                onChange={(e) =>
-                  setFormState((s) => ({ ...s, address: e.target.value }))
-                }
-              />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground">
-                {t('common.project')}
-              </label>
-              <Input
-                placeholder={t('common.project')!}
-                value={formState.project}
-                onChange={(e) =>
-                  setFormState((s) => ({ ...s, project: e.target.value }))
-                }
-              />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground">
-                {t('common.title')}
-              </label>
-              <Input
-                placeholder={t('common.title')!}
-                value={formState.title}
-                onChange={(e) =>
-                  setFormState((s) => ({ ...s, title: e.target.value }))
-                }
-              />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground">
-                {t('common.os')}
-              </label>
-              <select
-                aria-label={t('common.os')!}
-                className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm text-foreground transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
-                value={formState.os}
-                onChange={(e) =>
-                  setFormState((s) => ({ ...s, os: e.target.value }))
-                }
-              >
-                <option value="">{t('connections.select-os')}</option>
-                {Object.entries(OS_CONFIG).map(([name, conf]) => (
-                  <option value={name} key={name}>
-                    {conf.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground">
-                {t('devtool.platform')}
-              </label>
-              <select
-                aria-label={t('devtool.platform')!}
-                className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm text-foreground transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
-                value={formState.browser}
-                onChange={(e) =>
-                  setFormState((s) => ({ ...s, browser: e.target.value }))
-                }
-              >
-                <option value="">{t('connections.select-browser')}</option>
-                {!!BrowserOptions.length && (
-                  <optgroup label="Web">
-                    {BrowserOptions.map(({ name, label }) => (
-                      <option key={name} value={name}>
-                        {label}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-              </select>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <Button
-                type="submit"
-                variant="default"
-                size="default"
-                className="flex items-center gap-1.5"
-              >
-                <Search className="size-4" />
-                <span>{t('common.search')}</span>
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="default"
-                className="flex items-center gap-1.5"
-                onClick={handleReset}
-              >
-                <RotateCcw className="size-4" />
-                <span>{t('common.reset')}</span>
-              </Button>
-            </div>
-
-            {showMaximumAlert && (
-              <div className="text-xs text-warning bg-warning/10 p-2.5 rounded border border-warning/20">
-                {t('connections.maximum-alert')}
-              </div>
-            )}
-          </form>
-          {debug.enabled && <Statistics data={connectionList} />}
+    <div className="flex h-full min-h-0 flex-1 flex-col bg-background text-foreground">
+      <div className="sticky top-0 z-10 flex shrink-0 gap-2 border-b border-border bg-background p-3">
+        <div className="relative flex-1">
+          <Search
+            aria-hidden="true"
+            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+          />
+          <Input
+            type="search"
+            aria-label={
+              t('connections.search-label', {
+                defaultValue: 'Search devices',
+              }) as string
+            }
+            placeholder={
+              t('connections.search-placeholder', {
+                defaultValue: 'Search device ID, project or title',
+              }) as string
+            }
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="h-11 pl-9 text-base md:h-9 md:text-sm"
+          />
         </div>
-      </aside>
-
-      {/* Main Content Area */}
-      <main className="flex-1 flex flex-col overflow-y-auto">
-        <div className="flex md:hidden items-center justify-between p-4 border-b border-border bg-card/40">
-          <div className="flex items-center gap-2">
-            <h4 className="text-base font-semibold m-0 text-foreground">
-              {t('common.connections')}
-            </h4>
-            <Badge
-              variant="secondary"
-              className="bg-primary/15 text-primary-text"
-            >
-              {filterConnections(connectionList, conditions).length}
+        <Button
+          variant="outline"
+          size="touch"
+          className="md:h-9 md:text-sm"
+          onClick={() => openSheet(true)}
+        >
+          <ListFilter />
+          {t('common.filter')}
+          {activeFilterCount > 0 && (
+            <Badge>
+              {activeFilterCount}
+              <span className="sr-only">
+                {t('connections.active-filters', {
+                  defaultValue: 'active filters',
+                })}
+              </span>
             </Badge>
+          )}
+        </Button>
+      </div>
+
+      <div className="flex shrink-0 flex-wrap items-center gap-2 px-3 pt-3">
+        <span className="text-xs text-muted-foreground" aria-live="polite">
+          {t('connections.device-count', {
+            defaultValue: '{{count}} devices',
+            count: matched.length,
+          })}
+        </span>
+        {filters.os &&
+          chip(osLabel, () => setFilters((f) => ({ ...f, os: '' })))}
+        {filters.browser &&
+          chip(browserLabel, () => setFilters((f) => ({ ...f, browser: '' })))}
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {showMaximumAlert && (
+          <div className="px-3 pt-3">
+            <Alert>
+              <AlertTriangle className="text-warning" />
+              <AlertDescription>
+                {t('connections.maximum-alert')}
+              </AlertDescription>
+            </Alert>
           </div>
-          <Button
-            size="touch"
-            variant={hasActiveFilters ? 'default' : 'outline'}
-            className="flex items-center gap-2"
-            onClick={() => setMobileFilterOpen(true)}
-          >
-            <Filter className="size-4" />
-            <span>
-              {hasActiveFilters ? `Filter (${activeFilterCount})` : 'Filter'}
-            </span>
-          </Button>
-        </div>
+        )}
+        {renderBody()}
+      </div>
 
-        <div className="flex-1">{mainContent}</div>
-
-        {/* Mobile Filter Sheet */}
-        <Sheet open={mobileFilterOpen} onOpenChange={setMobileFilterOpen}>
-          <SheetContent
-            side="right"
-            className="w-[85vw] max-w-md bg-card p-6 flex flex-col gap-4"
-          >
-            <SheetHeader>
-              <SheetTitle className="flex items-center gap-2 text-foreground">
-                <Filter className="size-4 text-primary" />
-                <span>Filter Connections</span>
-              </SheetTitle>
-            </SheetHeader>
-            <form
-              onSubmit={(e) => {
-                handleSearch(e);
-                setMobileFilterOpen(false);
-              }}
-              className="flex flex-col gap-4 overflow-y-auto flex-1 pr-1"
-            >
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-muted-foreground">
-                  {t('common.device-id')}
-                </label>
-                <Input
-                  placeholder={t('common.device-id')!}
-                  value={formState.address}
-                  onChange={(e) =>
-                    setFormState((s) => ({ ...s, address: e.target.value }))
-                  }
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-muted-foreground">
-                  {t('common.project')}
-                </label>
-                <Input
-                  placeholder={t('common.project')!}
-                  value={formState.project}
-                  onChange={(e) =>
-                    setFormState((s) => ({ ...s, project: e.target.value }))
-                  }
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-muted-foreground">
-                  {t('common.title')}
-                </label>
-                <Input
-                  placeholder={t('common.title')!}
-                  value={formState.title}
-                  onChange={(e) =>
-                    setFormState((s) => ({ ...s, title: e.target.value }))
-                  }
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-muted-foreground">
-                  {t('common.os')}
-                </label>
-                <select
-                  aria-label={t('common.os')!}
-                  className="h-11 min-h-[44px] w-full rounded-lg border border-input bg-transparent px-2.5 text-base text-foreground transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
-                  value={formState.os}
-                  onChange={(e) =>
-                    setFormState((s) => ({ ...s, os: e.target.value }))
-                  }
+      <Sheet open={sheetOpen} onOpenChange={openSheet}>
+        <SheetContent
+          side={isDesktop ? 'right' : 'bottom'}
+          className="max-h-[85dvh] md:max-h-none"
+        >
+          <SheetHeader>
+            <SheetTitle>{t('common.filter')}</SheetTitle>
+            <SheetDescription className="sr-only">
+              {t('connections.filter-desc', {
+                defaultValue: 'Filter devices by OS and platform',
+              })}
+            </SheetDescription>
+          </SheetHeader>
+          <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-4">
+            <div className="flex flex-col gap-2">
+              <label
+                htmlFor="filter-os"
+                className="text-xs font-medium text-muted-foreground"
+              >
+                {t('common.os', { defaultValue: 'OS' })}
+              </label>
+              <Select
+                items={osItems}
+                value={draft.os || ALL}
+                onValueChange={(v) =>
+                  setDraft((d) => ({ ...d, os: !v || v === ALL ? '' : v }))
+                }
+              >
+                <SelectTrigger
+                  id="filter-os"
+                  className="h-11 w-full text-base md:h-9 md:text-sm"
                 >
-                  <option value="">{t('connections.select-os')}</option>
-                  {Object.entries(OS_CONFIG).map(([name, conf]) => (
-                    <option value={name} key={name}>
-                      {conf.label}
-                    </option>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent alignItemWithTrigger={false}>
+                  {osItems.map((i) => (
+                    <SelectItem key={i.value} value={i.value}>
+                      {i.label}
+                    </SelectItem>
                   ))}
-                </select>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-muted-foreground">
-                  {t('devtool.platform')}
-                </label>
-                <select
-                  aria-label={t('devtool.platform')!}
-                  className="h-11 min-h-[44px] w-full rounded-lg border border-input bg-transparent px-2.5 text-base text-foreground transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
-                  value={formState.browser}
-                  onChange={(e) =>
-                    setFormState((s) => ({ ...s, browser: e.target.value }))
-                  }
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-2">
+              <label
+                htmlFor="filter-platform"
+                className="text-xs font-medium text-muted-foreground"
+              >
+                {t('devtool.platform', { defaultValue: 'Platform' })}
+              </label>
+              <Select
+                items={browserItems}
+                value={draft.browser || ALL}
+                onValueChange={(v) =>
+                  setDraft((d) => ({
+                    ...d,
+                    browser: !v || v === ALL ? '' : v,
+                  }))
+                }
+              >
+                <SelectTrigger
+                  id="filter-platform"
+                  className="h-11 w-full text-base md:h-9 md:text-sm"
                 >
-                  <option value="">{t('connections.select-browser')}</option>
-                  {!!BrowserOptions.length && (
-                    <optgroup label="Web">
-                      {BrowserOptions.map(({ name, label }) => (
-                        <option key={name} value={name}>
-                          {label}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                </select>
-              </div>
-
-              <div className="flex items-center gap-3 pt-4 mt-auto">
-                <Button
-                  type="submit"
-                  size="touch"
-                  className="flex-1 flex items-center justify-center gap-2"
-                >
-                  <Search className="size-4" />
-                  <span>{t('common.search')}</span>
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="touch"
-                  className="flex-1 flex items-center justify-center gap-2"
-                  onClick={() => {
-                    handleReset();
-                    setMobileFilterOpen(false);
-                  }}
-                >
-                  <RotateCcw className="size-4" />
-                  <span>{t('common.reset')}</span>
-                </Button>
-              </div>
-            </form>
-          </SheetContent>
-        </Sheet>
-      </main>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent alignItemWithTrigger={false}>
+                  {browserItems.map((i) => (
+                    <SelectItem key={i.value} value={i.value}>
+                      {i.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <SheetFooter className="flex-row gap-2 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <Button
+              variant="outline"
+              size="touch"
+              className="flex-1 md:h-9 md:text-sm"
+              onClick={() => {
+                setDraft(EMPTY_FILTERS);
+                setFilters(EMPTY_FILTERS);
+                setSheetOpen(false);
+              }}
+            >
+              {t('common.reset')}
+            </Button>
+            <Button
+              size="touch"
+              className="flex-1 md:h-9 md:text-sm"
+              onClick={() => {
+                setFilters(draft);
+                setSheetOpen(false);
+              }}
+            >
+              {t('connections.apply', { defaultValue: 'Apply' })}
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };

@@ -1,105 +1,78 @@
 import { parseUserAgent } from '@/utils/brand';
-import {
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-} from '@/components/ui/tooltip';
+import { Card } from '@/components/ui/card';
 import { DebugButton } from '../DebugButton';
-import { PropsWithChildren, memo } from 'react';
+import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface Props {
   room: I.SpyRoom;
 }
 
-const ConnDetailItem = ({
-  title,
-  children,
-}: PropsWithChildren<{ title: string }>) => {
-  return (
-    <div className="flex-1 min-w-0 text-center">
-      <p className="text-xs text-muted-foreground m-0">{title}</p>
-      <div className="mx-auto mt-1 flex h-[42px] max-w-[100px] items-center justify-center">
-        {children}
-      </div>
-    </div>
-  );
-};
-
 export const RoomCard = memo(
   ({ room }: Props) => {
+    const { t } = useTranslation();
     const { address, name, group, tags } = room;
     const decodeGroup = decodeURI(group);
     const simpleAddress = address.slice(0, 4);
     const { os, browser } = parseUserAgent(name);
+    const title = tags.title?.toString() || '--';
+    const osName = `${os.name} ${os.version}`.trim();
+    const browserName = `${browser.name} ${browser.version}`.trim();
 
     return (
-      <div
-        key={address}
-        className="w-full sm:w-full md:w-1/2 lg:w-1/2 xl:w-1/3 2xl:w-1/4 p-2"
-      >
-        <div className="bg-card border border-border rounded-xl p-4 flex flex-col gap-3">
-          <div className="flex justify-between items-baseline gap-2">
-            <code className="text-3xl font-mono font-bold text-foreground">
-              <b>{simpleAddress}</b>
+      <Card className="gap-3 p-4">
+        <div className="flex min-w-0 flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <code className="font-mono text-base font-semibold text-foreground">
+              {simpleAddress}
             </code>
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <div className="text-sm text-muted-foreground truncate cursor-default" />
-                }
-              >
-                {tags.title?.toString() || '--'}
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                {`Title: ${tags.title?.toString() || '--'}`}
-              </TooltipContent>
-            </Tooltip>
+            <span
+              aria-hidden="true"
+              className="size-2 shrink-0 rounded-full bg-success"
+            />
+            <span className="sr-only">
+              {t('common.online', { defaultValue: 'online' })}
+            </span>
           </div>
-          <div className="flex items-center justify-between gap-3 my-2">
-            <ConnDetailItem title="Project">
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <p className="text-sm font-medium text-foreground truncate cursor-default m-0" />
-                  }
-                >
-                  {decodeGroup}
-                </TooltipTrigger>
-                <TooltipContent>{decodeGroup}</TooltipContent>
-              </Tooltip>
-            </ConnDetailItem>
-            <ConnDetailItem title="OS">
-              <Tooltip>
-                <TooltipTrigger
-                  render={<div className="cursor-default inline-block" />}
-                >
-                  <img
-                    src={os.logo}
-                    alt="os logo"
-                    className="h-6 w-auto object-contain"
-                  />
-                </TooltipTrigger>
-                <TooltipContent>{`${os.name} ${os.version}`}</TooltipContent>
-              </Tooltip>
-            </ConnDetailItem>
-            <ConnDetailItem title="Platform">
-              <Tooltip>
-                <TooltipTrigger
-                  render={<div className="cursor-default inline-block" />}
-                >
-                  <img
-                    src={browser.logo}
-                    alt="browser logo"
-                    className="h-6 w-auto object-contain"
-                  />
-                </TooltipTrigger>
-                <TooltipContent>{`${browser.name} ${browser.version}`}</TooltipContent>
-              </Tooltip>
-            </ConnDetailItem>
-          </div>
-          <DebugButton room={room} />
+          <p
+            className="m-0 truncate text-sm text-muted-foreground"
+            title={title}
+          >
+            {title}
+          </p>
         </div>
-      </div>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          <span className="flex min-w-0 items-center gap-1">
+            <img
+              src={os.logo}
+              alt={os.name}
+              className="size-4 shrink-0 object-contain"
+            />
+            <span className="sr-only">
+              {t('common.os', { defaultValue: 'OS' })}:
+            </span>
+            {osName}
+          </span>
+          <span className="flex min-w-0 items-center gap-1">
+            <img
+              src={browser.logo}
+              alt={browser.name}
+              className="size-4 shrink-0 object-contain"
+            />
+            <span className="sr-only">
+              {t('devtool.platform', { defaultValue: 'Platform' })}:
+            </span>
+            {browserName}
+          </span>
+          <span className="min-w-0 truncate" title={decodeGroup}>
+            <span className="sr-only">
+              {t('common.project', { defaultValue: 'Project' })}:
+            </span>
+            {decodeGroup}
+          </span>
+        </div>
+        <DebugButton room={room} />
+      </Card>
     );
   },
   ({ room: old }, { room: now }) => {
