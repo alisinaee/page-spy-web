@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useTranslation } from 'react-i18next';
 import { useSocketMessageStore } from '@/store/socket-message';
@@ -21,6 +21,8 @@ import {
 
 const NetworkPanel = memo(() => {
   const { t } = useTranslation();
+  const searchStepRef = useRef<(delta: number) => void>(() => undefined);
+  const [match, setMatch] = useState({ index: 0, count: 0 });
 
   const [networkKeyword, setNetworkKeyword, networkType, setNetworkType] =
     useSocketMessageStore(
@@ -73,6 +75,10 @@ const NetworkPanel = memo(() => {
             value={networkKeyword}
             onChange={setNetworkKeyword}
             label={t('network.filter-url', { defaultValue: 'Filter by URL' })}
+            resultIndex={match.index}
+            resultCount={networkKeyword.trim() ? match.count : undefined}
+            onPrev={() => searchStepRef.current(-1)}
+            onNext={() => searchStepRef.current(1)}
           />
         }
       >
@@ -83,6 +89,8 @@ const NetworkPanel = memo(() => {
         filterKeyword={networkKeyword}
         filterType={networkType}
         cookie={storageMsg.cookie}
+        onMatchState={setMatch}
+        searchStepRef={searchStepRef}
       />
     </div>
   );

@@ -1,6 +1,7 @@
 import { formatTehranDateTime } from '@/utils/tehran';
 import { useSocketMessageStore } from '@/store/socket-message';
 import { redactSecrets } from '../../smoke-test/log-format.js';
+import { buildRouteTrace } from '../../smoke-test/route-trace.js';
 
 type JsonValue =
   | null
@@ -85,6 +86,44 @@ const normalizeValue = (
 export const normalizeForExport = (value: unknown) =>
   redactSecrets(normalizeValue(value));
 
+const partText = (value: unknown) => {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean')
+    return String(value);
+  return '';
+};
+
+export const consoleLineText = (item: {
+  logs?: { value?: unknown }[];
+  message?: unknown;
+}) => {
+  const fromLogs =
+    item.logs?.map((log) => partText(log?.value)).join(' ') || '';
+  const raw = fromLogs.trim()
+    ? fromLogs
+    : typeof item.message === 'string'
+    ? item.message
+    : '';
+  return raw.replace(/\u001b\[[0-9;]*[a-zA-Z]/g, '').trim();
+};
+
+export const routesFromConsole = (
+  consoleMsg: {
+    id?: string;
+    time?: number;
+    logs?: { value?: unknown }[];
+    message?: unknown;
+  }[],
+) =>
+  buildRouteTrace(
+    consoleMsg.map((item, index) => ({
+      id: item.id,
+      index,
+      time: item.time || 0,
+      text: consoleLineText(item),
+    })),
+  );
+
 export const ensurePageSnapshot = async (timeoutMs = 2000) => {
   const store = useSocketMessageStore.getState();
   if (store.pageMsg?.location || !store.socket) return;
@@ -106,6 +145,7 @@ export const createDeviceSessionSnapshot = (deviceId: string) => {
     clientInfo: state.clientInfo,
     console: state.consoleMsg,
     network: state.networkMsg,
+    routes: routesFromConsole(state.consoleMsg),
     page: state.pageMsg,
     storage: state.storageMsg,
     system: state.systemMsg,

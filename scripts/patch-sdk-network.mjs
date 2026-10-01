@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const DEVICE_LOGGER_LOAD = 'if(typeof window.__pageSpyLoadDeviceLogs!=="function"){window.__pageSpyLoadDeviceLogs=function(){if(window.PageSpyClientLogs){try{if(window.PageSpyClientLogs.install)window.PageSpyClientLogs.install()}catch(e){}return Promise.resolve()}if(window.__pageSpyDeviceLoggerPromise)return window.__pageSpyDeviceLoggerPromise;window.__pageSpyDeviceLoggerPromise=new Promise(function(resolve,reject){var src="";var scripts=document.getElementsByTagName("script");for(var i=0;i<scripts.length;i++){var item=scripts[i].src||"";if(item.indexOf("page-spy/index.min.js")!==-1)src=item}var base=src?src.replace(/[^\\/]*$/,""):"";if(!base){reject(new Error("sdk"));return}var el=document.createElement("script");el.type="module";el.src=base+"client-logs.js";el.onload=function(){try{if(window.PageSpyClientLogs&&window.PageSpyClientLogs.install)window.PageSpyClientLogs.install()}catch(e){}resolve()};el.onerror=function(){reject(new Error("device logger"))};(document.head||document.documentElement).appendChild(el)});return window.__pageSpyDeviceLoggerPromise}}';
+const DEVICE_LOGGER_LOAD = 'if(typeof window.__pageSpyLoadDeviceLogs!=="function"){window.__pageSpyLoadDeviceLogs=function(){if(window.PageSpyClientLogs){try{if(window.PageSpyClientLogs.install)window.PageSpyClientLogs.install()}catch(e){}return Promise.resolve()}if(window.__pageSpyDeviceLoggerPromise)return window.__pageSpyDeviceLoggerPromise;window.__pageSpyDeviceLoggerPromise=new Promise(function(resolve,reject){var src="";var scripts=document.getElementsByTagName("script");for(var i=0;i<scripts.length;i++){var item=scripts[i].src||"";if(item.indexOf("page-spy/index.min.js")!==-1)src=item}var base=src?src.replace(/[^\\/]*$/,""):"";if(!base){reject(new Error("sdk"));return}var el=document.createElement("script");el.type="module";el.src=base+"client-logs.js?v=11";el.onload=function(){try{if(window.PageSpyClientLogs&&window.PageSpyClientLogs.install)window.PageSpyClientLogs.install()}catch(e){}resolve()};el.onerror=function(){reject(new Error("device logger"))};(document.head||document.documentElement).appendChild(el)});return window.__pageSpyDeviceLoggerPromise}}';
 const DEVICE_LOGGER_OPEN = 'var openDeviceLogs=function(){try{if(window.PageSpyClientLogs&&window.PageSpyClientLogs.install)window.PageSpyClientLogs.install()}catch(err){}if(window.PageSpyClientLogs&&window.PageSpyClientLogs.openViewer){window.PageSpyClientLogs.openViewer();return 1}return 0};if(!openDeviceLogs()){' + DEVICE_LOGGER_LOAD + 'window.__pageSpyLoadDeviceLogs().then(function(){if(!openDeviceLogs())Toast.message("On-device log viewer is not on this page")}).catch(function(){Toast.message("On-device log viewer failed to load")})}';
 const DEVICE_LOGGER_OPEN_BROKEN = 'var openDeviceLogs=function(){try{if(window.PageSpyClientLogs&&window.PageSpyClientLogs.install)window.PageSpyClientLogs.install()}catch(err){}if(window.PageSpyClientLogs&&window.PageSpyClientLogs.openViewer){window.PageSpyClientLogs.openViewer();return 1}return 0};if(!openDeviceLogs()){var loadDeviceLogs=window.__pageSpyLoadDeviceLogs;if(typeof loadDeviceLogs==="function"){loadDeviceLogs().then(function(){if(!openDeviceLogs())Toast.message("On-device log viewer is not on this page")}).catch(function(){Toast.message("On-device log viewer failed to load")})}else{Toast.message("On-device log viewer is not on this page")}}';
 
@@ -36,13 +36,13 @@ const DEVICE_DIALOG_EXTRAS_OLD = [
   '_btnSettings.onclick=function(e){e.preventDefault();e.stopPropagation();var apply=function(){if(window.PageSpyClientLogs&&window.PageSpyClientLogs.openSettings)window.PageSpyClientLogs.openSettings()};if(window.PageSpyClientLogs&&window.PageSpyClientLogs.openSettings){apply()}else if(typeof window.__pageSpyLoadDeviceLogs==="function"){window.__pageSpyLoadDeviceLogs().then(apply)}else{Toast.message("On-device log viewer is not on this page")}};',
 ].join('');
 
-const DEVICE_LOGGER_BOOT = ';if(typeof window!=="undefined"&&!window.__pageSpyLoadDeviceLogs){window.__pageSpyLoadDeviceLogs=function(){if(window.PageSpyClientLogs){try{if(window.PageSpyClientLogs.install)window.PageSpyClientLogs.install()}catch(e){}return Promise.resolve()}if(window.__pageSpyDeviceLoggerPromise)return window.__pageSpyDeviceLoggerPromise;window.__pageSpyDeviceLoggerPromise=new Promise(function(resolve,reject){var src="";if(document.currentScript&&document.currentScript.src)src=document.currentScript.src;if(!src){var scripts=document.getElementsByTagName("script");for(var i=0;i<scripts.length;i++){var item=scripts[i].src||"";if(item.indexOf("page-spy/index.min.js")!==-1)src=item}}var base=src?src.replace(/[^/]*$/,""):"";if(!base){reject(new Error("sdk"));return}var el=document.createElement("script");el.type="module";el.src=base+"client-logs.js";el.onload=function(){try{if(window.PageSpyClientLogs&&window.PageSpyClientLogs.install)window.PageSpyClientLogs.install()}catch(e){}resolve()};el.onerror=function(){reject(new Error("device logger"))};(document.head||document.documentElement).appendChild(el)});return window.__pageSpyDeviceLoggerPromise};window.__pageSpyLoadDeviceLogs()}';
+const DEVICE_LOGGER_BOOT = ';if(typeof window!=="undefined"&&!window.__pageSpyLoadDeviceLogs){window.__pageSpyLoadDeviceLogs=function(){if(window.PageSpyClientLogs){try{if(window.PageSpyClientLogs.install)window.PageSpyClientLogs.install()}catch(e){}return Promise.resolve()}if(window.__pageSpyDeviceLoggerPromise)return window.__pageSpyDeviceLoggerPromise;window.__pageSpyDeviceLoggerPromise=new Promise(function(resolve,reject){var src="";if(document.currentScript&&document.currentScript.src)src=document.currentScript.src;if(!src){var scripts=document.getElementsByTagName("script");for(var i=0;i<scripts.length;i++){var item=scripts[i].src||"";if(item.indexOf("page-spy/index.min.js")!==-1)src=item}}var base=src?src.replace(/[^/]*$/,""):"";if(!base){reject(new Error("sdk"));return}var el=document.createElement("script");el.type="module";el.src=base+"client-logs.js?v=11";el.onload=function(){try{if(window.PageSpyClientLogs&&window.PageSpyClientLogs.install)window.PageSpyClientLogs.install()}catch(e){}resolve()};el.onerror=function(){reject(new Error("device logger"))};(document.head||document.documentElement).appendChild(el)});return window.__pageSpyDeviceLoggerPromise};window.__pageSpyLoadDeviceLogs()}';
 
 function publishDeviceLogger(sdkFilePath) {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const root = path.resolve(here, '..');
   const destDir = path.dirname(path.resolve(sdkFilePath));
-  for (const name of ['client-logs.js', 'log-format.js']) {
+  for (const name of ['client-logs.js', 'log-format.js', 'route-trace.js', 'tehran-time.js']) {
     fs.copyFileSync(path.join(root, 'smoke-test', name), path.join(destDir, name));
   }
   console.log(`published device logger to ${destDir}`);
@@ -381,7 +381,7 @@ function patchSdk(filePath) {
   if (next.includes(DEVICE_LOGGER_OPEN_BROKEN)) {
     next = next.replace(DEVICE_LOGGER_OPEN_BROKEN, DEVICE_LOGGER_OPEN);
   }
-  if (!next.includes('base+"client-logs.js"')) {
+  if (!next.includes('base+"client-logs.js?v=11"')) {
     next += DEVICE_LOGGER_BOOT;
   }
 
@@ -485,7 +485,16 @@ function patchSdk(filePath) {
   }
 
   if (next !== source) {
-    fs.writeFileSync(filePath, next);
+    const flushOld =
+    'handleFlushBuffer(e){const{latestId:t}=e.source.data,r=this.messages.findIndex(((e,r)=>r>=this.messageHead&&e.content.data.data.id===t));this.messages.slice(r+1).forEach((t=>{const r={type:MESSAGE,content:{data:t.content.data,from:this.socketConnection,to:e.from}};this.send(r,!0)}))}';
+  const flushNext =
+    'handleFlushBuffer(e){const{latestId:t}=e.source.data,r=this.messages.findIndex(((e,i)=>{try{return i>=this.messageHead&&e.content.data.data.id===t}catch(err){return!1}}));this.messages.slice(r<0?this.messageHead:r+1).forEach((n)=>{try{if(!n||!n.content||!n.content.data)return;this.send({type:MESSAGE,content:{data:n.content.data,from:this.socketConnection,to:e.from}},!0)}catch(err){}})}';
+  if (!next.includes(flushOld)) {
+    throw new Error('SDK buffer flush anchor missing');
+  }
+  next = next.replace(flushOld, flushNext);
+
+  fs.writeFileSync(filePath, next);
     console.log(`patched ${filePath}`);
   } else {
     console.log(`already patched ${filePath}`);

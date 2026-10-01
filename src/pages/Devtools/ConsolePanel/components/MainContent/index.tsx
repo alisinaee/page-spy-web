@@ -1,8 +1,8 @@
 import { useSocketMessageStore } from '@/store/socket-message';
-import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMiscStore } from '@/store/misc';
 import { useForceThrottleRender } from '@/utils/useForceRender';
-import { ConsoleList } from '@/components/ConsoleList';
+import { ConsoleList, groupConsoleItems } from '@/components/ConsoleList';
 import { VariableSizeList, ListOnScrollProps } from 'react-window';
 import { useShallow } from 'zustand/react/shallow';
 import { useTranslation } from 'react-i18next';
@@ -101,10 +101,91 @@ export const MainContent = memo(() => {
   );
 
   const consoleListRef = useRef<VariableSizeList>(null);
+  const cursorRef = useRef(0);
+  const [cursor, setCursor] = useState(-1);
+  const appliedKeyword = useRef('');
+  const reportedMatch = useRef({ index: -1, count: -1 });
+
+  const publishMatch = (index: number, count: number) => {
+    if (
+      reportedMatch.current.index === index &&
+      reportedMatch.current.count === count
+    ) {
+      return;
+    }
+    reportedMatch.current = { index, count };
+    window.dispatchEvent(
+      new CustomEvent('devtools:console-search-state', {
+        detail: { index, count },
+      }),
+    );
+  };
+
   useEffect(() => {
-    if (!isAutoScroll || consoleDataList.length === 0) return;
+    if (
+      !isAutoScroll ||
+      consoleKeywordFilter.current.trim() ||
+      consoleDataList.length === 0
+    ) {
+      return;
+    }
     consoleListRef.current?.scrollToItem(consoleDataList.length - 1, 'end');
   }, [consoleDataList, isAutoScroll]);
+
+  useEffect(() => {
+    const keyword = consoleKeywordFilter.current.trim();
+    const count = keyword ? groupConsoleItems(consoleDataList).length : 0;
+    if (!keyword) {
+      appliedKeyword.current = '';
+      cursorRef.current = 0;
+      setCursor(-1);
+      publishMatch(0, 0);
+      return;
+    }
+    if (appliedKeyword.current !== keyword) {
+      appliedKeyword.current = keyword;
+      cursorRef.current = 0;
+      setCursor(count ? 0 : -1);
+      useMiscStore.getState().setIsAutoScroll(false);
+      if (count) {
+        requestAnimationFrame(() =>
+          consoleListRef.current?.scrollToItem(0, 'smart'),
+        );
+      }
+      publishMatch(count ? 1 : 0, count);
+      return;
+    }
+    if (cursorRef.current >= count) {
+      cursorRef.current = Math.max(0, count - 1);
+      setCursor(count ? cursorRef.current : -1);
+    }
+    publishMatch(count ? cursorRef.current + 1 : 0, count);
+  }, [consoleDataList]);
+
+  useEffect(() => {
+    const onStep = (event: Event) => {
+      const delta = (event as CustomEvent<number>).detail;
+      const count = groupConsoleItems(consoleDataList).length;
+      if (!count) return;
+      const current = cursorRef.current;
+      const next =
+        current < 0 || current >= count
+          ? delta < 0
+            ? count - 1
+            : 0
+          : (current + delta + count) % count;
+      cursorRef.current = next;
+      setCursor(next);
+      useMiscStore.getState().setIsAutoScroll(false);
+      requestAnimationFrame(() =>
+        consoleListRef.current?.scrollToItem(next, 'smart'),
+      );
+      publishMatch(next + 1, count);
+    };
+    window.addEventListener('devtools:console-search-step', onStep);
+    return () =>
+      window.removeEventListener('devtools:console-search-step', onStep);
+  }, [consoleDataList]);
 
   useEffect(() => {
     const handleScrollToEnd = () => {
@@ -142,6 +223,9 @@ export const MainContent = memo(() => {
             data={consoleDataList}
             ref={consoleListRef}
             onScroll={handleScroll}
+            activeIndex={
+              consoleKeywordFilter.current.trim() ? cursor : undefined
+            }
           />
         )}
       </div>

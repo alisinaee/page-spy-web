@@ -11,6 +11,8 @@ if [ -f "${root}/scripts/patch-sdk-network.mjs" ]; then
 fi
 cp "${root}/smoke-test/client-logs.js" "${target_sdk}/client-logs.js"
 cp "${root}/smoke-test/log-format.js" "${target_sdk}/log-format.js"
+cp "${root}/smoke-test/route-trace.js" "${target_sdk}/route-trace.js"
+cp "${root}/smoke-test/tehran-time.js" "${target_sdk}/tehran-time.js"
 
 # Official plugins
 target_plugin="${root}/public/plugin"

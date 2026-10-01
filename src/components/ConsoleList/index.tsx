@@ -192,10 +192,11 @@ interface Props {
   data: SpyConsole.DataItem[];
   onScroll: (props: ListOnScrollProps) => void;
   onActivate?: (item: SpyConsole.DataItem) => void;
+  activeIndex?: number;
 }
 
 export const ConsoleList = forwardRef<VariableSizeList, Props>(
-  ({ data, onScroll, onActivate }, ref) => {
+  ({ data, onScroll, onActivate, activeIndex }, ref) => {
     const innerRef = useRef<VariableSizeList>(null);
     const listRef = ref ?? innerRef;
     const heights = useRef<Map<number, number>>(new Map());
@@ -239,6 +240,7 @@ export const ConsoleList = forwardRef<VariableSizeList, Props>(
             <div
               style={style}
               data-index={index}
+              className={index === activeIndex ? 'bg-muted' : undefined}
               onClick={() => onActivate?.(item)}
             >
               <ConsoleItem
@@ -250,7 +252,7 @@ export const ConsoleList = forwardRef<VariableSizeList, Props>(
             </div>
           );
         },
-        [openIds, toggleOpen, onActivate],
+        [activeIndex, openIds, toggleOpen, onActivate],
       );
 
     const wrapperRef = useRef<HTMLDivElement>(null);

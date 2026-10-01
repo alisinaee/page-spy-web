@@ -57,6 +57,8 @@
     "prev-page": "Previous page",
     "next-page": "Next page",
     "clear-search": "Clear search",
+    "previous-result": "Previous result",
+    "next-result": "Next result",
     "close": "Close",
     "scroll-bottom": "Scroll to bottom",
     "download": "Download",
@@ -103,6 +105,7 @@
       "System": "System",
       "Page": "Page",
       "Storage": "Storage",
+      "Routing": "Routes",
       "MPPage": "MP Page",
       "MPSystem": "MP System"
     }

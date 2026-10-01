@@ -1,6 +1,6 @@
 import { ReactNode, useEffect, useRef, useState, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Search, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -81,7 +81,7 @@ export const PanelToolbar = ({
       </div>
       {menu && <div className="order-1 shrink-0 md:hidden">{menu}</div>}
       {search && (
-        <div className="order-3 flex w-full min-w-0 md:order-2 md:w-auto md:max-w-72 md:flex-1">
+        <div className="order-3 flex w-full min-w-0 md:order-2 md:w-auto md:max-w-md md:flex-1">
           {search}
         </div>
       )}
@@ -132,37 +132,96 @@ export const SearchField = ({
   placeholder,
   label,
   className,
+  resultIndex = 0,
+  resultCount,
+  onPrev,
+  onNext,
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   label: string;
   className?: string;
+  /** 1-based match currently shown. 0 when nothing is selected. */
+  resultIndex?: number;
+  resultCount?: number;
+  onPrev?: () => void;
+  onNext?: () => void;
 }) => {
   const { t } = useTranslation();
+  const showNav = Boolean(value) && resultCount != null && onPrev && onNext;
+  const step = (direction: -1 | 1) => {
+    if (direction < 0) onPrev?.();
+    else onNext?.();
+  };
   return (
-    <div className={cn('relative min-w-40 flex-1', className)}>
-      <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-      <Input
-        type="search"
-        aria-label={label}
-        placeholder={placeholder ?? label}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="h-11 pr-9 pl-8 text-base md:h-8 md:text-sm"
-      />
-      {value && (
-        <Button
-          variant="ghost"
-          size="icon-touch"
-          aria-label={
-            t('common.clear-search', { defaultValue: 'Clear search' })!
-          }
-          onClick={() => onChange('')}
-          className="absolute top-1/2 right-0 -translate-y-1/2 md:size-8 md:min-h-0 md:min-w-0"
-        >
-          <X />
-        </Button>
+    <div className={cn('flex min-w-40 flex-1 items-center gap-0.5', className)}>
+      <div className="relative min-w-0 flex-1">
+        <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          type="text"
+          aria-label={label}
+          placeholder={placeholder ?? label}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(event) => {
+            if (!showNav) return;
+            if (event.key !== 'Enter') return;
+            event.preventDefault();
+            step(event.shiftKey ? -1 : 1);
+          }}
+          className={cn(
+            'h-11 pl-8 text-base md:h-8 md:text-sm',
+            value && 'pr-9',
+          )}
+        />
+        {value && (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={
+              t('common.clear-search', { defaultValue: 'Clear search' })!
+            }
+            onClick={() => onChange('')}
+            className="absolute top-1/2 right-0.5 size-8 -translate-y-1/2"
+          >
+            <X />
+          </Button>
+        )}
+      </div>
+      {showNav && (
+        <div className="flex shrink-0 items-center">
+          <button
+            type="button"
+            aria-label={
+              t('common.previous-result', {
+                defaultValue: 'Previous result',
+              })!
+            }
+            disabled={!resultCount}
+            onClick={() => step(-1)}
+            className="inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground disabled:opacity-40"
+          >
+            <ChevronUp className="size-4" />
+          </button>
+          <span
+            className="min-w-10 text-center font-mono text-xs text-muted-foreground"
+            aria-live="polite"
+          >
+            {resultCount ? `${resultIndex || 0}/${resultCount}` : '0/0'}
+          </span>
+          <button
+            type="button"
+            aria-label={
+              t('common.next-result', { defaultValue: 'Next result' })!
+            }
+            disabled={!resultCount}
+            onClick={() => step(1)}
+            className="inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground disabled:opacity-40"
+          >
+            <ChevronDown className="size-4" />
+          </button>
+        </div>
       )}
     </div>
   );
