@@ -9,6 +9,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export const confirmLogFileName = (defaultName: string) =>
   new Promise<string | null>((resolve) => {
@@ -24,6 +25,7 @@ export const confirmLogFileName = (defaultName: string) =>
     };
 
     const DialogWrapper = () => {
+      const { t } = useTranslation();
       const [open, setOpen] = useState(true);
       const [value, setValue] = useState(defaultName);
 
@@ -40,7 +42,9 @@ export const confirmLogFileName = (defaultName: string) =>
         >
           <DialogContent className="sm:max-w-md bg-card border-border">
             <DialogHeader>
-              <DialogTitle>Save logs</DialogTitle>
+              <DialogTitle>
+                {t('common.save-logs', { defaultValue: 'Save logs' })}
+              </DialogTitle>
             </DialogHeader>
             <form
               onSubmit={(e) => {
@@ -53,6 +57,7 @@ export const confirmLogFileName = (defaultName: string) =>
             >
               <Input
                 autoFocus
+                className="h-11 text-base md:h-8 md:text-sm"
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
               />
@@ -60,15 +65,23 @@ export const confirmLogFileName = (defaultName: string) =>
                 <Button
                   type="button"
                   variant="outline"
+                  size="touch"
+                  className="md:h-8 md:min-h-0 md:text-sm"
                   onClick={() => {
                     setOpen(false);
                     cleanup();
                     resolve(null);
                   }}
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
-                <Button type="submit">Save</Button>
+                <Button
+                  type="submit"
+                  size="touch"
+                  className="md:h-8 md:min-h-0 md:text-sm"
+                >
+                  {t('common.save', { defaultValue: 'Save' })}
+                </Button>
               </DialogFooter>
             </form>
           </DialogContent>

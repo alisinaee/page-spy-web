@@ -48,7 +48,7 @@ const CopyContent: React.FC<Props> = ({ content, rows = 3, length = 120 }) => {
           render={
             <button
               type="button"
-              className="copyable-icon ml-2 inline-flex cursor-pointer items-center text-primary-text hover:text-foreground"
+              className="copyable-icon ml-2 inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center md:min-h-0 md:min-w-0 text-primary-text hover:text-foreground"
               onClick={onCopy}
               aria-label="Copy"
             >

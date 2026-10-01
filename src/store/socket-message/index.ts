@@ -29,6 +29,7 @@ interface SocketMessage {
   consoleMsg: SpyConsole.DataItem[];
   consoleMsgTypeFilter: string[];
   consoleMsgKeywordFilter: string;
+  consoleDisabledTags: string[];
   networkMsg: ResolvedNetworkInfo[];
   networkKeyword: string;
   networkType: NetworkType;
@@ -47,6 +48,7 @@ interface SocketMessage {
   initSocket: (args: Record<string, string>) => void;
   setConsoleMsgTypeFilter: (typeList: string[]) => void;
   setConsoleMsgKeywordFilter: (keyword: string) => void;
+  setConsoleDisabledTags: (tags: string[]) => void;
   setNetworkKeyword: (keyword: string) => void;
   setNetworkType: (type: NetworkType) => void;
   clearRecord: (key: string) => void;
@@ -61,6 +63,7 @@ export const useSocketMessageStore = create<SocketMessage>()(
     consoleMsg: [],
     consoleMsgTypeFilter: [],
     consoleMsgKeywordFilter: '',
+    consoleDisabledTags: [],
     networkMsg: [],
     networkKeyword: '',
     networkType: 'All',
@@ -310,6 +313,9 @@ export const useSocketMessageStore = create<SocketMessage>()(
     },
     setConsoleMsgKeywordFilter(keyword: string) {
       set({ consoleMsgKeywordFilter: keyword });
+    },
+    setConsoleDisabledTags: (tags: string[]) => {
+      set({ consoleDisabledTags: tags });
     },
     setNetworkKeyword(keyword: string) {
       set({ networkKeyword: keyword });

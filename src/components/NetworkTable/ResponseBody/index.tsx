@@ -61,10 +61,10 @@ const FilenameModal = withPopup<void, string | false>(
             />
           </div>
           <DialogFooter className="flex justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={() => resolve(false)}>
+            <Button variant="outline" size="lg" onClick={() => resolve(false)}>
               Cancel
             </Button>
-            <Button size="sm" onClick={ok}>
+            <Button size="lg" onClick={ok}>
               OK
             </Button>
           </DialogFooter>
@@ -126,7 +126,11 @@ const MediaWidget = ({ dataUrl }: MediaWidgetProps) => {
         {
           label: 'Save as: ',
           content: (
-            <Button onClick={showModal} size="sm" className="ml-3 h-7 text-xs">
+            <Button
+              onClick={showModal}
+              size="lg"
+              className="ml-3 h-11 text-sm md:h-8"
+            >
               <Download className="h-3.5 w-3.5 mr-1" />
               Download
             </Button>

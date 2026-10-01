@@ -8,7 +8,7 @@ interface MiscInfo {
 
 export const useMiscStore = create<MiscInfo>()(
   immer((set) => ({
-    isAutoScroll: false,
+    isAutoScroll: true,
     setIsAutoScroll: (data: boolean) => {
       set((state) => {
         state.isAutoScroll = data;

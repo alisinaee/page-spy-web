@@ -3,13 +3,7 @@ import { getOriginFragments } from '@/utils/parseError';
 import { useEventListener } from '@/utils/useEventListener';
 import { Crosshair, Frown } from 'lucide-react';
 import { useRequest } from 'ahooks';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetFooter,
-} from '@/components/ui/sheet';
+import { DetailPane } from '@/components/panel';
 import { Button } from '@/components/ui/button';
 import {
   Tooltip,
@@ -95,9 +89,10 @@ const ErrorStackItem = ({ frame }: { frame: Required<StackFrame> }) => {
           </div>
           {data.useTabs && (
             <select
+              aria-label="Tab size"
               value={tabSize}
               onChange={(e) => setTabSize(Number(e.target.value))}
-              className="text-xs bg-secondary border border-border rounded px-2 py-1"
+              className="h-11 rounded border border-border bg-secondary px-2 text-base md:h-8 md:text-xs"
             >
               {TAB_SIZE.map((size) => (
                 <option key={size} value={size}>
@@ -124,26 +119,26 @@ const ErrorStackItem = ({ frame }: { frame: Required<StackFrame> }) => {
 
   return (
     <div className="error-stack-item [&~.error-stack-item]:mt-3">
-      <div className="stack-filename mb-3 flex flex-nowrap items-center gap-3 overflow-hidden">
+      <div className="stack-filename mb-1 flex flex-nowrap items-center gap-3 overflow-hidden">
         <Tooltip>
           <TooltipTrigger
             render={
-              <code className="text-xs truncate block max-w-[85%] cursor-pointer">
+              <code className="block min-w-0 max-w-[85%] truncate text-xs md:text-sm">
                 {stackFilename}
               </code>
             }
           />
           <TooltipContent>{stackFilename}</TooltipContent>
         </Tooltip>
-        <Crosshair
-          className={clsx(
-            'locate-icon w-4 h-4 cursor-pointer text-primary-text hover:text-foreground shrink-0',
-            {
-              'animate-spin': loading,
-            },
-          )}
+        <Button
+          variant="ghost"
+          size="icon-touch"
+          aria-label={t('locate', { defaultValue: 'Locate source' })!}
           onClick={requestChunk}
-        />
+          className="shrink-0 text-primary-text hover:text-foreground md:size-8 md:min-h-0 md:min-w-0"
+        >
+          <Crosshair className={clsx({ 'animate-spin': loading })} />
+        </Button>
       </div>
       {content}
     </div>
@@ -151,7 +146,6 @@ const ErrorStackItem = ({ frame }: { frame: Required<StackFrame> }) => {
 };
 
 export const ErrorDetailDrawer = memo(() => {
-  const { t: ct } = useTranslation();
   const { t } = useTranslation('translation', {
     keyPrefix: 'console.error-trace',
   });
@@ -176,40 +170,25 @@ export const ErrorDetailDrawer = memo(() => {
   });
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetContent
-        side="right"
-        className="error-detail-drawer w-full sm:max-w-2xl overflow-y-auto flex flex-col justify-between"
-      >
-        <div>
-          <SheetHeader className="pb-4">
-            <SheetTitle>{t('title')}</SheetTitle>
-          </SheetHeader>
-          <div className="space-y-4">
-            <BlockTitle title={t('message-title')} />
-            {errorMessage ? (
-              <div className="error-message-box overflow-auto rounded-md bg-destructive/10 px-3 py-2 font-mono text-xs leading-snug text-destructive">
-                <pre>
-                  <code>{errorMessage}</code>
-                </pre>
-              </div>
-            ) : (
-              <div className="text-center text-muted-foreground py-4 text-xs">
-                No error message
-              </div>
-            )}
-            <BlockTitle title={t('stack-title')} />
-            {frames?.map((f, index) => (
-              <ErrorStackItem key={f.fileName + index} frame={f} />
-            ))}
+    <DetailPane open={open} onClose={() => setOpen(false)} title={t('title')}>
+      <div className="error-detail-drawer space-y-4 p-3">
+        <BlockTitle title={t('message-title')} />
+        {errorMessage ? (
+          <div className="error-message-box overflow-auto rounded-md bg-destructive/10 px-3 py-2 font-mono text-xs leading-snug text-destructive md:text-sm">
+            <pre>
+              <code>{errorMessage}</code>
+            </pre>
           </div>
-        </div>
-        <SheetFooter className="pt-4 border-t border-border flex justify-end">
-          <Button size="touch" onClick={() => setOpen(false)}>
-            {ct('common.OK')}
-          </Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+        ) : (
+          <div className="py-4 text-center text-xs text-muted-foreground">
+            {t('no-message', { defaultValue: 'No error message' })}
+          </div>
+        )}
+        <BlockTitle title={t('stack-title')} />
+        {frames?.map((f, index) => (
+          <ErrorStackItem key={f.fileName + index} frame={f} />
+        ))}
+      </div>
+    </DetailPane>
   );
 });

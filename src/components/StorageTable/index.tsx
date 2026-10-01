@@ -1,15 +1,14 @@
-import { useCacheDetailStore } from '@/store/cache-detail';
 import { StorageType } from '@/store/platform-config';
 import { SpyStorage } from '@huolala-tech/page-spy-types';
 import { capitalize } from 'lodash-es';
-import { useMemo, useRef, useState } from 'react';
-import { ResizableTitle } from '../ResizableTitle';
-import { ResizeCallbackData } from 'react-resizable';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { formatTehranDateTime } from '@/utils/tehran';
+import { useMemo, useState } from 'react';
+import { ArrowDown, ArrowUp, Copy } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import copy from 'copy-to-clipboard';
+import { cn } from '@/lib/utils';
+import { message } from '@/utils/message';
+import { Button } from '@/components/ui/button';
 import {
   Table,
   TableHeader,
@@ -18,251 +17,269 @@ import {
   TableRow,
   TableCell,
 } from '@/components/ui/table';
+import { PanelEmpty, useIsDesktop } from '@/components/panel';
+
+type Row = SpyStorage.Data;
 
 interface ColumnDef {
-  key: string;
-  dataIndex: keyof SpyStorage.Data;
+  key: keyof Row;
   title: string;
-  width: number;
-  sorter?: (a: SpyStorage.Data, b: SpyStorage.Data) => number;
-  render?: (val: any, record: SpyStorage.Data) => React.ReactNode;
+  sorter?: (a: Row, b: Row) => number;
+  render?: (val: any) => string;
 }
 
+const str = (v: unknown) => String(v ?? '');
+const by = (key: keyof Row) => (a: Row, b: Row) =>
+  str(a[key]).localeCompare(str(b[key]));
+
 const defaultCols: ColumnDef[] = [
-  {
-    key: 'name',
-    dataIndex: 'name',
-    title: 'Name',
-    width: 200,
-    sorter: (a, b) => a.name.localeCompare(b.name),
-  },
-  {
-    key: 'value',
-    dataIndex: 'value',
-    title: 'Value',
-    width: 300,
-    sorter: (a, b) => a.value.localeCompare(b.value),
-  },
-  {
-    key: 'domain',
-    dataIndex: 'domain',
-    title: 'Domain',
-    width: 200,
-    sorter: (a, b) => {
-      if (!(a.domain && b.domain)) return 0;
-      return a.domain.localeCompare(b.domain);
-    },
-  },
-  {
-    key: 'path',
-    dataIndex: 'path',
-    title: 'Path',
-    width: 100,
-    sorter: (a, b) => {
-      if (!(a.path && b.path)) return 0;
-      return a.path.localeCompare(b.path);
-    },
-  },
+  { key: 'name', title: 'Name', sorter: by('name') },
+  { key: 'value', title: 'Value', sorter: by('value') },
+  { key: 'domain', title: 'Domain', sorter: by('domain') },
+  { key: 'path', title: 'Path', sorter: by('path') },
   {
     key: 'expires',
-    dataIndex: 'expires',
     title: 'Expires',
-    width: 240,
-    render: (value: string) => {
-      const time = value ? new Date(value).toISOString() : 'Session';
-      return (
-        <Tooltip>
-          <TooltipTrigger
-            render={<span className="truncate block">{time}</span>}
-          />
-          <TooltipContent>{time}</TooltipContent>
-        </Tooltip>
-      );
-    },
-    sorter: (a, b) => {
-      if (!(a.expires && b.expires)) return 0;
-      return String(a.expires).localeCompare(String(b.expires));
-    },
+    sorter: by('expires'),
+    render: (v: string) => (v ? formatTehranDateTime(v) || v : 'Session'),
   },
   {
     key: 'secure',
-    dataIndex: 'secure',
     title: 'Secure',
-    width: 80,
-    render: (bool: boolean) => bool && '✅',
-    sorter: (a, b) => {
-      if (!(a.secure && b.secure)) return 0;
-      return String(a.secure).localeCompare(String(b.secure));
-    },
+    sorter: by('secure'),
+    render: (v: boolean) => (v ? 'Yes' : ''),
   },
   {
     key: 'sameSite',
-    dataIndex: 'sameSite',
     title: 'SameSite',
-    width: 80,
+    sorter: by('sameSite'),
     render: (v: string) => (v ? capitalize(v) : ''),
-    sorter: (a, b) => {
-      if (!(a.sameSite && b.sameSite)) return 0;
-      return String(a.sameSite).localeCompare(String(b.sameSite));
-    },
   },
-  {
-    key: 'partitioned',
-    dataIndex: 'partitioned',
-    title: 'Partitioned',
-    width: 80,
-    sorter: (a, b) => {
-      if (!(a.partitioned && b.partitioned)) return 0;
-      return String(a.partitioned).localeCompare(String(b.partitioned));
-    },
-  },
+  { key: 'partitioned', title: 'Partitioned', sorter: by('partitioned') },
 ];
+
+const prettyValue = (value: unknown) => {
+  const text = str(value);
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed && typeof parsed === 'object') {
+      return JSON.stringify(parsed, null, 2);
+    }
+  } catch (e) {
+    // not JSON, show raw
+  }
+  return text;
+};
+
+const CopyButton = ({ text, label }: { text: string; label: string }) => (
+  <Button
+    variant="ghost"
+    size="icon-touch"
+    aria-label={label}
+    className="md:size-8 md:min-h-0 md:min-w-0"
+    onClick={() => {
+      if (copy(text)) message.success('Copy success');
+      else message.error('Copy failed');
+    }}
+  >
+    <Copy />
+  </Button>
+);
+
+/** Full key / value / metadata of one storage entry, for the DetailPane. */
+export const StorageDetail = ({ row }: { row: Row }) => {
+  const { t } = useTranslation();
+  const { name, value, ...rest } = row;
+  const pretty = useMemo(() => prettyValue(value), [value]);
+  const meta = defaultCols.filter(
+    (c) => c.key in rest && c.key !== 'name' && c.key !== 'value',
+  );
+  return (
+    <div className="space-y-4 p-4">
+      <section>
+        <div className="flex items-center justify-between">
+          <h4 className="text-xs text-muted-foreground">
+            {t('storage.key', { defaultValue: 'Key' })}
+          </h4>
+          <CopyButton
+            text={str(name)}
+            label={t('storage.copy-key', { defaultValue: 'Copy key' })!}
+          />
+        </div>
+        <p className="font-mono text-xs break-all md:text-sm">{str(name)}</p>
+      </section>
+      <section>
+        <div className="flex items-center justify-between">
+          <h4 className="text-xs text-muted-foreground">
+            {t('storage.value', { defaultValue: 'Value' })}
+          </h4>
+          <CopyButton
+            text={str(value)}
+            label={t('storage.copy-value', { defaultValue: 'Copy value' })!}
+          />
+        </div>
+        <pre className="font-mono text-xs break-all whitespace-pre-wrap md:text-sm">
+          {pretty}
+        </pre>
+      </section>
+      {meta.length > 0 && (
+        <dl className="space-y-1 border-t border-border pt-3 text-xs md:text-sm">
+          {meta.map((c) => (
+            <div key={c.key} className="flex justify-between gap-3">
+              <dt className="text-muted-foreground">{c.title}</dt>
+              <dd className="font-mono break-all">
+                {c.render
+                  ? c.render(rest[c.key as keyof typeof rest])
+                  : str(rest[c.key as keyof typeof rest])}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </div>
+  );
+};
 
 interface Props {
   activeTab: StorageType;
   storageMsg: Record<StorageType, SpyStorage.GetTypeDataItem['data']>;
-  resizeCacheKey: string;
+  selected: Row | null;
+  onSelect: (row: Row) => void;
 }
 
 export const StorageTable = ({
   activeTab,
   storageMsg,
-  resizeCacheKey,
+  selected,
+  onSelect,
 }: Props) => {
-  const data = useMemo(() => {
-    return Object.values(storageMsg[activeTab] || {});
-  }, [activeTab, storageMsg]);
+  const { t } = useTranslation();
+  const isDesktop = useIsDesktop();
+  const data = useMemo(
+    () => Object.values(storageMsg[activeTab] || {}) as Row[],
+    [activeTab, storageMsg],
+  );
 
   const hasDetail = useMemo(() => {
-    const { name, value, ...rest } = data[0] || {};
+    const { name, value, ...rest } = data[0] || ({} as Row);
     return Object.keys(rest).length > 0;
   }, [data]);
 
-  const unionCacheKey = useMemo(
-    () => `${resizeCacheKey}:${activeTab}`,
-    [resizeCacheKey, activeTab],
-  );
-  const cacheWidthRef = useRef<Record<string, { [title: string]: number }>>({});
-
-  const [colWidths, setColWidths] = useState<Record<string, number>>(() => {
-    const cache = localStorage.getItem(unionCacheKey);
-    const val = cache ? JSON.parse(cache) : {};
-    return val || {};
-  });
-
-  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<keyof Row | null>(null);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
-  const visibleCols = useMemo(() => {
-    let cols = defaultCols;
-    if (!hasDetail) {
-      cols = cols.slice(0, 2);
-    }
-    return cols;
-  }, [hasDetail]);
+  const visibleCols = hasDetail ? defaultCols : defaultCols.slice(0, 2);
 
   const sortedData = useMemo(() => {
     if (!sortKey) return data;
     const col = visibleCols.find((c) => c.key === sortKey);
-    if (!col || !col.sorter) return data;
+    if (!col?.sorter) return data;
     const sorted = [...data].sort(col.sorter);
     return sortOrder === 'desc' ? sorted.reverse() : sorted;
   }, [data, sortKey, sortOrder, visibleCols]);
 
-  const setDetailInfo = useCacheDetailStore((state) => state.setCurrentDetail);
+  if (data.length === 0) {
+    return (
+      <PanelEmpty title={t('storage.no-data', { defaultValue: 'No data' })} />
+    );
+  }
 
-  const handleResize =
-    (title: string) =>
-    (_: any, { size }: ResizeCallbackData) => {
-      setColWidths((prev) => {
-        const next = { ...prev, [title]: size.width };
-        cacheWidthRef.current[unionCacheKey] = next;
-        return next;
-      });
-    };
-
-  const handleResizeStop = () => {
-    const refValue = cacheWidthRef.current[unionCacheKey];
-    if (refValue) {
-      localStorage.setItem(unionCacheKey, JSON.stringify(refValue));
-    }
-  };
+  if (!isDesktop) {
+    return (
+      <ul>
+        {sortedData.map((row, idx) => {
+          const active = selected === row;
+          return (
+            <li key={row.name || idx}>
+              <button
+                type="button"
+                onClick={() => onSelect(row)}
+                className={cn(
+                  'block min-h-11 w-full border-b border-border px-3 py-1.5 text-left hover:bg-muted/60',
+                  active && 'border-l-2 border-l-primary bg-muted',
+                )}
+              >
+                <span className="block truncate font-mono text-sm">
+                  {str(row.name)}
+                </span>
+                <span className="block truncate font-mono text-xs text-muted-foreground">
+                  {str(row.value)}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
 
   return (
-    <div className="storage-table w-full overflow-auto">
-      <Table className="text-xs">
-        <TableHeader>
-          <TableRow>
-            {visibleCols.map((col) => {
-              const width = colWidths[col.title] || col.width;
+    <Table className="table-fixed text-sm">
+      <TableHeader className="sticky top-0 z-10 bg-background">
+        <TableRow>
+          {visibleCols.map((col) => (
+            <TableHead key={col.key} className="h-9 text-muted-foreground">
+              <button
+                type="button"
+                className="inline-flex items-center gap-1"
+                onClick={() => {
+                  if (sortKey === col.key) {
+                    setSortOrder((p) => (p === 'asc' ? 'desc' : 'asc'));
+                  } else {
+                    setSortKey(col.key);
+                    setSortOrder('asc');
+                  }
+                }}
+              >
+                {col.title}
+                {sortKey === col.key &&
+                  (sortOrder === 'asc' ? (
+                    <ArrowUp className="size-3" />
+                  ) : (
+                    <ArrowDown className="size-3" />
+                  ))}
+              </button>
+            </TableHead>
+          ))}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {sortedData.map((row, idx) => (
+          <TableRow
+            key={row.name || idx}
+            data-state={selected === row ? 'selected' : undefined}
+            className={cn(
+              'hover:bg-muted/60',
+              selected === row && 'border-l-2 border-l-primary',
+            )}
+          >
+            {visibleCols.map((col, i) => {
+              const text = col.render
+                ? col.render(row[col.key])
+                : str(row[col.key]);
               return (
-                <ResizableTitle
+                <TableCell
                   key={col.key}
-                  width={width}
-                  onResize={handleResize(col.title) as any}
-                  onResizeStop={handleResizeStop as any}
-                  onClick={() => {
-                    if (col.sorter) {
-                      if (sortKey === col.key) {
-                        setSortOrder((prev) =>
-                          prev === 'asc' ? 'desc' : 'asc',
-                        );
-                      } else {
-                        setSortKey(col.key);
-                        setSortOrder('asc');
-                      }
-                    }
-                  }}
-                  className="cursor-pointer select-none font-semibold text-muted-foreground"
-                  style={{ width }}
+                  className="h-9 truncate p-0 font-mono text-sm"
+                  title={text}
                 >
-                  <div className="flex items-center justify-between">
-                    <span>{col.title}</span>
-                    {sortKey === col.key && (
-                      <span className="ml-1 text-[10px]">
-                        {sortOrder === 'asc' ? '▲' : '▼'}
-                      </span>
-                    )}
-                  </div>
-                </ResizableTitle>
+                  {i === 0 ? (
+                    <button
+                      type="button"
+                      className="block w-full truncate px-2 text-left"
+                      onClick={() => onSelect(row)}
+                    >
+                      {text}
+                    </button>
+                  ) : (
+                    <span className="block truncate px-2">{text}</span>
+                  )}
+                </TableCell>
               );
             })}
           </TableRow>
-        </TableHeader>
-        <TableBody>
-          {sortedData.length === 0 ? (
-            <TableRow>
-              <TableCell
-                colSpan={visibleCols.length}
-                className="text-center py-8 text-muted-foreground"
-              >
-                No data
-              </TableCell>
-            </TableRow>
-          ) : (
-            sortedData.map((row, idx) => (
-              <TableRow
-                key={row.name || idx}
-                onClick={() => setDetailInfo(row.value || '')}
-                className="cursor-pointer hover:bg-muted/50"
-              >
-                {visibleCols.map((col) => {
-                  const val = row[col.dataIndex];
-                  return (
-                    <TableCell
-                      key={col.key}
-                      className="max-w-xs truncate"
-                      style={{ width: colWidths[col.title] || col.width }}
-                    >
-                      {col.render ? col.render(val, row) : String(val ?? '')}
-                    </TableCell>
-                  );
-                })}
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
-    </div>
+        ))}
+      </TableBody>
+    </Table>
   );
 };

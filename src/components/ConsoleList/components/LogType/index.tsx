@@ -61,14 +61,13 @@ const LogType = ({ type }: Props) => {
   }
   const IconComp = theme?.icon;
   return (
-    <div className="log-type inline-block w-5">
-      <div
-        className="log-type__icon flex items-center justify-center text-[0px]"
-        title={logType}
-      >
-        {IconComp && <IconComp style={{ width: 14, height: 14 }} />}
-      </div>
-    </div>
+    <span
+      className="log-type inline-flex size-5 items-center justify-center"
+      style={{ color: theme?.color }}
+    >
+      {IconComp && <IconComp style={{ width: 16, height: 16 }} />}
+      <span className="sr-only">{logType}</span>
+    </span>
   );
 };
 

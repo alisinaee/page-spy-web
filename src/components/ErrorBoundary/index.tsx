@@ -2,42 +2,29 @@ import { RotateCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Component, ReactNode } from 'react';
 import './index.css';
-import { Trans, useTranslation } from 'react-i18next';
+import { useTranslation } from 'react-i18next';
 
 const ErrorElement = ({ error }: { error: Error }) => {
   const { t } = useTranslation();
   return (
-    <div className="error-boundary flex h-screen w-screen items-center justify-center">
+    <div className="error-boundary flex h-dvh w-screen items-center justify-center">
       <div className="error-container">
         <div className="flex items-center gap-8 flex-col sm:flex-row">
           <div className="logo relative size-20 shrink-0 grayscale-[0.4]" />
           <div>
-            <h3 className="text-xl font-bold mb-2">😱 {t('error.oops')}</h3>
+            <h3 className="text-xl font-bold mb-2">{t('error.oops')}</h3>
             <p className="error-actions flex items-center flex-wrap gap-2 text-sm text-muted-foreground">
-              <Trans i18nKey="error.actions">
-                You can take a
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    window.location.reload();
-                  }}
-                  className="mx-1"
-                >
-                  <RotateCw className="h-3.5 w-3.5 mr-1" />
-                  Try again
-                </Button>
-                or
-                <a
-                  href={`${import.meta.env.VITE_GITHUB_REPO}/issues`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mx-1 inline-flex items-center justify-center rounded-md border border-input bg-background px-3 py-1 text-xs font-medium shadow-xs hover:bg-accent hover:text-accent-foreground"
-                >
-                  Report
-                </a>
-                the issue.
-              </Trans>
+              {t('error.actions')}
+              <Button
+                size="touch"
+                variant="outline"
+                onClick={() => {
+                  window.location.reload();
+                }}
+              >
+                <RotateCw />
+                {t('error.try-again')}
+              </Button>
             </p>
           </div>
         </div>

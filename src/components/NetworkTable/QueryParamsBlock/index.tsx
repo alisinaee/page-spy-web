@@ -1,39 +1,33 @@
 import { useState, useMemo } from 'react';
-import { EntriesBody } from '@/components/EntriesBody';
-import React from 'react';
+import { DetailSection, KeyValueList } from '../DetailParts';
 
-export const QueryParamsBlock: React.FC<{ data: [string, string][] }> = ({
-  data,
-}) => {
+export const QueryParamsBlock = ({ data }: { data: [string, string][] }) => {
   const [decoded, setDecoded] = useState(true);
-  const decodedData = useMemo(() => {
-    if (!decoded) {
-      return data.reduce((acc, [key, value]) => {
-        acc.push([key, encodeURIComponent(value)]);
-        return acc;
-      }, [] as [string, string][]);
-    }
-    return data;
-  }, [data, decoded]);
-
-  const toggleText = useMemo(() => {
-    return decoded ? 'view URL-encoded' : 'view decoded';
-  }, [decoded]);
+  const shown = useMemo(
+    () =>
+      decoded
+        ? data
+        : data.map(([key, value]): [string, string] => [
+            key,
+            encodeURIComponent(value),
+          ]),
+    [data, decoded],
+  );
 
   return (
-    <div className="detail-block break-words border-b border-border px-3 py-1 text-[13px] last:border-b-0">
-      <div className="detail-block__label flex items-center gap-2 font-bold leading-loose text-foreground">
-        <span>Query String Parameters</span>
-        <span
+    <DetailSection
+      label="Query String Parameters"
+      action={
+        <button
+          type="button"
           onClick={() => setDecoded(!decoded)}
-          className="text-xs text-primary font-normal cursor-pointer hover:underline"
+          className="min-h-11 px-2 text-xs font-normal text-primary-text md:min-h-6"
         >
-          {toggleText}
-        </span>
-      </div>
-      <div className="detail-block__content mb-5 whitespace-pre-wrap pl-3 text-muted-foreground">
-        <EntriesBody data={decodedData} />
-      </div>
-    </div>
+          {decoded ? 'view URL-encoded' : 'view decoded'}
+        </button>
+      }
+    >
+      <KeyValueList data={shown} />
+    </DetailSection>
   );
 };

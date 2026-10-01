@@ -1,5 +1,6 @@
 import { useSocketMessageStore } from '@/store/socket-message';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { SpyConsole } from '@huolala-tech/page-spy-types';
 import ErrorSvg from '@/assets/image/error.svg?react';
 import InfoSvg from '@/assets/image/info.svg?react';
@@ -9,26 +10,39 @@ import DebugSvg from '@/assets/image/debug.svg?react';
 import { debounce } from 'lodash-es';
 import { useShallow } from 'zustand/react/shallow';
 import { SectionLogActions } from '@/pages/Devtools/SectionLogActions';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { FilterChip, PanelToolbar, SearchField } from '@/components/panel';
+import { MoreVertical } from 'lucide-react';
 import {
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-} from '@/components/ui/tooltip';
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 export const HeaderActions = () => {
-  const [changeConsoleMsgFilter, setConsoleMsgKeywordFilter] =
-    useSocketMessageStore(
-      useShallow((state) => [
-        state.setConsoleMsgTypeFilter,
-        state.setConsoleMsgKeywordFilter,
-      ]),
-    );
+  const { t } = useTranslation();
+  const [
+    changeConsoleMsgFilter,
+    setConsoleMsgKeywordFilter,
+    consoleMsg,
+    disabledTags,
+    setConsoleDisabledTags,
+  ] = useSocketMessageStore(
+    useShallow((state) => [
+      state.setConsoleMsgTypeFilter,
+      state.setConsoleMsgKeywordFilter,
+      state.consoleMsg,
+      state.consoleDisabledTags,
+      state.setConsoleDisabledTags,
+    ]),
+  );
 
   const [selectedLevels, setSelectedLevels] = useState<SpyConsole.ProxyType[]>(
     [],
   );
+  const [keyword, setKeyword] = useState('');
 
   const toggleLevel = (level: SpyConsole.ProxyType) => {
     const next = selectedLevels.includes(level)
@@ -43,12 +57,55 @@ export const HeaderActions = () => {
     value: SpyConsole.ProxyType;
     icon: React.ComponentType<{ className?: string }>;
   }> = [
-    { label: 'User messages', value: 'log', icon: UserSvg },
-    { label: 'Errors', value: 'error', icon: ErrorSvg },
-    { label: 'Warnings', value: 'warn', icon: WarnSvg },
-    { label: 'Info', value: 'info', icon: InfoSvg },
-    { label: 'Verbose', value: 'debug', icon: DebugSvg },
+    {
+      label: t('console.filter.user', { defaultValue: 'User' }),
+      value: 'log',
+      icon: UserSvg,
+    },
+    {
+      label: t('console.filter.errors', { defaultValue: 'Errors' }),
+      value: 'error',
+      icon: ErrorSvg,
+    },
+    {
+      label: t('console.filter.warnings', { defaultValue: 'Warnings' }),
+      value: 'warn',
+      icon: WarnSvg,
+    },
+    {
+      label: t('console.filter.info', { defaultValue: 'Info' }),
+      value: 'info',
+      icon: InfoSvg,
+    },
+    {
+      label: t('console.filter.verbose', { defaultValue: 'Verbose' }),
+      value: 'debug',
+      icon: DebugSvg,
+    },
   ];
+
+  const tags = useMemo(() => {
+    const found = new Set<string>();
+    consoleMsg.forEach((item) => {
+      const text = (item.logs || [])
+        .map((log) =>
+          typeof log.value === 'string'
+            ? log.value
+            : JSON.stringify(log.value ?? ''),
+        )
+        .join(' ');
+      const matches = text.match(/\[([A-Z0-9_]+)\]/g);
+      matches?.forEach((tag) => found.add(tag.slice(1, -1)));
+    });
+    return [...found].sort();
+  }, [consoleMsg]);
+
+  const toggleTag = (tag: string) => {
+    const next = disabledTags.includes(tag)
+      ? disabledTags.filter((item) => item !== tag)
+      : [...disabledTags, tag];
+    setConsoleDisabledTags(next);
+  };
 
   const debouncedKeywordFilter = useMemo(
     () =>
@@ -57,43 +114,94 @@ export const HeaderActions = () => {
       }, 300),
     [setConsoleMsgKeywordFilter],
   );
+  useEffect(
+    () => () => debouncedKeywordFilter.cancel(),
+    [debouncedKeywordFilter],
+  );
+
+  const selectAll = () => {
+    setSelectedLevels(logLevelList.map((item) => item.value));
+    setConsoleDisabledTags([]);
+  };
+  const unselectAll = () => {
+    setSelectedLevels([]);
+    setConsoleDisabledTags(tags);
+  };
 
   return (
-    <div className="console-header-actions flex flex-wrap items-center justify-end gap-2 p-1.5 w-full">
-      <div className="flex items-center gap-1 overflow-x-auto">
-        {logLevelList.map(({ label, value, icon: IconComponent }) => {
-          const isActive = selectedLevels.includes(value);
-          return (
-            <Tooltip key={value}>
-              <TooltipTrigger render={<span />}>
-                <Button
-                  type="button"
-                  variant={isActive ? 'default' : 'outline'}
-                  size="xs"
-                  className={`h-7 px-2 text-xs flex items-center gap-1 ${
-                    isActive ? 'border-primary' : 'opacity-70 hover:opacity-100'
-                  }`}
-                  onClick={() => toggleLevel(value)}
-                >
-                  <IconComponent className="size-3.5" />
-                  <span className="hidden sm:inline">{label}</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{label}</TooltipContent>
-            </Tooltip>
-          );
-        })}
-      </div>
-
-      <div className="w-36 sm:w-48">
-        <Input
-          onChange={(e) => debouncedKeywordFilter(e.target.value)}
-          placeholder="Keyword Filter"
-          className="h-7 text-xs"
+    <PanelToolbar
+      actions={<SectionLogActions section="console" />}
+      menu={
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            aria-label="Filters"
+            className="inline-flex size-11 items-center justify-center rounded-lg border border-border text-foreground"
+          >
+            <MoreVertical className="size-4" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="max-h-80 min-w-44">
+            <DropdownMenuItem className="min-h-11" onClick={selectAll}>
+              Select all
+            </DropdownMenuItem>
+            <DropdownMenuItem className="min-h-11" onClick={unselectAll}>
+              Unselect all
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            {logLevelList.map(({ label, value }) => (
+              <DropdownMenuCheckboxItem
+                key={value}
+                className="min-h-11"
+                checked={selectedLevels.includes(value)}
+                onCheckedChange={() => toggleLevel(value)}
+              >
+                {label}
+              </DropdownMenuCheckboxItem>
+            ))}
+            {tags.map((tag) => (
+              <DropdownMenuCheckboxItem
+                key={tag}
+                className="min-h-11"
+                checked={!disabledTags.includes(tag)}
+                onCheckedChange={() => toggleTag(tag)}
+              >
+                {tag}
+              </DropdownMenuCheckboxItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      }
+      search={
+        <SearchField
+          value={keyword}
+          onChange={(val) => {
+            setKeyword(val);
+            debouncedKeywordFilter(val);
+          }}
+          label={t('console.keyword-filter', {
+            defaultValue: 'Keyword filter',
+          })}
         />
-      </div>
-
-      <SectionLogActions section="console" />
-    </div>
+      }
+    >
+      {logLevelList.map(({ label, value, icon: IconComponent }) => (
+        <FilterChip
+          key={value}
+          active={selectedLevels.includes(value)}
+          onClick={() => toggleLevel(value)}
+          icon={<IconComponent />}
+        >
+          {label}
+        </FilterChip>
+      ))}
+      {tags.map((tag) => (
+        <FilterChip
+          key={tag}
+          active={!disabledTags.includes(tag)}
+          onClick={() => toggleTag(tag)}
+        >
+          {tag}
+        </FilterChip>
+      ))}
+    </PanelToolbar>
   );
 };

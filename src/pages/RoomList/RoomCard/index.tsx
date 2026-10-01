@@ -15,7 +15,7 @@ export const RoomCard = memo(
     const decodeGroup = decodeURI(group);
     const simpleAddress = address.slice(0, 4);
     const { os, browser } = parseUserAgent(name);
-    const title = tags.title?.toString() || '--';
+    const title = tags.title?.toString() || '';
     const osName = `${os.name} ${os.version}`.trim();
     const browserName = `${browser.name} ${browser.version}`.trim();
 
@@ -34,12 +34,14 @@ export const RoomCard = memo(
               {t('common.online', { defaultValue: 'online' })}
             </span>
           </div>
-          <p
-            className="m-0 truncate text-sm text-muted-foreground"
-            title={title}
-          >
-            {title}
-          </p>
+          {title && (
+            <p
+              className="m-0 truncate text-sm text-muted-foreground"
+              title={title}
+            >
+              {title}
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
           <span className="flex min-w-0 items-center gap-1">

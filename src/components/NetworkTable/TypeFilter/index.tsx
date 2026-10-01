@@ -1,7 +1,5 @@
-import { useState } from 'react';
 import { SpyNetwork } from '@huolala-tech/page-spy-types';
-import clsx from 'clsx';
-import React from 'react';
+import { FilterChip } from '@/components/panel';
 
 export type NetworkType =
   | 'All'
@@ -36,39 +34,20 @@ export const RESOURCE_TYPE: Map<
 ]);
 
 interface Props {
-  size?: 'small' | 'middle' | 'large';
   value?: NetworkType;
   onChange: (type: NetworkType) => void;
 }
 
-export const TypeFilter = ({
-  size = 'middle',
-  value = 'All',
-  onChange,
-}: Props) => {
-  const [type, setType] = useState<NetworkType>(value);
-
-  return (
-    <div className="inline-flex items-center rounded-lg bg-secondary/80 p-0.5 border border-border">
-      {[...RESOURCE_TYPE.keys()].map((key) => (
-        <button
-          key={key}
-          type="button"
-          className={clsx(
-            'rounded-md font-medium transition-all cursor-pointer whitespace-nowrap',
-            size === 'small' ? 'px-2 py-0.5 text-xs' : 'px-2.5 py-1 text-xs',
-            type === key
-              ? 'bg-background text-foreground shadow-xs font-semibold'
-              : 'text-muted-foreground hover:text-foreground',
-          )}
-          onClick={() => {
-            setType(key);
-            onChange(key);
-          }}
-        >
-          {key}
-        </button>
-      ))}
-    </div>
-  );
-};
+export const TypeFilter = ({ value = 'All', onChange }: Props) => (
+  <>
+    {[...RESOURCE_TYPE.keys()].map((key) => (
+      <FilterChip
+        key={key}
+        active={value === key}
+        onClick={() => onChange(key)}
+      >
+        {key}
+      </FilterChip>
+    ))}
+  </>
+);

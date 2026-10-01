@@ -17,13 +17,14 @@ import { Trans } from 'react-i18next';
 import CopyContent from '@/components/CopyContent';
 import { useShallow } from 'zustand/react/shallow';
 import { Link } from 'react-router-dom';
-const CONSOLE_NODE = 'console-node mr-[7px] break-words text-xs leading-[18px]';
+const CONSOLE_NODE =
+  'console-node mr-[7px] break-words text-xs leading-5 md:text-sm';
 const TYPE_CLASS: Record<string, string> = {
   origin: 'text-foreground',
   number: 'text-info',
-  string: 'text-warning',
+  string: 'text-foreground',
   boolean: 'text-primary-text',
-  symbol: 'text-warning',
+  symbol: 'text-primary-text',
   error: 'text-destructive',
   function: 'text-foreground',
   object: 'cursor-pointer whitespace-nowrap text-muted-foreground',
@@ -88,7 +89,7 @@ function GetterNode({ id, parentId, instanceId, keyName }: GetterNodeProps) {
 
   return (
     <div className="atom-node">
-      <code className="console-node mr-[7px] break-words text-xs leading-[18px]">
+      <code className="console-node mr-[7px] break-words text-xs leading-5 md:text-sm">
         <span
           className="property-key font-bold text-primary-text"
           style={{ fontStyle: 'normal' }}

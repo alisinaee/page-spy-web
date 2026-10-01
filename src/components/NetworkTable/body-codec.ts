@@ -102,6 +102,16 @@ export const responseLogText = (
       return String(response);
     }
   }
-  if (typeof response === 'string' && response) return response;
+  if (typeof response === 'string' && response) {
+    const trimmed = response.trim();
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      try {
+        return JSON.stringify(JSON.parse(trimmed), null, 2);
+      } catch (error) {
+        return response;
+      }
+    }
+    return response;
+  }
   return responseReason || '';
 };

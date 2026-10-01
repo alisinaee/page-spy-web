@@ -125,7 +125,7 @@ export const ColoredJson = ({ value }: { value: unknown }) => {
   }, [value]);
 
   return (
-    <pre className="colored-json m-2 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-card p-3 font-mono text-xs leading-normal text-foreground">
+    <pre className="colored-json overflow-auto whitespace-pre-wrap break-words rounded-lg bg-muted p-3 font-mono text-xs leading-normal md:text-sm text-foreground">
       {nodes}
     </pre>
   );

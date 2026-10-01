@@ -1,4 +1,4 @@
-import { ChevronRight, Play, Pause, AlertCircle } from 'lucide-react';
+import { ArrowDownToLine, ChevronRight, Play, Pause } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Tooltip,
@@ -8,6 +8,7 @@ import {
 import { Shortcuts } from '../Shortcuts';
 import { useSocketMessageStore } from '@/store/socket-message';
 import { useRef, useState, useEffect, useCallback, memo } from 'react';
+import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import type { KeyboardEvent } from 'react';
 import { useMiscStore } from '@/store/misc';
@@ -28,6 +29,8 @@ export const FooterInput = memo(() => {
   const executeHistory = useRef<string[]>(
     JSON.parse(localStorage.getItem(EXECUTE_HISTORY_ID) || '[]'),
   );
+  const [focused, setFocused] = useState(false);
+  const [keyboardInset, setKeyboardInset] = useState(0);
   const [isAutoScroll, setIsAutoScroll] = useMiscStore((state) => [
     state.isAutoScroll,
     state.setIsAutoScroll,
@@ -47,6 +50,26 @@ export const FooterInput = memo(() => {
       }
     };
   }, []);
+
+  // Lift the input above the on-screen keyboard while it is focused.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!focused || !vv) {
+      setKeyboardInset(0);
+      return;
+    }
+    const update = () => {
+      const inset = window.innerHeight - vv.height - vv.offsetTop;
+      setKeyboardInset(Math.max(0, Math.round(inset)));
+    };
+    update();
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+    };
+  }, [focused]);
 
   const handleDebugCode = useCallback(() => {
     const trimedCode = code.trim();
@@ -162,44 +185,77 @@ export const FooterInput = memo(() => {
   );
 
   return (
-    <div className="console-item page-spy-input flex items-center gap-2 p-2 border-t border-border bg-card">
-      <ChevronRight className="icon size-4 text-primary-text shrink-0" />
-      <div className="relative flex-1">
-        <textarea
-          ref={inputRef}
-          spellCheck="false"
-          placeholder={t('placeholder')!}
-          rows={1}
-          value={code}
-          onChange={(evt) => setCode(evt.target.value)}
-          className="mono-code w-full resize-none border-0 bg-transparent p-0 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:outline-none"
-          onKeyDown={onTextareaKeyDown}
-        />
-      </div>
+    <div
+      className="page-spy-input sticky bottom-0 z-10 flex shrink-0 items-center gap-1 border-t border-border bg-card px-2 py-1.5"
+      style={keyboardInset ? { paddingBottom: keyboardInset } : undefined}
+    >
+      <ChevronRight className="size-4 shrink-0 text-primary-text" />
+      <textarea
+        ref={inputRef}
+        spellCheck="false"
+        autoCapitalize="off"
+        autoCorrect="off"
+        aria-label={t('placeholder')!}
+        placeholder={t('placeholder')!}
+        rows={1}
+        value={code}
+        onChange={(evt) => setCode(evt.target.value)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        className="mono-code max-h-32 min-h-11 min-w-0 flex-1 resize-none border-0 bg-transparent px-1 py-2.5 font-mono text-base text-foreground outline-none placeholder:text-muted-foreground md:min-h-8 md:py-1.5 md:text-sm"
+        onKeyDown={onTextareaKeyDown}
+      />
       <Button
         variant="default"
-        size="sm"
-        className="h-7 px-3 text-xs"
+        size="touch"
+        className="md:h-8 md:min-h-0 md:text-sm"
         onClick={handleDebugCode}
       >
         {t('run')}
       </Button>
       <Tooltip>
-        <TooltipTrigger render={<span />}>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => {
-              setIsAutoScroll(!isAutoScroll);
-            }}
-            aria-label="Toggle auto scroll"
-          >
-            {!isAutoScroll ? (
-              <Play className="size-3.5" />
-            ) : (
-              <Pause className="size-3.5" />
-            )}
-          </Button>
+        <TooltipTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon-touch"
+              className={cn('md:size-8 md:min-h-0 md:min-w-0')}
+              onClick={() => {
+                setIsAutoScroll(true);
+                window.dispatchEvent(
+                  new CustomEvent('devtools:scroll-console-end'),
+                );
+              }}
+              aria-label={
+                t('scroll-to-end', { defaultValue: 'Scroll to end' })!
+              }
+            />
+          }
+        >
+          <ArrowDownToLine />
+        </TooltipTrigger>
+        <TooltipContent>
+          {t('scroll-to-end', { defaultValue: 'Scroll to end' })}
+        </TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon-touch"
+              className={cn('md:size-8 md:min-h-0 md:min-w-0')}
+              onClick={() => {
+                setIsAutoScroll(!isAutoScroll);
+              }}
+              aria-label={
+                !isAutoScroll ? t('auto-scroll-on')! : t('auto-scroll-off')!
+              }
+              aria-pressed={isAutoScroll}
+            />
+          }
+        >
+          {!isAutoScroll ? <Play /> : <Pause />}
         </TooltipTrigger>
         <TooltipContent>
           {!isAutoScroll ? t('auto-scroll-on') : t('auto-scroll-off')}

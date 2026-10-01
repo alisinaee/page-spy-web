@@ -1,3 +1,7 @@
+import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+import { cn } from '@/lib/utils';
+import { formatTehranDateTime } from '@/utils/tehran';
 import { ArrowDownToLine, Download, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -40,7 +44,7 @@ const downloadSection = async (section: SectionName, deviceId: string) => {
     [
       JSON.stringify(
         {
-          exportedAt: new Date().toISOString(),
+          exportedAt: formatTehranDateTime(new Date()),
           deviceId,
           clientInfo: normalizeForExport(state.clientInfo),
           section,
@@ -98,43 +102,65 @@ const scrollToSectionEnd = (section: SectionName) => {
   }
 };
 
+const ActionButton = ({
+  label,
+  onClick,
+  children,
+  className,
+}: {
+  label: string;
+  onClick: () => void;
+  children: ReactNode;
+  className?: string;
+}) => (
+  <Tooltip>
+    <TooltipTrigger
+      render={
+        <Button
+          variant="ghost"
+          size="icon-touch"
+          aria-label={label}
+          onClick={onClick}
+          className={cn('md:size-8 md:min-h-0 md:min-w-0', className)}
+        />
+      }
+    >
+      {children}
+    </TooltipTrigger>
+    <TooltipContent>{label}</TooltipContent>
+  </Tooltip>
+);
+
 export const SectionLogActions = ({ section }: { section: SectionName }) => {
+  const { t } = useTranslation();
   const clearRecord = useSocketMessageStore((state) => state.clearRecord);
   const { address = '' } = useSearch();
 
   return (
-    <div className="flex items-center gap-1.5">
-      <Tooltip>
-        <TooltipTrigger render={<span />}>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => scrollToSectionEnd(section)}
-            aria-label="Scroll to bottom"
-          >
-            <ArrowDownToLine className="size-3.5" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Scroll to bottom</TooltipContent>
-      </Tooltip>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-7 px-2 text-xs flex items-center gap-1"
+    <>
+      {section !== 'console' && (
+        <ActionButton
+          label={t('common.scroll-bottom', {
+            defaultValue: 'Scroll to bottom',
+          })}
+          onClick={() => scrollToSectionEnd(section)}
+        >
+          <ArrowDownToLine />
+        </ActionButton>
+      )}
+      <ActionButton
+        label={t('common.download', { defaultValue: 'Download' })}
         onClick={() => downloadSection(section, address)}
       >
-        <Download className="size-3.5" />
-        <span>Download</span>
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-7 px-2 text-xs flex items-center gap-1 text-muted-foreground hover:text-destructive"
+        <Download />
+      </ActionButton>
+      <ActionButton
+        label={t('common.clear')}
         onClick={() => clearRecord(section)}
+        className="hover:text-destructive"
       >
-        <Trash2 className="size-3.5" />
-        <span>Clear</span>
-      </Button>
-    </div>
+        <Trash2 />
+      </ActionButton>
+    </>
   );
 };

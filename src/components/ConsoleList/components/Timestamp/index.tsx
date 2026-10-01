@@ -1,20 +1,22 @@
 import { memo } from 'react';
+import { formatTehranDateTime } from '@/utils/tehran';
 
 interface TimestampTypes {
   time?: number;
 }
 
-function getLocalTime(nS: number) {
-  // return new Date(nS).toLocaleString().replace(/:\d{1,2}$/, ' ');
-  return new Date(nS).toLocaleString();
-}
-
 const Timestamp = memo((props: TimestampTypes) => {
   const { time = Date.now() } = props;
+  const date = new Date(time);
+  const label = formatTehranDateTime(date);
   return (
-    <span className="timestamp inline-block font-mono text-xs font-medium text-muted-foreground">
-      {getLocalTime(time)}
-    </span>
+    <time
+      dateTime={date.toISOString()}
+      title={label}
+      className="timestamp shrink-0 font-mono text-xs text-muted-foreground"
+    >
+      {label}
+    </time>
   );
 });
 

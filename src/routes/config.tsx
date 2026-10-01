@@ -8,6 +8,8 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 
 const Devtools = React.lazy(() => import('@/pages/Devtools'));
 const RoomList = React.lazy(() => import('@/pages/RoomList'));
+const Recordings = React.lazy(() => import('@/pages/Recordings'));
+const RecordingViewer = React.lazy(() => import('@/pages/Recordings/Viewer'));
 
 export interface RouteInfo {
   icon?: any;
@@ -39,6 +41,22 @@ const routes: RouteObject[] = [
         element: (
           <ProtectedRoute>
             <RoomList />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'recordings',
+        element: (
+          <ProtectedRoute>
+            <Recordings />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'recordings/view',
+        element: (
+          <ProtectedRoute>
+            <RecordingViewer />
           </ProtectedRoute>
         ),
       },

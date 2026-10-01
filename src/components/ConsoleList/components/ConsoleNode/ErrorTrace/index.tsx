@@ -1,6 +1,7 @@
 import { SpyConsole } from '@huolala-tech/page-spy-types';
 import ErrorStackSvg from '@/assets/image/error-stack.svg?react';
 import { useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import ErrorStackParser from 'error-stack-parser';
 
 export type RequiredFrames = Required<StackFrame>[];
@@ -65,6 +66,7 @@ interface Props {
   data: { error: Error; frames: RequiredFrames };
 }
 export const ErrorTraceNode = ({ data }: Props) => {
+  const { t } = useTranslation();
   const onPopupDetail = useCallback(() => {
     window.dispatchEvent(
       new CustomEvent('source-code-detail', {
@@ -85,12 +87,15 @@ export const ErrorTraceNode = ({ data }: Props) => {
 
   return (
     <div className="error-trace flex flex-nowrap items-start">
-      <ErrorStackSvg
-        className="error-trace-icon cursor-pointer text-muted-foreground hover:text-foreground"
+      <button
+        type="button"
+        aria-label={t('console.error-trace.title')!}
         onClick={onPopupDetail}
-        style={{ width: 16, height: 16, cursor: 'pointer' }}
-      />
-      <div className="error-trace-node flex-1 px-2 text-xs">
+        className="error-trace-icon inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+      >
+        <ErrorStackSvg style={{ width: 16, height: 16 }} />
+      </button>
+      <div className="error-trace-node flex-1 px-2 text-xs md:text-sm">
         <code>{errorMessage}</code>
       </div>
     </div>

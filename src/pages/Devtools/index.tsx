@@ -1,5 +1,5 @@
 import copy from 'copy-to-clipboard';
-import React, { memo, useEffect, useMemo, useState } from 'react';
+import React, { memo, useEffect, useMemo, useRef, useState } from 'react';
 import ConsolePanel from './ConsolePanel';
 import NetworkPanel from './NetworkPanel';
 import SystemPanel from './SystemPanel';
@@ -26,6 +26,7 @@ import {
 import { confirmLogFileName } from './save-log-dialog';
 import { message } from '@/utils/message';
 import { Button } from '@/components/ui/button';
+import { PaneResizeHandle, usePaneWidth } from '@/components/panel';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -187,34 +188,58 @@ interface MenuProps {
 
 const SideNav = memo(({ active, badge, menus, onSelect }: MenuProps) => {
   const { t } = useTranslation('translation', { keyPrefix: 'devtool' });
+  const frameRef = useRef<HTMLDivElement>(null);
+  const pane = usePaneWidth({
+    storageKey: 'sidebar',
+    fallback: 208,
+    min: 168,
+    max: 360,
+    reserve: 480,
+    frameRef,
+  });
   return (
-    <nav className="hidden w-52 shrink-0 flex-col gap-1 border-r border-border bg-card p-2 md:flex">
-      {menus.map((key) => {
-        const Icon = MENU_ICONS[key];
-        const isActive = active === key;
-        return (
-          <button
-            key={key}
-            type="button"
-            aria-current={isActive ? 'page' : undefined}
-            className={clsx(
-              'relative flex h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
-              isActive
-                ? 'bg-muted font-medium text-foreground'
-                : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
-            )}
-            onClick={() => onSelect(key)}
-          >
-            {isActive && (
-              <span className="absolute inset-y-1 left-0 w-0.5 rounded-full bg-primary" />
-            )}
-            <Icon className="size-4 shrink-0" />
-            <span className="flex-1 truncate">{t(`menu.${key}`)}</span>
-            {badge[key] && <UnreadDot label={t('new-activity')} />}
-          </button>
-        );
-      })}
-    </nav>
+    <div
+      ref={frameRef}
+      style={{ width: pane.width }}
+      className="relative hidden shrink-0 md:block"
+    >
+      <nav className="flex h-full flex-col gap-1 border-r border-border bg-card p-2">
+        {menus.map((key) => {
+          const Icon = MENU_ICONS[key];
+          const isActive = active === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              aria-current={isActive ? 'page' : undefined}
+              className={clsx(
+                'relative flex h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+                isActive
+                  ? 'bg-muted font-medium text-foreground'
+                  : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+              )}
+              onClick={() => onSelect(key)}
+            >
+              {isActive && (
+                <span className="absolute inset-y-1 left-0 w-0.5 rounded-full bg-primary" />
+              )}
+              <Icon className="size-4 shrink-0" />
+              <span className="flex-1 truncate">{t(`menu.${key}`)}</span>
+              {badge[key] && <UnreadDot label={t('new-activity')} />}
+            </button>
+          );
+        })}
+      </nav>
+      <PaneResizeHandle
+        label={t('resize-sidebar', { defaultValue: 'Resize sidebar' })!}
+        edge="end"
+        value={pane.width}
+        min={pane.min}
+        max={pane.max}
+        onChange={pane.setWidth}
+        onReset={pane.reset}
+      />
+    </div>
   );
 });
 
@@ -377,6 +402,7 @@ const TopBar = memo(() => {
         size="icon-touch"
         className="md:size-9"
         aria-label={String(t('back'))}
+        nativeButton={false}
         render={<Link to="/room-list" />}
       >
         <ChevronLeft />
@@ -393,12 +419,37 @@ const TopBar = memo(() => {
         </div>
         <div className="truncate text-xs text-muted-foreground">
           {os && browser
-            ? `${os.name} ${os.version} · ${browser.name} ${browser.version}`
+            ? `${os.name}${os.version ? ' ' + os.version : ''} · ${
+                browser.name
+              } ${browser.version}`
             : '\u00a0'}
         </div>
       </button>
 
       <ConnectStatus />
+
+      <Button
+        variant="ghost"
+        size="icon-touch"
+        className="md:size-9"
+        title={String(t('download'))}
+        aria-label={String(t('download'))}
+        onClick={() => {
+          void downloadAllLogs();
+        }}
+      >
+        <Download />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon-touch"
+        className="md:size-9"
+        title={String(t('clear-panel-logs'))}
+        aria-label={String(t('clear-panel-logs'))}
+        onClick={() => setClearConfirmOpen(true)}
+      >
+        <Trash2 />
+      </Button>
 
       <DropdownMenu>
         <DropdownMenuTrigger
@@ -465,9 +516,11 @@ const TopBar = memo(() => {
                   />
                   <div className="min-w-0 text-sm">
                     <div className="truncate font-medium">{os.name}</div>
-                    <div className="truncate text-xs text-muted-foreground">
-                      {os.version}
-                    </div>
+                    {os.version ? (
+                      <div className="truncate text-xs text-muted-foreground">
+                        {os.version}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               )}
@@ -492,7 +545,7 @@ const TopBar = memo(() => {
               <div className="text-xs font-medium text-muted-foreground">
                 {t('device-id')}
               </div>
-              <div className="break-all font-mono text-sm">{address}</div>
+              <div className="break-words font-mono text-sm">{address}</div>
             </div>
 
             {clientInfo && (

@@ -90,10 +90,6 @@
             lang: 'en',
           });
           PageSpyClientLogs.mountDialogActions();
-          new MutationObserver(PageSpyClientLogs.mountDialogActions).observe(document.documentElement, {
-            childList: true,
-            subtree: true,
-          });
           document.querySelector('#status').textContent = 'PageSpy SDK loaded. Check panel connection.';
           if (new URLSearchParams(location.search).get('autoload') === '1') {
             setTimeout(loadKycLogs, 600);

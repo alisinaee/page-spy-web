@@ -1,101 +1,104 @@
+import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { RefreshCw, Trash2 } from 'lucide-react';
 import type { SpyStorage } from '@huolala-tech/page-spy-types';
 import { Button } from '@/components/ui/button';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import { SectionLogActions } from '../SectionLogActions';
-import { useEffect, useState } from 'react';
 import { useSocketMessageStore } from '@/store/socket-message';
-import { RefreshCw } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
 import { StorageType, useStorageTypes } from '@/store/platform-config';
 import { DBTable } from '@/components/DBTable';
+import { StorageDetail } from '@/components/StorageTable';
+import { DetailPane, FilterChip, PanelToolbar } from '@/components/panel';
 import { StorageContent } from './StorageContent';
-import { ResizableDetail } from '@/components/ResizableDetail';
 import { useShallow } from 'zustand/react/shallow';
-import clsx from 'clsx';
 
 export const StoragePanel = () => {
   const { t } = useTranslation();
-  const refresh = useSocketMessageStore(useShallow((state) => state.refresh));
-
+  const [refresh, clearRecord] = useSocketMessageStore(
+    useShallow((state) => [state.refresh, state.clearRecord]),
+  );
   const storageTypes = useStorageTypes();
 
-  const [activeTab, setActiveTab] = useState<StorageType | 'indexedDB'>(() => {
-    if (storageTypes.length > 0) {
-      return storageTypes[0].name;
-    }
-    return 'localStorage';
-  });
+  const [activeTab, setActiveTab] = useState<StorageType | 'indexedDB'>(() =>
+    storageTypes.length > 0 ? storageTypes[0].name : 'localStorage',
+  );
+  const [selected, setSelected] = useState<SpyStorage.Data | null>(null);
 
   useEffect(() => {
     if (
       storageTypes.length > 0 &&
-      !storageTypes.some((t) => t.name === activeTab)
+      !storageTypes.some((s) => s.name === activeTab)
     ) {
       setActiveTab(storageTypes[0].name);
     }
   }, [storageTypes, activeTab]);
 
+  useEffect(() => setSelected(null), [activeTab]);
+
   return (
-    <div className="storage-panel relative flex flex-col h-full bg-background">
-      <div className="flex justify-end p-2 border-b border-border">
-        <div className="flex items-center gap-2">
-          <SectionLogActions section="storage" />
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  size="icon-touch"
-                  variant="outline"
-                  onClick={() => {
-                    refresh(activeTab);
-                  }}
-                  aria-label={t('common.refresh')!}
-                >
-                  <RefreshCw className="h-4 w-4" />
-                </Button>
-              }
+    <div className="flex h-full min-h-0 flex-col bg-background">
+      <PanelToolbar
+        actions={
+          <>
+            <Button
+              variant="ghost"
+              size="icon-touch"
+              aria-label={t('common.refresh')!}
+              className="md:size-8 md:min-h-0 md:min-w-0"
+              onClick={() => refresh(activeTab)}
+            >
+              <RefreshCw />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-touch"
+              aria-label={t('common.clear')!}
+              className="md:size-8 md:min-h-0 md:min-w-0"
+              onClick={() => {
+                clearRecord('storage');
+                setSelected(null);
+              }}
+            >
+              <Trash2 />
+            </Button>
+          </>
+        }
+      >
+        {storageTypes.map((st) => {
+          const Icon = st.icon;
+          return (
+            <FilterChip
+              key={st.name}
+              active={activeTab === st.name}
+              onClick={() => setActiveTab(st.name)}
+              icon={Icon && <Icon />}
+            >
+              {st.label}
+            </FilterChip>
+          );
+        })}
+      </PanelToolbar>
+      {activeTab === 'indexedDB' ? (
+        <div className="min-h-0 flex-1">
+          <DBTable />
+        </div>
+      ) : (
+        <div className="flex min-h-0 flex-1">
+          <div className="min-w-0 flex-1 overflow-auto">
+            <StorageContent
+              activeTab={activeTab}
+              selected={selected}
+              onSelect={setSelected}
             />
-            <TooltipContent>{t('common.refresh')}</TooltipContent>
-          </Tooltip>
-        </div>
-      </div>
-      <div className="storage-panel__layout flex flex-1 h-0 max-md:flex-col overflow-hidden bg-background">
-        <div className="storage-panel__sider w-44 shrink-0 border-r border-border p-2 space-y-1 overflow-y-auto bg-background max-md:flex max-md:w-full max-md:space-y-0 max-md:gap-1 max-md:overflow-x-auto max-md:overflow-y-hidden max-md:whitespace-nowrap max-md:border-r-0 max-md:border-b">
-          {storageTypes.map((st) => {
-            const IconComp = st.icon;
-            return (
-              <button
-                key={st.name}
-                type="button"
-                className={clsx(
-                  'w-full max-md:w-auto max-md:shrink-0 flex items-center gap-2 px-3 py-2 text-sm rounded-md text-left transition-colors cursor-pointer',
-                  activeTab === st.name
-                    ? 'bg-secondary text-foreground font-medium'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50',
-                )}
-                onClick={() => setActiveTab(st.name)}
-              >
-                {IconComp && <IconComp style={{ width: 16, height: 16 }} />}
-                <span className="truncate">{st.label}</span>
-              </button>
-            );
-          })}
-        </div>
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="storage-panel__content flex-1 overflow-auto bg-background [&_thead]:sticky [&_thead]:top-0 [&_thead]:z-10">
-            {activeTab === 'indexedDB' ? (
-              <DBTable />
-            ) : (
-              <StorageContent activeTab={activeTab} />
-            )}
           </div>
-          {activeTab !== 'indexedDB' && <ResizableDetail />}
+          <DetailPane
+            open={!!selected}
+            onClose={() => setSelected(null)}
+            title={selected?.name ?? ''}
+          >
+            {selected && <StorageDetail row={selected} />}
+          </DetailPane>
         </div>
-      </div>
+      )}
     </div>
   );
 };

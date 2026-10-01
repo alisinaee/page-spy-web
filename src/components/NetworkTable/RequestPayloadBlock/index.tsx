@@ -2,23 +2,25 @@ import { isString } from 'lodash-es';
 import { useMemo } from 'react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
-import { EntriesBody } from '@/components/EntriesBody';
 import { ColoredJson } from '../ColoredJson';
 import { LOST_REQUEST_BODIES } from '../body-codec';
-import React from 'react';
+import { DetailSection, KeyValueList } from '../DetailParts';
 
-export const RequestPayloadBlock: React.FC<{
+export const RequestPayloadBlock = ({
+  data,
+  urlencoded = false,
+}: {
   data: string | [string, string][];
   urlencoded?: boolean;
-}> = ({ data, urlencoded = false }) => {
+}) => {
   const content = useMemo(() => {
     if (isString(data)) {
       if (LOST_REQUEST_BODIES.has(data)) {
         return (
           <Alert className="border-warning/50 bg-warning/10 text-warning">
-            <AlertCircle className="h-4 w-4" />
+            <AlertCircle className="size-4" />
             <AlertTitle>Request body not captured</AlertTitle>
-            <AlertDescription className="text-xs text-muted-foreground mt-1">
+            <AlertDescription className="mt-1 text-xs text-muted-foreground">
               Client sent raw bytes. This session only stored a placeholder, so
               the POST body and cURL cannot include the real data. Reload the
               app after the debugger SDK update, then capture the call again.
@@ -26,22 +28,11 @@ export const RequestPayloadBlock: React.FC<{
           </Alert>
         );
       }
-      if (urlencoded) {
-        const params = new URLSearchParams(data);
-        return <EntriesBody data={[...params]} />;
-      }
+      if (urlencoded)
+        return <KeyValueList data={[...new URLSearchParams(data)]} />;
       return <ColoredJson value={data} />;
     }
-    return <EntriesBody data={data} />;
+    return <KeyValueList data={data} />;
   }, [data, urlencoded]);
-  return (
-    <div className="detail-block break-words border-b border-border px-3 py-1 text-[13px] last:border-b-0">
-      <b className="detail-block__label font-bold leading-loose text-foreground">
-        Request Payload
-      </b>
-      <div className="detail-block__content mb-5 whitespace-pre-wrap pl-3 text-muted-foreground">
-        {content}
-      </div>
-    </div>
-  );
+  return <DetailSection label="Request Payload">{content}</DetailSection>;
 };

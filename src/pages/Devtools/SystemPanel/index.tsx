@@ -1,14 +1,9 @@
 import { memo } from 'react';
 import { Button } from '@/components/ui/button';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import { SectionLogActions } from '../SectionLogActions';
+import { PanelEmpty, PanelToolbar } from '@/components/panel';
 import { useSocketMessageStore } from '@/store/socket-message';
 import SystemContent from '@/components/SystemContent';
-import { RefreshCw } from 'lucide-react';
+import { Cpu, RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -16,38 +11,33 @@ const SystemPanel = memo(() => {
   const [systemMsg, refresh] = useSocketMessageStore(
     useShallow((state) => [state.systemMsg, state.refresh]),
   );
-
   const { t } = useTranslation();
 
   return (
-    <div className="system-panel flex flex-col h-full">
-      <div className="flex justify-end p-2 border-b border-border">
-        <div className="flex items-center gap-2">
-          <SectionLogActions section="system" />
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  size="icon-touch"
-                  variant="outline"
-                  onClick={() => {
-                    refresh('system');
-                  }}
-                  aria-label={t('common.refresh')!}
-                >
-                  <RefreshCw className="h-4 w-4" />
-                </Button>
-              }
-            />
-            <TooltipContent>{t('common.refresh')}</TooltipContent>
-          </Tooltip>
-        </div>
-      </div>
-      <div className="flex-1 overflow-auto p-4">
+    <div className="flex h-full min-h-0 flex-col">
+      <PanelToolbar
+        actions={
+          <Button
+            variant="ghost"
+            size="icon-touch"
+            aria-label={t('common.refresh')!}
+            className="md:size-8 md:min-h-0 md:min-w-0"
+            onClick={() => refresh('system')}
+          >
+            <RefreshCw />
+          </Button>
+        }
+      >
+        <span className="px-1 text-sm font-medium">
+          {t('system.title', { defaultValue: 'System' })}
+        </span>
+      </PanelToolbar>
+      <div className="min-h-0 flex-1 overflow-auto">
         {systemMsg.length === 0 ? (
-          <div className="text-center text-muted-foreground py-12">
-            No system data
-          </div>
+          <PanelEmpty
+            icon={<Cpu />}
+            title={t('system.empty', { defaultValue: 'No system data' })}
+          />
         ) : (
           <SystemContent data={systemMsg} />
         )}

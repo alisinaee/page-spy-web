@@ -325,7 +325,7 @@ const RoomList = () => {
       type="button"
       variant="secondary"
       size="touch"
-      className="h-8 min-h-8 min-w-0 gap-1 px-3 text-xs md:h-6 md:min-h-6"
+      className="min-w-0 gap-1 px-3 text-xs md:h-6 md:min-h-6 md:px-2"
       aria-label={
         t('connections.remove-filter', {
           defaultValue: 'Remove filter {{name}}',

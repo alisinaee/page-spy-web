@@ -1,16 +1,26 @@
-/* eslint-disable no-case-declarations */
 import { memo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useTranslation } from 'react-i18next';
 import { useSocketMessageStore } from '@/store/socket-message';
 import { NetworkTable } from '@/components/NetworkTable';
-import { ONLINE_NETWORK_CACHE } from '@/components/ResizableTitle/cache-key';
-import { TypeFilter } from '@/components/NetworkTable/TypeFilter';
+import {
+  RESOURCE_TYPE,
+  TypeFilter,
+  type NetworkType,
+} from '@/components/NetworkTable/TypeFilter';
+import { PanelToolbar, SearchField } from '@/components/panel';
 import { SectionLogActions } from '../SectionLogActions';
-import { Input } from '@/components/ui/input';
+import { MoreVertical } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const NetworkPanel = memo(() => {
-  const { t: ct } = useTranslation('translation', { keyPrefix: 'common' });
+  const { t } = useTranslation();
 
   const [networkKeyword, setNetworkKeyword, networkType, setNetworkType] =
     useSocketMessageStore(
@@ -27,35 +37,53 @@ const NetworkPanel = memo(() => {
   );
 
   return (
-    <div className="network-panel flex flex-col h-full">
-      <div className="network-header-actions flex flex-wrap items-center justify-end gap-2 p-1.5 border-b border-border/40">
-        <div className="w-36 sm:w-48">
-          <Input
+    <div className="network-panel flex h-full min-h-0 flex-col">
+      <PanelToolbar
+        actions={<SectionLogActions section="network" />}
+        menu={
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              aria-label="Filters"
+              className="inline-flex size-11 items-center justify-center rounded-lg border border-border text-foreground"
+            >
+              <MoreVertical className="size-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-40">
+              <DropdownMenuItem
+                className="min-h-11"
+                onClick={() => setNetworkType('All')}
+              >
+                Select all
+              </DropdownMenuItem>
+              {[...RESOURCE_TYPE.keys()].map((key) => (
+                <DropdownMenuCheckboxItem
+                  key={key}
+                  className="min-h-11"
+                  checked={networkType === key}
+                  onCheckedChange={() => setNetworkType(key as NetworkType)}
+                >
+                  {key}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        }
+        search={
+          <SearchField
             value={networkKeyword}
-            onChange={(e) => {
-              setNetworkKeyword(e.target.value);
-            }}
-            placeholder={ct('filter')!}
-            className="h-7 text-xs"
+            onChange={setNetworkKeyword}
+            label={t('network.filter-url', { defaultValue: 'Filter by URL' })}
           />
-        </div>
-        <TypeFilter
-          value={networkType}
-          onChange={(type) => {
-            setNetworkType(type);
-          }}
-        />
-        <SectionLogActions section="network" />
-      </div>
-      <div className="network-panel__content relative flex-1 h-0 min-h-0 mt-2 overflow-auto border border-border">
-        <NetworkTable
-          data={networkMsg}
-          filterKeyword={networkKeyword}
-          filterType={networkType}
-          cookie={storageMsg.cookie}
-          resizeCacheKey={ONLINE_NETWORK_CACHE}
-        />
-      </div>
+        }
+      >
+        <TypeFilter value={networkType} onChange={setNetworkType} />
+      </PanelToolbar>
+      <NetworkTable
+        data={networkMsg}
+        filterKeyword={networkKeyword}
+        filterType={networkType}
+        cookie={storageMsg.cookie}
+      />
     </div>
   );
 });

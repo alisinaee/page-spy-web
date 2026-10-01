@@ -25,12 +25,18 @@ import { GroupedConsoleItem } from '../../index';
 
 interface Props {
   data: GroupedConsoleItem;
+  expanded: boolean;
+  onToggle: () => void;
   onHeightChange: (height: number) => void;
 }
 
-export const ConsoleItem = ({ data, onHeightChange }: Props) => {
+export const ConsoleItem = ({
+  data,
+  expanded,
+  onToggle,
+  onHeightChange,
+}: Props) => {
   const { t } = useTranslation();
-  const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const height = useRef(0);
@@ -60,18 +66,16 @@ export const ConsoleItem = ({ data, onHeightChange }: Props) => {
 
   const isClickable = Boolean(data.isGroup || isLongLog);
 
-  const toggleExpand = useCallback((e: React.MouseEvent) => {
-    const target = e.target as HTMLElement;
-    if (
-      target.closest('.rjv') ||
-      target.closest('a') ||
-      target.closest('button') ||
-      target.closest('.ant-btn')
-    ) {
-      return;
+  const toggleExpand = onToggle;
+
+  const [rowCopied, setRowCopied] = useState(false);
+  const onCopyRow = useCallback(() => {
+    const text = data.isGroup ? '' : rawText;
+    if (text && copy(text)) {
+      setRowCopied(true);
+      setTimeout(() => setRowCopied(false), 1500);
     }
-    setExpanded((prev) => !prev);
-  }, []);
+  }, [data.isGroup, rawText]);
 
   const groupFullText = useMemo(() => {
     if (!data.isGroup || !data.groupItems) return '';
@@ -105,16 +109,12 @@ export const ConsoleItem = ({ data, onHeightChange }: Props) => {
       .join('\n');
   }, [data]);
 
-  const onCopyGroup = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation();
-      if (groupFullText && copy(groupFullText)) {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
-      }
-    },
-    [groupFullText],
-  );
+  const onCopyGroup = useCallback(() => {
+    if (groupFullText && copy(groupFullText)) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }
+  }, [groupFullText]);
 
   const content = useMemo(() => {
     if (data.isGroup) {
@@ -123,14 +123,14 @@ export const ConsoleItem = ({ data, onHeightChange }: Props) => {
           <div className="console-group__row flex w-full min-w-0 flex-nowrap items-center gap-1.5">
             <Badge
               variant="secondary"
-              className="console-group__tag m-0 shrink-0 rounded px-1.5 text-[11px] font-semibold leading-[18px]"
+              className="console-group__tag m-0 shrink-0 rounded px-1.5 text-xs font-semibold"
             >
               GROUP ({data.groupItems?.length})
             </Badge>
             <span
               className={clsx(
                 'console-group__title console-group__title--' + data.logType,
-                'max-w-[calc(100vw-160px)] truncate font-semibold',
+                'min-w-0 truncate font-semibold',
                 {
                   'text-foreground':
                     data.logType !== 'error' && data.logType !== 'warn',
@@ -143,30 +143,6 @@ export const ConsoleItem = ({ data, onHeightChange }: Props) => {
               {data.groupTitle}
             </span>
           </div>
-
-          {expanded && (
-            <div className="console-group-details mt-2 max-h-[450px] w-full overflow-y-auto whitespace-pre-wrap break-all rounded-md border border-border bg-background px-3 py-2 font-mono text-xs leading-relaxed text-foreground">
-              <div className="console-group-details__bar mb-1.5 flex items-center justify-between border-b border-border pb-1">
-                <span className="console-group-details__count text-[11px] text-muted-foreground">
-                  {data.groupItems?.length} grouped lines
-                </span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="console-group-details__copy h-[22px] px-2 text-[11px] text-muted-foreground"
-                  onClick={onCopyGroup}
-                >
-                  {copied ? (
-                    <Check className="h-3 w-3 mr-1" />
-                  ) : (
-                    <Copy className="h-3 w-3 mr-1" />
-                  )}
-                  {copied ? 'Copied' : 'Copy'}
-                </Button>
-              </div>
-              {groupFullText}
-            </div>
-          )}
         </div>
       );
     }
@@ -198,14 +174,19 @@ export const ConsoleItem = ({ data, onHeightChange }: Props) => {
       }
       return <ConsoleNode data={log} key={log.id} />;
     });
-  }, [data, t, expanded, groupFullText, copied, onCopyGroup]);
+  }, [data, t]);
+
+  const toggleLabel = expanded
+    ? t('console.collapse', { defaultValue: 'Collapse' })
+    : t('console.expand', { defaultValue: 'Expand' });
 
   return (
     <div
       className={clsx(
-        'console-item flex min-h-[27px] whitespace-pre-wrap border-t border-border px-2 py-1 text-xs transition-colors first:border-t-0 last:border-b hover:bg-muted',
+        'console-item flex min-h-11 items-start gap-1 border-b border-border pr-1 pl-1 text-sm transition-colors hover:bg-muted/60 md:min-h-9 md:text-sm',
         data.logType,
         expanded ? 'expanded' : 'collapsed',
+        isClickable && 'cursor-pointer',
         {
           'text-primary-text': data.logType === 'debug',
           'bg-warning/10 text-warning': data.logType === 'warn',
@@ -213,44 +194,111 @@ export const ConsoleItem = ({ data, onHeightChange }: Props) => {
         },
       )}
       ref={ref}
-      onClick={isClickable ? toggleExpand : undefined}
-      style={{ cursor: isClickable ? 'pointer' : 'default' }}
+      role={isClickable ? 'button' : undefined}
+      tabIndex={isClickable ? 0 : undefined}
+      aria-expanded={isClickable ? expanded : undefined}
+      aria-label={isClickable ? toggleLabel : undefined}
+      onClick={
+        isClickable
+          ? (event) => {
+              const target = event.target as HTMLElement;
+              if (target.closest('button, a, input, textarea')) return;
+              toggleExpand();
+            }
+          : undefined
+      }
+      onKeyDown={
+        isClickable
+          ? (event) => {
+              const target = event.target as HTMLElement;
+              if (target.closest('button, a, input, textarea')) return;
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                toggleExpand();
+              }
+            }
+          : undefined
+      }
     >
-      <div className="console-item__title mt-0.5">
-        <LogType type={data.logType} />
-      </div>
-      <div className="console-item__content min-w-0 flex-1">
-        <div className="flex items-start gap-2 flex-nowrap w-full">
-          <div className="shrink-0 flex items-center gap-1">
-            {isClickable && (
-              <span className="console-item__toggle-icon inline-flex size-3.5 cursor-pointer select-none items-center justify-center text-muted-foreground">
-                {expanded ? (
-                  <ChevronDown className="h-3 w-3" />
-                ) : (
-                  <ChevronRight className="h-3 w-3" />
-                )}
-              </span>
-            )}
-            <Timestamp time={data.time} />
-          </div>
-          <div
-            className="flex-1 flex flex-wrap overflow-hidden"
-            style={{
-              maxHeight: expanded ? 'none' : '26px',
-              textOverflow: expanded ? 'initial' : 'ellipsis',
-              whiteSpace: expanded ? 'pre-wrap' : 'nowrap',
-            }}
-          >
-            {content}
-          </div>
+      {isClickable ? (
+        <div className="console-item__title mt-1.5 flex w-8 shrink-0 flex-col items-center justify-center gap-0.5 rounded-md text-muted-foreground">
+          <LogType type={data.logType} />
+          {expanded ? (
+            <ChevronDown className="size-3.5" />
+          ) : (
+            <ChevronRight className="size-3.5" />
+          )}
         </div>
+      ) : (
+        <div className="console-item__title mt-1.5 flex w-8 shrink-0 items-center justify-center">
+          <LogType type={data.logType} />
+        </div>
+      )}
+      <div className="console-item__content flex min-w-0 flex-1 flex-col justify-center py-1.5">
+        <div
+          className="flex min-w-0 flex-1 flex-wrap overflow-hidden"
+          style={{
+            maxHeight: expanded ? 'none' : '22px',
+            textOverflow: expanded ? 'initial' : 'ellipsis',
+            whiteSpace: expanded ? 'pre-wrap' : 'nowrap',
+          }}
+        >
+          {content}
+        </div>
+        <div className="mt-0.5 flex min-w-0 items-baseline gap-2 text-[11px] leading-4 text-muted-foreground">
+          <Timestamp time={data.time} />
+          <span className="min-w-0 truncate font-mono" title={data.url}>
+            {getLogUrl(data.url)}
+          </span>
+        </div>
+        {expanded && data.isGroup && (
+          <div className="console-group-details mt-2 max-h-[450px] w-full overflow-y-auto whitespace-pre-wrap wrap-break-word rounded-md border border-border bg-background px-3 py-2 font-mono text-xs leading-relaxed text-foreground md:text-sm">
+            <div className="console-group-details__bar mb-1.5 flex items-center justify-between border-b border-border pb-1">
+              <span className="console-group-details__count text-xs text-muted-foreground">
+                {t('console.grouped-lines', {
+                  count: data.groupItems?.length,
+                  defaultValue: '{{count}} grouped lines',
+                })}
+              </span>
+              <Button
+                size="icon-touch"
+                variant="ghost"
+                aria-label={
+                  copied
+                    ? t('common.copied')!
+                    : t('common.copy', { defaultValue: 'Copy' })!
+                }
+                className="console-group-details__copy text-muted-foreground md:size-8 md:min-h-0 md:min-w-0"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onCopyGroup();
+                }}
+              >
+                {copied ? <Check /> : <Copy />}
+              </Button>
+            </div>
+            {groupFullText}
+          </div>
+        )}
       </div>
-      <div
-        className="console-item__url hidden-xs max-w-[150px] overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground underline transition-colors hover:text-foreground max-[992px]:hidden"
-        title={data.url}
-      >
-        {getLogUrl(data.url)}
-      </div>
+      {!data.isGroup && rawText && (
+        <Button
+          variant="ghost"
+          size="icon-touch"
+          aria-label={
+            rowCopied
+              ? t('common.copied')!
+              : t('common.copy', { defaultValue: 'Copy' })!
+          }
+          onClick={(event) => {
+            event.stopPropagation();
+            onCopyRow();
+          }}
+          className="mt-1 shrink-0 self-start text-muted-foreground md:size-8 md:min-h-0 md:min-w-0"
+        >
+          {rowCopied ? <Check /> : <Copy />}
+        </Button>
+      )}
     </div>
   );
 };

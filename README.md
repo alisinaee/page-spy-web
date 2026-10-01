@@ -117,6 +117,42 @@ docker run -d --restart=always -v ./log:/app/log -v ./data:/app/data -p 6752:675
 
 When the container is running, open `http://localhost:6752` in your browser. After local testing, deploy the same setup to your server.
 
+## Run the runtime with Spy Tobank
+
+Do this in order. Do not skip the cache clear. The SDK and the on-device log script are cached for 24 hours, so a normal reload keeps the old float button and the old log buttons.
+
+1. Stop anything already listening on port 8080 and port 6753.
+2. Clear the in-IDE browser cache, then open the runtime with a new `?fresh=` query. Do this before judging the float button or the on-device log buttons.
+3. Start Spy Tobank, then start the App Studio web runtime pointed at it. Do not edit runtime Dart. The defines below are enough.
+
+Spy Tobank listens on port 6753. The binary and its config live in `/tmp/pagespy-run` (`config.json` has `"port": "6753"`). From that directory:
+
+```bash
+./pagespy
+```
+
+Confirm `http://127.0.0.1:6753/page-spy/index.min.js` returns 200 before starting the runtime. Rebuild the binary only when it is missing or the panel or SDK code changed.
+
+From `/Users/ali/Works/appstudio-runtime`:
+
+```bash
+flutter run -d web-server -t lib/main_runtime.dart --web-port=8080 \
+  --dart-define=ENABLE_WEB_DEBUGGER=true \
+  --dart-define=WEB_DEBUGGER_API=localhost:6753 \
+  --dart-define=SHOW_LOGS=true \
+  --dart-define=ENABLE_VPN_DETECTION=false \
+  --dart-define=ENABLE_SSL_PINNING=false \
+  --dart-define=ENABLE_ROOT_DETECTION=false
+```
+
+Runtime: `http://localhost:8080`. Panel: `http://localhost:6753`. Connected means a room for project `app_forge_client` and the float button at the bottom right. A build without `WEB_DEBUGGER_API` talks to production `appstudio.arshamnovin.ir/spy-web`.
+
+## Recordings
+
+Testers can upload what happened on a device without a live session: open the SDK float button, tap **Clear logs**, reproduce the bug, then tap the float button again and choose **Upload logs**. A note is required. The upload shows up on the **Recordings** page, where it opens as a read-only Console and Network timeline and can be downloaded.
+
+The API server deletes uploaded logs after `maxLogLifeTimeOfHour` hours. `yarn start:server` writes `168` (7 days) when that key is missing and leaves a value you already set. `config.json` stays out of git. On Docker, mount the file next to `/app/main` and set the same key there if the container does not run `yarn start:server`.
+
 ## Contributing
 
 See [Contributing](./CONTRIBUTING.md).

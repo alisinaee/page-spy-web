@@ -5,12 +5,19 @@ import { useForceThrottleRender } from '@/utils/useForceRender';
 import { ConsoleList } from '@/components/ConsoleList';
 import { VariableSizeList, ListOnScrollProps } from 'react-window';
 import { useShallow } from 'zustand/react/shallow';
+import { useTranslation } from 'react-i18next';
+import { Terminal } from 'lucide-react';
+import { PanelEmpty } from '@/components/panel';
+
+const MAX_VISIBLE = 2000;
 
 export const MainContent = memo(() => {
+  const { t } = useTranslation();
   const storeRef = useRef(useSocketMessageStore.getState());
   const consoleMessages = useRef(storeRef.current.consoleMsg);
   const consoleFilter = useRef(storeRef.current.consoleMsgTypeFilter);
   const consoleKeywordFilter = useRef(storeRef.current.consoleMsgKeywordFilter);
+  const consoleDisabledTags = useRef(storeRef.current.consoleDisabledTags);
   const { isUpdated, throttleRender } = useForceThrottleRender();
   useEffect(
     () =>
@@ -18,6 +25,7 @@ export const MainContent = memo(() => {
         consoleMessages.current = state.consoleMsg;
         consoleFilter.current = state.consoleMsgTypeFilter;
         consoleKeywordFilter.current = state.consoleMsgKeywordFilter;
+        consoleDisabledTags.current = state.consoleDisabledTags;
         throttleRender();
       }),
     [throttleRender],
@@ -28,61 +36,74 @@ export const MainContent = memo(() => {
   );
 
   const handleScroll = useCallback(
-    ({ scrollDirection }: ListOnScrollProps) => {
-      if (scrollDirection === 'backward' && isAutoScroll) {
-        setIsAutoScroll(false);
+    ({
+      scrollDirection,
+      scrollOffset,
+      scrollUpdateWasRequested,
+    }: ListOnScrollProps) => {
+      // Programmatic jumps, and the clamp after scrollToItem, are not the
+      // user reading. Only a real move away from the tail pauses follow.
+      if (
+        scrollUpdateWasRequested ||
+        !isAutoScroll ||
+        scrollDirection !== 'backward'
+      ) {
         return;
       }
+      const outer = (
+        consoleListRef.current as { _outerRef?: HTMLElement } | null
+      )?._outerRef;
+      const distance = outer
+        ? outer.scrollHeight - outer.clientHeight - scrollOffset
+        : 0;
+      if (distance <= 24) return;
+      setIsAutoScroll(false);
     },
     [isAutoScroll, setIsAutoScroll],
   );
 
-  const consoleDataList = useMemo(() => {
+  const filteredList = useMemo(() => {
     const data = consoleMessages.current;
     const logLevels = consoleFilter.current;
     const keyword = consoleKeywordFilter.current.trim();
-    if (!logLevels.length && !keyword) return data;
-
-    if (logLevels.length && keyword) {
-      return data.filter(
-        (item) =>
-          logLevels.includes(item.logType) &&
-          (item.logs || [])
-            .map((item) => item.value)
-            .join('')
-            .indexOf(keyword) !== -1,
-      );
-    }
-
-    if (logLevels.length) {
-      return data.filter((item) => logLevels.includes(item.logType));
-    }
-
-    return data.filter(
-      (item) =>
-        (item.logs || [])
-          .map((item) => item.value)
-          .join('')
-          .indexOf(keyword) !== -1,
-    );
+    const disabledTags = consoleDisabledTags.current;
+    const textOf = (item: (typeof data)[number]) =>
+      (item.logs || [])
+        .map((log) =>
+          typeof log.value === 'string'
+            ? log.value
+            : JSON.stringify(log.value ?? ''),
+        )
+        .join(' ');
+    return data.filter((item) => {
+      if (logLevels.length && !logLevels.includes(item.logType)) return false;
+      const text = textOf(item);
+      if (keyword && text.indexOf(keyword) === -1) return false;
+      if (disabledTags.length) {
+        const tags = text.match(/\[([A-Z0-9_]+)\]/g) || [];
+        if (
+          tags.length &&
+          tags.every((tag) => disabledTags.includes(tag.slice(1, -1)))
+        ) {
+          return false;
+        }
+      }
+      return true;
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isUpdated]);
 
+  // Low-end phones: only render the newest entries.
+  const isCapped = filteredList.length > MAX_VISIBLE;
+  const consoleDataList = useMemo(
+    () => (isCapped ? filteredList.slice(-MAX_VISIBLE) : filteredList),
+    [filteredList, isCapped],
+  );
+
   const consoleListRef = useRef<VariableSizeList>(null);
   useEffect(() => {
-    if (isAutoScroll) {
-      consoleListRef.current?.scrollToItem(consoleDataList.length - 1, 'end');
-      return;
-    }
-
-    const data = consoleMessages.current;
-    const logType = data[data.length - 1]?.logType || '';
-    const isDebug = ['debug-origin', 'debug-eval'].includes(logType);
-    const evalError =
-      data.length > 1 && data[data.length - 2].logType === 'debug-origin';
-    if (isDebug || evalError) {
-      consoleListRef.current?.scrollToItem(data.length - 1, 'end');
-    }
+    if (!isAutoScroll || consoleDataList.length === 0) return;
+    consoleListRef.current?.scrollToItem(consoleDataList.length - 1, 'end');
   }, [consoleDataList, isAutoScroll]);
 
   useEffect(() => {
@@ -101,12 +122,29 @@ export const MainContent = memo(() => {
   }, [consoleDataList]);
 
   return (
-    <div className="main-content flex-1 h-0 overflow-auto pt-2">
-      <ConsoleList
-        data={consoleDataList}
-        ref={consoleListRef}
-        onScroll={handleScroll}
-      />
+    <div className="main-content flex min-h-0 min-w-0 flex-1 flex-col">
+      {isCapped && (
+        <div className="shrink-0 border-b border-border px-3 py-1 text-center text-xs text-muted-foreground">
+          {t('console.showing-latest', {
+            count: MAX_VISIBLE,
+            defaultValue: 'Showing latest {{count}}',
+          })}
+        </div>
+      )}
+      <div className="min-h-0 flex-1">
+        {consoleDataList.length === 0 ? (
+          <PanelEmpty
+            icon={<Terminal />}
+            title={t('console.empty', { defaultValue: 'No logs yet' })}
+          />
+        ) : (
+          <ConsoleList
+            data={consoleDataList}
+            ref={consoleListRef}
+            onScroll={handleScroll}
+          />
+        )}
+      </div>
     </div>
   );
 });
