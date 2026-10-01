@@ -36,11 +36,20 @@ interface TokenCounter {
   truncated: boolean;
 }
 
+const TOKEN_CLASS: Record<string, string> = {
+  key: 'text-primary-text',
+  str: 'text-success',
+  num: 'text-info',
+  bool: 'text-warning',
+  nil: 'text-muted-foreground',
+  punct: 'text-foreground',
+};
+
 const token = (text: string, kind: string, counter: TokenCounter) => {
   counter.count += 1;
   counter.id += 1;
   return (
-    <span className={'j-' + kind} key={counter.id}>
+    <span className={`j-${kind} ${TOKEN_CLASS[kind] ?? ''}`} key={counter.id}>
       {text}
     </span>
   );
@@ -115,5 +124,9 @@ export const ColoredJson = ({ value }: { value: unknown }) => {
     return writeJson(deepen(value), 0, counter);
   }, [value]);
 
-  return <pre className="colored-json">{nodes}</pre>;
+  return (
+    <pre className="colored-json overflow-auto whitespace-pre-wrap break-words rounded-lg bg-muted p-3 font-mono text-xs leading-normal md:text-sm text-foreground">
+      {nodes}
+    </pre>
+  );
 };

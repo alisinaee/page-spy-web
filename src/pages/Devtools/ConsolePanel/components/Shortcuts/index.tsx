@@ -1,14 +1,17 @@
-import { usePopupRef, withPopup } from '@/utils/withPopup';
-import KeyboardSvg from '@/assets/image/keyboard.svg?react';
-import Icon from '@ant-design/icons';
-import { Col, Modal, Row, Space } from 'antd';
 import { Fragment, memo, useMemo } from 'react';
-import './index.less';
 import { useTranslation } from 'react-i18next';
+import { Keyboard } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
-const ShortcutsModal = withPopup(({ resolve, visible }) => {
+export const Shortcuts = memo(() => {
   const { t } = useTranslation('translation', { keyPrefix: 'shortcuts' });
-
   const shortcuts: {
     keys: string[];
     description: string;
@@ -47,55 +50,52 @@ const ShortcutsModal = withPopup(({ resolve, visible }) => {
   }, [t]);
 
   return (
-    <Modal open={visible} title={t('title')} onCancel={resolve} onOk={resolve}>
-      {shortcuts.map(({ keys, relation = 'intersection', description }) => {
-        const relationSymbol = relation === 'union' ? 'or' : '+';
-        const keySize = keys.length;
-        return (
-          <Row
-            align="middle"
-            key={keys.join('')}
-            gutter={20}
-            wrap={false}
-            className="shortcuts-item"
-          >
-            <Col className="shortcuts-item__desc">
-              <span>{description}</span>
-            </Col>
-            <Col>
-              <Space>
-                {keys.map((k, index) => {
-                  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="icon-touch"
+            aria-label={t('title')!}
+            className="md:size-8 md:min-h-0 md:min-w-0"
+          />
+        }
+      >
+        <Keyboard />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" side="top" className="w-72">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>{t('title')}</DropdownMenuLabel>
+          {shortcuts.map(({ keys, relation = 'intersection', description }) => {
+            const relationSymbol = relation === 'union' ? 'or' : '+';
+            const keySize = keys.length;
+            return (
+              <div
+                key={keys.join('')}
+                className="flex min-h-11 items-center justify-between gap-3 border-b border-border px-1.5 last:border-0 md:min-h-9"
+              >
+                <span className="text-sm text-muted-foreground">
+                  {description}
+                </span>
+                <div className="flex shrink-0 items-center gap-1">
+                  {keys.map((k, index) => (
                     <Fragment key={k}>
-                      <div className="keyboard-button">{k}</div>
-                      {keySize > 1 && index !== keySize - 1 && relationSymbol}
+                      <kbd className="rounded border border-border bg-muted px-2 py-0.5 font-mono text-xs text-foreground">
+                        {k}
+                      </kbd>
+                      {keySize > 1 && index !== keySize - 1 && (
+                        <span className="text-xs text-muted-foreground">
+                          {relationSymbol}
+                        </span>
+                      )}
                     </Fragment>
-                  );
-                })}
-              </Space>
-            </Col>
-          </Row>
-        );
-      })}
-    </Modal>
-  );
-});
-
-export const Shortcuts = memo(() => {
-  const { t } = useTranslation('translation', { keyPrefix: 'shortcuts' });
-  const modalRef = usePopupRef();
-
-  return (
-    <div className="console-keyboard-shortcuts">
-      <Icon
-        title={t('title')!}
-        component={KeyboardSvg}
-        style={{ fontSize: 24, color: '#666' }}
-        onClick={() => {
-          modalRef.current?.popup();
-        }}
-      />
-      <ShortcutsModal ref={modalRef} />
-    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 });

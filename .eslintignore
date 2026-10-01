@@ -1,3 +1,8 @@
 .eslintrc.js
 *.config.[j|t]s
 index.html
+node_modules/
+dist/
+build/
+coverage/
+*.min.js

@@ -1,65 +1,66 @@
-import { Col, Flex, Layout, Row } from 'antd';
-import { Outlet } from 'react-router-dom';
-import './index.less';
-import { Suspense, useEffect } from 'react';
+import { Link, Outlet, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import { Suspense } from 'react';
 import { LoadingFallback } from '@/components/LoadingFallback';
-import { NavMenuOnPc, NavMenuOnMobile } from './NavMenu';
-import { isDoc } from '@/utils/constants';
 import { Logo } from './Logo';
-import { useWhere } from '@/utils/useWhere';
 import { useTitle } from 'ahooks';
-import { useDarkTheme } from '@/utils/useDarkTheme';
-import { OpenDocSearch } from '@/components/DocSearch/OpenDocSearch';
 import { BRAND_NAME } from '@/utils/brand';
-const { Header, Content } = Layout;
 
 export const Layouts = () => {
-  const isDark = useDarkTheme();
-  useEffect(() => {
-    if (isDark) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [isDark]);
-
-  const { isOSpy } = useWhere();
-  useTitle(isOSpy ? 'O-Spy' : BRAND_NAME);
+  useTitle(BRAND_NAME);
+  const { pathname } = useLocation();
+  const { t } = useTranslation();
+  const isDevtools = pathname.includes('/devtools');
 
   return (
-    <Layout className="layouts">
-      <Header>
-        <Row justify="space-between" align="middle" className="header">
-          <Col className="header-left">
-            <Flex gap={20} align="center">
-              <Logo />
-              <OpenDocSearch />
-              {isDoc && (
-                <a
-                  href="https://trendshift.io/repositories/5407"
-                  target="_blank"
-                  className="third-brand"
+    <div className="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
+      {!isDevtools && (
+        <header className="flex h-12 shrink-0 items-center border-b border-border bg-background px-4">
+          <Logo />
+          <nav
+            aria-label={t('nav.label', { defaultValue: 'Main' })!}
+            className="ml-3 flex items-center gap-1"
+          >
+            {[
+              {
+                to: '/room-list',
+                label: t('nav.devices', { defaultValue: 'Devices' }),
+              },
+              {
+                to: '/recordings',
+                label: t('nav.recordings', { defaultValue: 'Recordings' }),
+              },
+            ].map((item) => {
+              const active = pathname.startsWith(item.to);
+              return (
+                <Button
+                  key={item.to}
+                  variant="ghost"
+                  size="touch"
+                  nativeButton={false}
+                  render={<Link to={item.to} />}
+                  aria-current={active ? 'page' : undefined}
+                  className={cn(
+                    'px-3 text-sm md:h-8 md:min-h-0',
+                    active
+                      ? 'bg-muted text-foreground'
+                      : 'text-muted-foreground',
+                  )}
                 >
-                  <img
-                    src="https://trendshift.io/api/badge/repositories/5407"
-                    alt="HuolalaTech/page-spy-web | Trendshift"
-                    style={{ height: 36 }}
-                  />
-                </a>
-              )}
-            </Flex>
-          </Col>
-          <Col className="header-right">
-            <NavMenuOnPc />
-            <NavMenuOnMobile />
-          </Col>
-        </Row>
-      </Header>
-      <Content>
+                  {item.label}
+                </Button>
+              );
+            })}
+          </nav>
+        </header>
+      )}
+      <main className="flex min-h-0 flex-1 flex-col">
         <Suspense fallback={<LoadingFallback />}>
           <Outlet />
         </Suspense>
-      </Content>
-    </Layout>
+      </main>
+    </div>
   );
 };

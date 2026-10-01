@@ -8,6 +8,20 @@ const DEVICE_LOGGER_OPEN_BROKEN = 'var openDeviceLogs=function(){try{if(window.P
 
 
 const DEVICE_DIALOG_EXTRAS = [
+  'var _btnMaster=document.createElement("label");',
+  '_btnMaster.id="page-spy-logs-toggle";',
+  '_btnMaster.className="page-spy-btn";',
+  '_btnMaster.innerHTML=\'<span>Logs</span><input type="checkbox" role="switch" aria-label="Logs" checked>\';',
+  '_btnMaster.onclick=function(e){e.stopPropagation()};',
+  '_btnMaster.querySelector("input").onchange=function(){var input=this;var apply=function(){if(window.PageSpyClientLogs&&window.PageSpyClientLogs.saveSettings)window.PageSpyClientLogs.saveSettings({masterLogs:input.checked})};if(window.PageSpyClientLogs&&window.PageSpyClientLogs.saveSettings){apply()}else if(typeof window.__pageSpyLoadDeviceLogs==="function"){window.__pageSpyLoadDeviceLogs().then(apply)}};',
+  'var _btnSettings=document.createElement("button");',
+  '_btnSettings.type="button";',
+  '_btnSettings.id="page-spy-log-settings";',
+  '_btnSettings.className="page-spy-btn";',
+  '_btnSettings.innerHTML=\'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/></svg><span>Settings</span>\';',
+  '_btnSettings.onclick=function(e){e.preventDefault();e.stopPropagation();var apply=function(){if(window.PageSpyClientLogs&&window.PageSpyClientLogs.openSettings)window.PageSpyClientLogs.openSettings()};if(window.PageSpyClientLogs&&window.PageSpyClientLogs.openSettings){apply()}else if(typeof window.__pageSpyLoadDeviceLogs==="function"){window.__pageSpyLoadDeviceLogs().then(apply)}else{Toast.message("On-device log viewer is not on this page")}};',
+].join('');
+const DEVICE_DIALOG_EXTRAS_OLD = [
   'var _btnMaster=document.createElement("button");',
   '_btnMaster.type="button";',
   '_btnMaster.id="page-spy-logs-toggle";',
@@ -32,6 +46,61 @@ function publishDeviceLogger(sdkFilePath) {
     fs.copyFileSync(path.join(root, 'smoke-test', name), path.join(destDir, name));
   }
   console.log(`published device logger to ${destDir}`);
+}
+
+
+// Spy Tobank tokens for the SDK's own UI. client-logs.js defines --spyt-* on
+// :root; the hex fallbacks keep the SDK usable before that file has loaded.
+const SPYT = {
+  bg: '#0b0d12',
+  card: '#12151c',
+  popover: '#181c25',
+  muted: '#1f2430',
+  border: '#5c6b86',
+  input: '#5c6b86',
+  fg: '#e7e9ee',
+  'muted-fg': '#9aa3b2',
+  primary: '#e10613',
+  'primary-fg': '#ffffff',
+  'primary-text': '#ff8a8a',
+  destructive: '#f87171',
+};
+const t = (name) => `var(--spyt-${name},${SPYT[name]})`;
+
+function buildSdkCss() {
+  return [
+    // theme variables the SDK's own stylesheet reads
+    `#__pageSpy{--primary-color:${t('primary')}!important;--text-primary:${t('fg')};--text-secondary:${t('muted-fg')};--text-placeholder:${t('muted-fg')};--divider-color:${t('border')};--border-color:${t('border')};--disabled-color:${t('muted')};--font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--dark-shadow:none}`,
+    // float button
+    `#__pageSpy .page-spy-logo{width:48px;height:48px;border-radius:50%;background-color:${t('primary')};border:1px solid ${t('primary')};box-shadow:none;left:auto;top:auto;right:16px;bottom:calc(16px + env(safe-area-inset-bottom))}`,
+    `#__pageSpy .page-spy-logo.inactive{background-color:${t('muted')};border-color:${t('border')};filter:none}`,
+    `#__pageSpy .page-spy-logo::after{background-color:${t('primary')}}`,
+    `#__pageSpy .page-spy-logo img{width:28px;filter:brightness(0) invert(1)}`,
+    `#__pageSpy .page-spy-logo.page-spy-idle{opacity:.5;transform:translate(var(--page-spy-idle-x,0),var(--page-spy-idle-y,0))}`,
+    // modal surface
+    `#__pageSpy .page-spy-modal{background-color:rgba(0,0,0,.6)!important;animation:none!important;pointer-events:none!important}`,
+    `#__pageSpy .page-spy-modal-content{pointer-events:auto;max-height:calc(100dvh - 32px);overflow:auto;background:${t('popover')};color:${t('fg')};border:1px solid ${t('border')};border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.4)}`,
+    `#__pageSpy .page-spy-modal-header{background:${t('popover')}!important;color:${t('fg')}!important;border-bottom:1px solid ${t('border')}}`,
+    `#__pageSpy .page-spy-modal-header svg,#__pageSpy .page-spy-modal-header img{filter:none}`,
+    `#__pageSpy .page-spy-modal-main{background:${t('popover')}!important;color:${t('fg')}}`,
+    `#__pageSpy .page-spy-modal-main b{color:${t('fg')}}`,
+    `#__pageSpy .page-spy-modal-main span{color:${t('muted-fg')}}`,
+    // footer + buttons
+    `#__pageSpy .page-spy-modal-footer{display:flex!important;flex-direction:column!important;gap:8px!important;width:100%!important;padding:12px 16px max(16px,env(safe-area-inset-bottom))!important;box-sizing:border-box!important;background:${t('popover')}!important;border-top:1px solid ${t('border')}!important}`,
+    `#__pageSpy .page-spy-modal-footer button,#__pageSpy .page-spy-modal-footer #page-spy-logs-toggle{width:100%!important;min-height:40px;margin:0!important;display:flex!important;align-items:center;justify-content:center;gap:8px;padding:0 12px!important;border:1px solid ${t('border')}!important;border-radius:8px!important;background:transparent!important;color:${t('fg')}!important;box-shadow:none!important;font:13px/1 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif!important;letter-spacing:0;cursor:pointer}`,
+    `#__pageSpy .page-spy-modal-footer #page-spy-logs-toggle{justify-content:space-between!important}`,
+    `#__pageSpy .page-spy-modal-footer #page-spy-logs-toggle input{appearance:none;width:40px;height:24px;margin:0;border:0;border-radius:999px;background:#3a4150;position:relative;cursor:pointer;flex:none}`,
+    `#__pageSpy .page-spy-modal-footer #page-spy-logs-toggle input::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff}`,
+    `#__pageSpy .page-spy-modal-footer #page-spy-logs-toggle input:checked{background:${t('primary')}}`,
+    `#__pageSpy .page-spy-modal-footer #page-spy-logs-toggle input:checked::after{transform:translateX(16px)}`,
+    `#__pageSpy .page-spy-modal-footer button svg,#__pageSpy .page-spy-modal-footer button img{display:block!important;flex:none;width:16px;height:16px}`,
+    `#__pageSpy .page-spy-modal-footer #page-spy-copy-link{background:${t('primary')}!important;color:${t('primary-fg')}!important;border-color:${t('primary')}!important}`,
+    `#__pageSpy .page-spy-modal-footer #page-spy-clear-logs{color:${t('destructive')}!important}`,
+    `#__pageSpy .page-spy-modal-footer button:disabled{opacity:.5;cursor:not-allowed}`,
+    `#__pageSpy .page-spy-modal-footer button:focus-visible{outline:2px solid ${t('primary-text')};outline-offset:2px}`,
+    // toast
+    `#__pageSpy .page-spy-toast{background:${t('card')}!important;color:${t('fg')}!important;border:1px solid ${t('border')};border-radius:8px;box-shadow:none;min-height:44px;font-size:14px}`,
+  ].join('');
 }
 
 
@@ -282,11 +351,10 @@ function patchSdk(filePath) {
     '_btnClear.type="button";',
     '_btnClear.id="page-spy-clear-logs";',
     '_btnClear.className="page-spy-btn";',
-    '_btnClear.style.color="#b42318";',
     '_btnClear.innerHTML=\'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V5h6v2"/><path d="M7 7l1 13h8l1-13"/></svg><span>Clear logs</span>\';',
     '_btnClear.onclick=function(e){e.preventDefault();e.stopPropagation();if(window.PageSpyClientLogs&&window.PageSpyClientLogs.clear){window.PageSpyClientLogs.clear()}var cleared=false;var plugins=this.plugins||[];for(var pi=0;pi<plugins.length;pi++){var p=plugins[pi];if(p&&p.name==="DataHarborPlugin"&&typeof p.clearAndNotify==="function"){p.clearAndNotify();cleared=true}}if(!cleared&&typeof socketStore!=="undefined"&&socketStore.dispatchEvent){socketStore.dispatchEvent("harbor-clear",null)}console.clear();modal.close();Toast.message("Logs cleared")}.bind(this);',
     'var _st=document.createElement("style");',
-    '_st.textContent="#page-spy-copy-link,#page-spy-download-logs,#page-spy-see-logs,#page-spy-clear-logs{width:100%!important;min-height:42px;margin:0!important;display:flex!important;align-items:center;justify-content:center;gap:8px;padding:0 12px!important;border:1px solid #e6e8f0!important;border-radius:10px!important;background:#fff!important;color:#1f2430!important;box-shadow:none!important;font:14px/1 system-ui,sans-serif!important;cursor:pointer}#page-spy-clear-logs{color:#b42318!important}.page-spy-modal-footer{display:flex!important;flex-direction:column!important;gap:8px!important;width:100%!important;padding:4px 16px 16px!important;box-sizing:border-box!important}";',
+    '_st.textContent="";',
     'h.appendChild(_st);',
     'modal.build({logo:l.logo||img$2,title:l.title||"PageSpy",content:y,footer:[m,_btnDl,_btnView,_btnClear],mounted:h});window.PageSpyModal=modal;PageSpy.modal=modal;if(typeof f!=="undefined"&&f)f.onclick=function(){modal.show()};',
     '})()',
@@ -321,6 +389,9 @@ function patchSdk(filePath) {
   if (!next.includes("window.PageSpy=PageSpy")) {
     next += pageSpyExport;
   }
+  if (next.includes(DEVICE_DIALOG_EXTRAS_OLD)) {
+    next = next.replace(DEVICE_DIALOG_EXTRAS_OLD, DEVICE_DIALOG_EXTRAS);
+  }
   if (!next.includes('page-spy-logs-toggle')) {
     const clearStart = 'var _btnClear=document.createElement("button");';
     if (!next.includes(clearStart)) {
@@ -341,6 +412,76 @@ function patchSdk(filePath) {
       '(()=>{var _btnDl=document.createElement("button");',
       '(()=>{' + DEVICE_LOGGER_LOAD + ';var _btnDl=document.createElement("button");',
     );
+  }
+  // Capture from SDK render (app init). The loader used to wait until See logs.
+  const EARLY_CAPTURE =
+    'if(!window.__pageSpyEarlyCapture){window.__pageSpyEarlyCapture=1;window.__pageSpyEarlyLogs=[];["debug","info","log","warn","error"].forEach(function(level){var current=console[level];if(!current||current.__pageSpyEarly)return;var original=current.bind(console);var wrapped=function(){try{window.__pageSpyEarlyLogs.push({level:level,args:Array.prototype.slice.call(arguments),time:Date.now()})}catch(err){}return original.apply(console,arguments)};wrapped.__pageSpyEarly=1;wrapped.__pageSpyOriginal=original;console[level]=wrapped});}';
+  const LOADER_READY = 'return window.__pageSpyDeviceLoggerPromise}};';
+  const LOADER_BOOT = LOADER_READY + EARLY_CAPTURE + 'window.__pageSpyLoadDeviceLogs();';
+  if (next.includes(LOADER_READY) && !next.includes('window.__pageSpyEarlyCapture=1')) {
+    next = next.replace(LOADER_READY, LOADER_BOOT);
+  }
+
+  // 7. Spy Tobank styling for the SDK modal, float button and footer buttons.
+  // Always rewritten so older patched files pick up the current tokens.
+  next = next.replace('_btnClear.style.color="#b42318";', '');
+  const styleStart = next.indexOf('_st.textContent=');
+  const styleEnd = styleStart < 0 ? -1 : next.indexOf(';h.appendChild(_st);', styleStart);
+  if (styleStart < 0 || styleEnd < 0) {
+    throw new Error(`SDK style injection anchor not found in ${filePath}`);
+  }
+  next =
+    next.slice(0, styleStart) +
+    '_st.textContent=' +
+    JSON.stringify(buildSdkCss()) +
+    next.slice(styleEnd);
+
+  // 8. Forward every "public-data" message to the on-device logger so testers
+  // can upload what happened since they last cleared. The DataHarbor plugin is
+  // not loaded in the app_studio runtime, so the SDK itself is the only source.
+  const PUBLIC_DATA_ANCHOR = 'dispatchEvent(e,t){var r;["public-data"].includes(e)?';
+  const PUBLIC_DATA_FORWARD =
+    'dispatchEvent(e,t){var r;if("public-data"===e)try{window.PageSpyClientLogs&&window.PageSpyClientLogs.onPublicData&&window.PageSpyClientLogs.onPublicData(t)}catch(_e){}["public-data"].includes(e)?';
+  if (!next.includes(PUBLIC_DATA_FORWARD)) {
+    if (!next.includes(PUBLIC_DATA_ANCHOR)) {
+      throw new Error(`socketStore.dispatchEvent anchor not found in ${filePath}`);
+    }
+    next = next.replace(PUBLIC_DATA_ANCHOR, PUBLIC_DATA_FORWARD);
+  }
+
+  const MODAL_SHOW = 'eventBus.dispatchEvent(new Event("modal:show"))';
+  const MODAL_SHOW_WINDOW =
+    'eventBus.dispatchEvent(new Event("modal:show")),window.dispatchEvent(new Event("modal:show"))';
+  if (!next.includes(MODAL_SHOW_WINDOW)) {
+    if (!next.includes(MODAL_SHOW)) {
+      throw new Error(`modal:show anchor not found in ${filePath}`);
+    }
+    next = next.replace(MODAL_SHOW, MODAL_SHOW_WINDOW);
+  }
+
+  // Float button starts at the Material end/bottom corner (16px + safe area).
+  // A saved drag point is ignored so a resized window cannot park it off screen.
+  // The edge-dock hide is disabled so the button cannot slide out of view.
+  const LOGO_RESTORE =
+    'const t=localStorage.getItem(POSITION_CACHE_ID);if(t){const[r,n]=t.split(",");+r<window.innerWidth&&+n<window.innerHeight&&(e.style.left="".concat(r,"px"),e.style.top="".concat(n,"px"))}';
+  const LOGO_DEFAULT =
+    'try{localStorage.removeItem(POSITION_CACHE_ID)}catch(err){}e.style.left="auto",e.style.top="auto",e.style.right="16px",e.style.bottom="calc(16px + env(safe-area-inset-bottom))",e.disableHidden=!0,window.addEventListener("resize",(function(){var box=e.getBoundingClientRect();if(box.width&&(box.left<0||box.top<0||box.right>window.innerWidth||box.bottom>window.innerHeight)){e.style.left="auto",e.style.top="auto",e.style.right="16px",e.style.bottom="calc(16px + env(safe-area-inset-bottom))"}}));';
+  if (!next.includes('e.style.bottom="calc(16px + env(safe-area-inset-bottom))"')) {
+    if (!next.includes(LOGO_RESTORE)) {
+      throw new Error(`float button position anchor not found in ${filePath}`);
+    }
+    next = next.replace(LOGO_RESTORE, LOGO_DEFAULT);
+  }
+  const LOGO_HIDE = 'e.disableHidden||(t<=0?e.classList.add("hidden-in-left")';
+  const LOGO_HIDE_OFF = '1||(t<=0?e.classList.add("hidden-in-left")';
+  if (next.includes(LOGO_HIDE)) {
+    next = next.replace(LOGO_HIDE, LOGO_HIDE_OFF);
+  }
+  // Idle: tuck halfway off the nearest edge at 50% opacity until the user touches it.
+  const IDLE_MARK = 'e.__pageSpyIdle=1';
+  const IDLE_BOOT = '(function(){if(e.__pageSpyIdle)return;e.__pageSpyIdle=1;var idleTimer=null,pointerDown=0;var dock=function(){if(pointerDown)return;var box=e.getBoundingClientRect();if(!box.width)return;var half=box.width/2;var dLeft=box.left,dRight=window.innerWidth-box.right,dTop=box.top,dBottom=window.innerHeight-box.bottom;var x=0,y=0;if(Math.min(dLeft,dRight)<=Math.min(dTop,dBottom)){x=dLeft<=dRight?-(dLeft+half):(dRight+half)}else{y=dTop<=dBottom?-(dTop+half):(dBottom+half)}e.style.setProperty("--page-spy-idle-x",x+"px");e.style.setProperty("--page-spy-idle-y",y+"px");e.classList.add("page-spy-idle")};var arm=function(){clearTimeout(idleTimer);idleTimer=setTimeout(dock,1600)};var wake=function(){e.classList.remove("page-spy-idle");arm()};e.addEventListener("pointerenter",wake);e.addEventListener("pointerdown",function(){pointerDown=1;wake()});e.addEventListener("pointerup",function(){pointerDown=0;arm()});e.addEventListener("pointercancel",function(){pointerDown=0;arm()});e.addEventListener("pointerleave",function(){if(!pointerDown)arm()});arm()})()';
+  if (next.includes('e.disableHidden=!0') && !next.includes(IDLE_MARK)) {
+    next = next.replace('e.disableHidden=!0', 'e.disableHidden=!0,' + IDLE_BOOT, 1);
   }
 
   if (next !== source) {

@@ -1,10 +1,14 @@
+import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+import { cn } from '@/lib/utils';
+import { formatTehranDateTime } from '@/utils/tehran';
+import { ArrowDownToLine, Download, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import {
-  ClearOutlined,
-  DownloadOutlined,
-  VerticalAlignBottomOutlined,
-} from '@ant-design/icons';
-import { Tooltip } from 'antd';
-import { Button, Space } from 'antd';
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from '@/components/ui/tooltip';
 import { useSocketMessageStore } from '@/store/socket-message';
 import useSearch from '@/utils/useSearch';
 import {
@@ -40,7 +44,7 @@ const downloadSection = async (section: SectionName, deviceId: string) => {
     [
       JSON.stringify(
         {
-          exportedAt: new Date().toISOString(),
+          exportedAt: formatTehranDateTime(new Date()),
           deviceId,
           clientInfo: normalizeForExport(state.clientInfo),
           section,
@@ -98,33 +102,65 @@ const scrollToSectionEnd = (section: SectionName) => {
   }
 };
 
+const ActionButton = ({
+  label,
+  onClick,
+  children,
+  className,
+}: {
+  label: string;
+  onClick: () => void;
+  children: ReactNode;
+  className?: string;
+}) => (
+  <Tooltip>
+    <TooltipTrigger
+      render={
+        <Button
+          variant="ghost"
+          size="icon-touch"
+          aria-label={label}
+          onClick={onClick}
+          className={cn('md:size-8 md:min-h-0 md:min-w-0', className)}
+        />
+      }
+    >
+      {children}
+    </TooltipTrigger>
+    <TooltipContent>{label}</TooltipContent>
+  </Tooltip>
+);
+
 export const SectionLogActions = ({ section }: { section: SectionName }) => {
+  const { t } = useTranslation();
   const clearRecord = useSocketMessageStore((state) => state.clearRecord);
   const { address = '' } = useSearch();
 
   return (
-    <Space size={8}>
-      <Tooltip title="Scroll to bottom">
-        <Button
-          size="small"
-          icon={<VerticalAlignBottomOutlined />}
+    <>
+      {section !== 'console' && (
+        <ActionButton
+          label={t('common.scroll-bottom', {
+            defaultValue: 'Scroll to bottom',
+          })}
           onClick={() => scrollToSectionEnd(section)}
-        />
-      </Tooltip>
-      <Button
-        size="small"
-        icon={<DownloadOutlined />}
+        >
+          <ArrowDownToLine />
+        </ActionButton>
+      )}
+      <ActionButton
+        label={t('common.download', { defaultValue: 'Download' })}
         onClick={() => downloadSection(section, address)}
       >
-        Download
-      </Button>
-      <Button
-        size="small"
-        icon={<ClearOutlined />}
+        <Download />
+      </ActionButton>
+      <ActionButton
+        label={t('common.clear')}
         onClick={() => clearRecord(section)}
+        className="hover:text-destructive"
       >
-        Clear
-      </Button>
-    </Space>
+        <Trash2 />
+      </ActionButton>
+    </>
   );
 };

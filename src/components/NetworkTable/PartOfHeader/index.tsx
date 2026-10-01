@@ -1,8 +1,8 @@
-import { InfoCircleFilled } from '@ant-design/icons';
-import { Tooltip } from 'antd';
+import { AlertCircle } from 'lucide-react';
 
 export const PartOfHeader = () => (
-  <Tooltip title="CAUTION: just part of headers are shown.">
-    <InfoCircleFilled style={{ color: '#E9994B' }} />
-  </Tooltip>
+  <span className="inline-flex items-center gap-1 font-normal text-warning">
+    <AlertCircle className="size-3.5" />
+    Only some headers are shown
+  </span>
 );

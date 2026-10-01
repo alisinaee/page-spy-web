@@ -1,7 +1,6 @@
 import React, { memo } from 'react';
-import { CaretRightOutlined } from '@ant-design/icons';
+import { ChevronRight } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import './index.less';
 import type { ElementContent, Element } from 'hast';
 import { camelCaseToKebabCase, replaceProperties } from './utils';
 import { useSocketMessageStore } from '@/store/socket-message';
@@ -10,6 +9,7 @@ import sh from '@/utils/shiki-highlighter';
 import type { Lang } from 'shiki';
 import { isArray } from 'lodash-es';
 import { useShallow } from 'zustand/react/shallow';
+
 const tag2lang = {
   style: 'css',
   script: 'javascript',
@@ -37,13 +37,13 @@ const ElementAttrs: React.FC<{ data?: Record<string, any> }> = ({
     return Object.entries(data).map(([key, val]) => {
       const prop = camelCaseToKebabCase(replaceProperties(key));
       return (
-        <span className="attrs-item" key={key}>
+        <span className="attrs-item text-muted-foreground" key={key}>
           {' '}
-          <span className="attrs-item__name">{prop}</span>
+          <span className="attrs-item__name text-warning">{prop}</span>
           {!!val && (
             <>
               =&quot;
-              <span className="attrs-item__value">
+              <span className="attrs-item__value text-info">
                 {isArray(val) ? val.join(' ') : val}
               </span>
               &quot;
@@ -78,11 +78,11 @@ function ElementItem({
     }
     const highlighter = await sh.get({
       lang: lang as Lang,
-      theme: 'github-light',
+      theme: 'github-dark',
     });
     const result = highlighter.codeToHtml(content, {
       lang,
-      theme: 'github-light',
+      theme: 'github-dark',
     });
     setTextContent(result);
   }, [ast]);
@@ -91,22 +91,29 @@ function ElementItem({
     const { tagName, properties, children } = ast as Element;
 
     return (
-      <code className="element-item">
-        <div className="element-controller">
+      <code className="element-item flex items-start justify-start">
+        <div className="element-controller size-11 shrink-0 md:size-5">
           {children.length > 0 && (
-            <CaretRightOutlined
-              className="element-controller__btn"
-              rotate={spread ? 90 : 0}
+            <button
+              type="button"
+              className="element-controller__btn inline-flex size-full cursor-pointer items-center justify-center border-0 bg-transparent p-0 text-muted-foreground hover:text-foreground"
               onClick={() => {
                 setSpread(!spread);
               }}
-            />
+              aria-label="Toggle element expansion"
+            >
+              <ChevronRight
+                className={`size-4 transition-transform duration-150 ${
+                  spread ? 'rotate-90' : ''
+                }`}
+              />
+            </button>
           )}
         </div>
-        <div className="element-content">
-          <span className="element-content__header">
+        <div className="element-content min-w-0 py-3 md:py-0.5 text-xs leading-[1.4] break-all [&_code]:text-xs">
+          <span className="element-content__header text-muted-foreground">
             <span>&lt;</span>
-            <span className="tag-name">{tagName}</span>
+            <span className="tag-name text-primary-text">{tagName}</span>
             <ElementAttrs data={properties} />
             <span>&gt;</span>
           </span>
@@ -121,9 +128,9 @@ function ElementItem({
           ) : (
             ''
           )}
-          <span className="element-content__footer">
+          <span className="element-content__footer text-muted-foreground">
             <span>&lt;</span>
-            <span className="tag-name">/{tagName}</span>
+            <span className="tag-name text-primary-text">/{tagName}</span>
             <span>&gt;</span>
           </span>
         </div>
@@ -133,7 +140,7 @@ function ElementItem({
   if (type === 'text') {
     return (
       <div
-        className="element-item plain-text"
+        className="element-item plain-text ml-11 md:ml-5 block whitespace-pre-wrap text-xs [&_pre]:m-0 [&_pre]:whitespace-pre-wrap [&_pre]:bg-transparent!"
         dangerouslySetInnerHTML={{ __html: textContent }}
       />
     );
@@ -141,7 +148,7 @@ function ElementItem({
 
   if (type === 'comment') {
     return (
-      <code className="element-item comment">{`<!-- ${ast.value} -->`}</code>
+      <code className="element-item comment flex items-start justify-start ml-11 md:ml-5 text-muted-foreground">{`<!-- ${ast.value} -->`}</code>
     );
   }
   return null;

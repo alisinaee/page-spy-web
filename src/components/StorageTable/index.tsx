@@ -1,213 +1,285 @@
-import { useCacheDetailStore } from '@/store/cache-detail';
 import { StorageType } from '@/store/platform-config';
 import { SpyStorage } from '@huolala-tech/page-spy-types';
-import { Table, TableColumnsType, Tooltip } from 'antd';
 import { capitalize } from 'lodash-es';
-import { useMemo, useRef, useState } from 'react';
-import { ResizableTitle } from '../ResizableTitle';
-import { ResizeCallbackData } from 'react-resizable';
-import { ColumnType } from 'antd/es/table/interface';
+import { formatTehranDateTime } from '@/utils/tehran';
+import { useMemo, useState } from 'react';
+import { ArrowDown, ArrowUp, Copy } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import copy from 'copy-to-clipboard';
+import { cn } from '@/lib/utils';
+import { message } from '@/utils/message';
+import { Button } from '@/components/ui/button';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+} from '@/components/ui/table';
+import { PanelEmpty, useIsDesktop } from '@/components/panel';
 
-const allCols: TableColumnsType<SpyStorage.Data> = [
+type Row = SpyStorage.Data;
+
+interface ColumnDef {
+  key: keyof Row;
+  title: string;
+  sorter?: (a: Row, b: Row) => number;
+  render?: (val: any) => string;
+}
+
+const str = (v: unknown) => String(v ?? '');
+const by = (key: keyof Row) => (a: Row, b: Row) =>
+  str(a[key]).localeCompare(str(b[key]));
+
+const defaultCols: ColumnDef[] = [
+  { key: 'name', title: 'Name', sorter: by('name') },
+  { key: 'value', title: 'Value', sorter: by('value') },
+  { key: 'domain', title: 'Domain', sorter: by('domain') },
+  { key: 'path', title: 'Path', sorter: by('path') },
   {
-    dataIndex: 'name',
-    title: 'Name',
-    ellipsis: true,
-    width: 200,
-    sorter: (a, b) => a.name.localeCompare(b.name),
-  },
-  {
-    dataIndex: 'value',
-    title: 'Value',
-    ellipsis: true,
-    width: 300,
-    sorter: (a, b) => a.value.localeCompare(b.value),
-  },
-  {
-    dataIndex: 'domain',
-    title: 'Domain',
-    ellipsis: true,
-    width: 200,
-    sorter: (a, b) => {
-      if (!(a.domain && b.domain)) return 0;
-      return a.domain.localeCompare(b.domain);
-    },
-  },
-  {
-    dataIndex: 'path',
-    title: 'Path',
-    ellipsis: true,
-    width: 100,
-    sorter: (a, b) => {
-      if (!(a.path && b.path)) return 0;
-      return a.path.localeCompare(b.path);
-    },
-  },
-  {
-    dataIndex: 'expires',
+    key: 'expires',
     title: 'Expires',
-    ellipsis: true,
-    width: 240,
-    render: (value: string) => {
-      const time = value ? new Date(value).toISOString() : 'Session';
-      return (
-        <Tooltip placement="topLeft" title={time}>
-          {time}
-        </Tooltip>
-      );
-    },
-    sorter: (a, b) => {
-      if (!(a.expires && b.expires)) return 0;
-      return a.expires.toString().localeCompare(b.expires.toString());
-    },
+    sorter: by('expires'),
+    render: (v: string) => (v ? formatTehranDateTime(v) || v : 'Session'),
   },
   {
-    dataIndex: 'secure',
+    key: 'secure',
     title: 'Secure',
-    ellipsis: true,
-    width: 80,
-    render: (bool: boolean) => bool && '✅',
-    sorter: (a, b) => {
-      if (!(a.secure && b.secure)) return 0;
-      return a.secure.toString().localeCompare(b.secure.toString());
-    },
+    sorter: by('secure'),
+    render: (v: boolean) => (v ? 'Yes' : ''),
   },
   {
-    dataIndex: 'sameSite',
+    key: 'sameSite',
     title: 'SameSite',
-    ellipsis: true,
-    width: 80,
-    render: (v: string) => capitalize(v),
-    sorter: (a, b) => {
-      if (!(a.sameSite && b.sameSite)) return 0;
-      return a.sameSite.toString().localeCompare(b.sameSite.toString());
-    },
+    sorter: by('sameSite'),
+    render: (v: string) => (v ? capitalize(v) : ''),
   },
-  {
-    dataIndex: 'partitioned',
-    title: 'Partitioned',
-    ellipsis: true,
-    sorter: (a, b) => {
-      if (!(a.partitioned && b.partitioned)) return 0;
-      return a.partitioned.toString().localeCompare(b.partitioned.toString());
-    },
-  },
+  { key: 'partitioned', title: 'Partitioned', sorter: by('partitioned') },
 ];
+
+const prettyValue = (value: unknown) => {
+  const text = str(value);
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed && typeof parsed === 'object') {
+      return JSON.stringify(parsed, null, 2);
+    }
+  } catch (e) {
+    // not JSON, show raw
+  }
+  return text;
+};
+
+const CopyButton = ({ text, label }: { text: string; label: string }) => (
+  <Button
+    variant="ghost"
+    size="icon-touch"
+    aria-label={label}
+    className="md:size-8 md:min-h-0 md:min-w-0"
+    onClick={() => {
+      if (copy(text)) message.success('Copy success');
+      else message.error('Copy failed');
+    }}
+  >
+    <Copy />
+  </Button>
+);
+
+/** Full key / value / metadata of one storage entry, for the DetailPane. */
+export const StorageDetail = ({ row }: { row: Row }) => {
+  const { t } = useTranslation();
+  const { name, value, ...rest } = row;
+  const pretty = useMemo(() => prettyValue(value), [value]);
+  const meta = defaultCols.filter(
+    (c) => c.key in rest && c.key !== 'name' && c.key !== 'value',
+  );
+  return (
+    <div className="space-y-4 p-4">
+      <section>
+        <div className="flex items-center justify-between">
+          <h4 className="text-xs text-muted-foreground">
+            {t('storage.key', { defaultValue: 'Key' })}
+          </h4>
+          <CopyButton
+            text={str(name)}
+            label={t('storage.copy-key', { defaultValue: 'Copy key' })!}
+          />
+        </div>
+        <p className="font-mono text-xs break-all md:text-sm">{str(name)}</p>
+      </section>
+      <section>
+        <div className="flex items-center justify-between">
+          <h4 className="text-xs text-muted-foreground">
+            {t('storage.value', { defaultValue: 'Value' })}
+          </h4>
+          <CopyButton
+            text={str(value)}
+            label={t('storage.copy-value', { defaultValue: 'Copy value' })!}
+          />
+        </div>
+        <pre className="font-mono text-xs break-all whitespace-pre-wrap md:text-sm">
+          {pretty}
+        </pre>
+      </section>
+      {meta.length > 0 && (
+        <dl className="space-y-1 border-t border-border pt-3 text-xs md:text-sm">
+          {meta.map((c) => (
+            <div key={c.key} className="flex justify-between gap-3">
+              <dt className="text-muted-foreground">{c.title}</dt>
+              <dd className="font-mono break-all">
+                {c.render
+                  ? c.render(rest[c.key as keyof typeof rest])
+                  : str(rest[c.key as keyof typeof rest])}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </div>
+  );
+};
 
 interface Props {
   activeTab: StorageType;
   storageMsg: Record<StorageType, SpyStorage.GetTypeDataItem['data']>;
-  resizeCacheKey: string;
+  selected: Row | null;
+  onSelect: (row: Row) => void;
 }
 
 export const StorageTable = ({
   activeTab,
   storageMsg,
-  resizeCacheKey,
+  selected,
+  onSelect,
 }: Props) => {
-  const data = useMemo(() => {
-    return Object.values(storageMsg[activeTab]);
-  }, [activeTab, storageMsg]);
+  const { t } = useTranslation();
+  const isDesktop = useIsDesktop();
+  const data = useMemo(
+    () => Object.values(storageMsg[activeTab] || {}) as Row[],
+    [activeTab, storageMsg],
+  );
+
   const hasDetail = useMemo(() => {
-    const { name, value, ...rest } = data[0] || {};
+    const { name, value, ...rest } = data[0] || ({} as Row);
     return Object.keys(rest).length > 0;
   }, [data]);
 
-  const unionCacheKey = useMemo(
-    () => `${resizeCacheKey}:${activeTab}`,
-    [resizeCacheKey, activeTab],
-  );
-  const cacheWidthRef = useRef<Record<string, { [title: string]: number }>>({});
+  const [sortKey, setSortKey] = useState<keyof Row | null>(null);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
-  const [columns, setColumns] =
-    useState<ColumnType<SpyStorage.Data>[]>(allCols);
+  const visibleCols = hasDetail ? defaultCols : defaultCols.slice(0, 2);
 
-  // Init width from cache
-  useMemo(() => {
-    const cache = localStorage.getItem(unionCacheKey);
-    const value = cache && JSON.parse(cache);
-    if (value) {
-      cacheWidthRef.current[unionCacheKey] = value;
-      const widthInitedColumns = [...allCols].map((i) => {
-        return {
-          ...i,
-          width: value[i.title as string] || i.width,
-        };
-      });
-      setColumns(widthInitedColumns);
-    } else {
-      cacheWidthRef.current[unionCacheKey] = {};
-    }
-  }, [unionCacheKey]);
+  const sortedData = useMemo(() => {
+    if (!sortKey) return data;
+    const col = visibleCols.find((c) => c.key === sortKey);
+    if (!col?.sorter) return data;
+    const sorted = [...data].sort(col.sorter);
+    return sortOrder === 'desc' ? sorted.reverse() : sorted;
+  }, [data, sortKey, sortOrder, visibleCols]);
 
-  // Dragging
-  const mergedColumns = useMemo(() => {
-    let renderCols = [...columns];
-    if (!hasDetail && renderCols.length !== 2) {
-      renderCols = renderCols.slice(0, 2);
-    }
-    const cacheWidth = cacheWidthRef.current[unionCacheKey];
-    if (cacheWidth) {
-      renderCols.forEach((i) => {
-        const width = cacheWidth[i.title as string];
-        if (width) {
-          i.width = width;
-        }
-      });
-    }
+  if (data.length === 0) {
+    return (
+      <PanelEmpty title={t('storage.no-data', { defaultValue: 'No data' })} />
+    );
+  }
 
-    return renderCols.map((c, index) => ({
-      ...c,
-      onHeaderCell: (column: ColumnType<SpyStorage.Data>) => ({
-        width: column.width,
-        onResize: ((
-          _: React.SyntheticEvent<Element>,
-          data: ResizeCallbackData,
-        ) => {
-          const { size } = data;
-
-          const newCols = [...renderCols];
-          newCols[index] = {
-            ...newCols[index],
-            width: size.width,
-          };
-          setColumns(newCols);
-
-          cacheWidthRef.current[unionCacheKey][column.title as string] =
-            size.width;
-        }) as React.ReactEventHandler<any>,
-        onResizeStop: (_: React.SyntheticEvent, data: ResizeCallbackData) => {
-          const refValue = cacheWidthRef.current[unionCacheKey];
-
-          localStorage.setItem(unionCacheKey, JSON.stringify(refValue));
-        },
-      }),
-    }));
-  }, [columns, hasDetail, unionCacheKey]);
-
-  const setDetailInfo = useCacheDetailStore((state) => state.setCurrentDetail);
+  if (!isDesktop) {
+    return (
+      <ul>
+        {sortedData.map((row, idx) => {
+          const active = selected === row;
+          return (
+            <li key={row.name || idx}>
+              <button
+                type="button"
+                onClick={() => onSelect(row)}
+                className={cn(
+                  'block min-h-11 w-full border-b border-border px-3 py-1.5 text-left hover:bg-muted/60',
+                  active && 'border-l-2 border-l-primary bg-muted',
+                )}
+              >
+                <span className="block truncate font-mono text-sm">
+                  {str(row.name)}
+                </span>
+                <span className="block truncate font-mono text-xs text-muted-foreground">
+                  {str(row.value)}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
 
   return (
-    <Table
-      className="storage-table"
-      rowKey="name"
-      bordered={false}
-      dataSource={data}
-      pagination={false}
-      size="small"
-      columns={mergedColumns}
-      onRow={(record) => {
-        return {
-          onClick() {
-            setDetailInfo(record.value || '');
-          },
-        };
-      }}
-      components={{
-        header: {
-          cell: ResizableTitle,
-        },
-      }}
-    />
+    <Table className="table-fixed text-sm">
+      <TableHeader className="sticky top-0 z-10 bg-background">
+        <TableRow>
+          {visibleCols.map((col) => (
+            <TableHead key={col.key} className="h-9 text-muted-foreground">
+              <button
+                type="button"
+                className="inline-flex items-center gap-1"
+                onClick={() => {
+                  if (sortKey === col.key) {
+                    setSortOrder((p) => (p === 'asc' ? 'desc' : 'asc'));
+                  } else {
+                    setSortKey(col.key);
+                    setSortOrder('asc');
+                  }
+                }}
+              >
+                {col.title}
+                {sortKey === col.key &&
+                  (sortOrder === 'asc' ? (
+                    <ArrowUp className="size-3" />
+                  ) : (
+                    <ArrowDown className="size-3" />
+                  ))}
+              </button>
+            </TableHead>
+          ))}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {sortedData.map((row, idx) => (
+          <TableRow
+            key={row.name || idx}
+            data-state={selected === row ? 'selected' : undefined}
+            className={cn(
+              'hover:bg-muted/60',
+              selected === row && 'border-l-2 border-l-primary',
+            )}
+          >
+            {visibleCols.map((col, i) => {
+              const text = col.render
+                ? col.render(row[col.key])
+                : str(row[col.key]);
+              return (
+                <TableCell
+                  key={col.key}
+                  className="h-9 truncate p-0 font-mono text-sm"
+                  title={text}
+                >
+                  {i === 0 ? (
+                    <button
+                      type="button"
+                      className="block w-full truncate px-2 text-left"
+                      onClick={() => onSelect(row)}
+                    >
+                      {text}
+                    </button>
+                  ) : (
+                    <span className="block truncate px-2">{text}</span>
+                  )}
+                </TableCell>
+              );
+            })}
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 };

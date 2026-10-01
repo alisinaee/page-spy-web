@@ -1,0 +1,17 @@
+.error-boundary .logo::before,
+.error-boundary .logo::after {
+  content: '';
+  display: inline-block;
+  position: absolute;
+  inset: 0;
+  background: url('../../assets/image/logo.svg') no-repeat;
+  background-size: 80px 80px;
+}
+.error-boundary .logo::before {
+  clip-path: path('M 0 0 L 30 30 h 12 v 4 h 6 v 16 h 12 v 10 L 80 80 L 0 80');
+  transform: translate(-2px, 2px);
+}
+.error-boundary .logo::after {
+  clip-path: path('M 0 0 L 30 30 h 12 v 4 h 6 v 16 h 12 v 10 L 80 80 L 80 0');
+  transform: translate(2px, -2px);
+}

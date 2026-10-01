@@ -2,6 +2,7 @@ import {
   buildCurlCommand,
   redactSecrets,
   createBoxLineGrouper,
+  isBoxSeparator,
   stripAnsi,
   stripBoxBorder,
 } from './log-format.js';
@@ -9,6 +10,57 @@ import {
 (() => {
   const logs = [];
   const textLimit = 12000;
+  const MAX_ENTRIES = 2000;
+  const sectionCounts = {};
+  const subscribers = new Set();
+  let refreshOpenViewer = null;
+
+  const removeSection = (section) => {
+    for (let i = logs.length - 1; i >= 0; i--) {
+      if (logs[i].section === section) logs.splice(i, 1);
+    }
+    sectionCounts[section] = 0;
+  };
+
+  // Spy Tobank design tokens. Same values as the panel; prefixed so they never
+  // collide with the host page. This is the only place hex colors live.
+  const TOKENS_CSS =
+    ':root{' +
+    '--spyt-bg:#0b0d12;--spyt-card:#12151c;--spyt-popover:#181c25;--spyt-muted:#1f2430;' +
+    '--spyt-border:#5c6b86;--spyt-input:#5c6b86;--spyt-fg:#e7e9ee;--spyt-muted-fg:#9aa3b2;' +
+    '--spyt-primary:#e10613;--spyt-primary-fg:#ffffff;--spyt-primary-text:#ff8a8a;' +
+    '--spyt-success:#22c55e;--spyt-warning:#f59e0b;--spyt-destructive:#f87171;--spyt-info:#38bdf8;' +
+    '--spyt-ring:#ff8a8a;--spyt-warning-bg:rgba(245,158,11,.10);--spyt-destructive-bg:rgba(248,113,113,.10);' +
+    '--spyt-scrim:rgba(0,0,0,.6);--spyt-shadow:0 8px 24px rgba(0,0,0,.4);' +
+    '--spyt-radius:8px;--spyt-radius-lg:12px;' +
+    '--spyt-font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;' +
+    '--spyt-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}';
+
+  const ensureTokens = () => {
+    if (typeof document === 'undefined') return;
+    if (document.getElementById('spy-tobank-tokens')) return;
+    const style = document.createElement('style');
+    style.id = 'spy-tobank-tokens';
+    style.textContent = TOKENS_CSS;
+    (document.head || document.documentElement).append(style);
+  };
+  ensureTokens();
+
+  // Shared by the settings card and the save dialog (rendered inside each overlay
+  // so it also works when the overlay lives in a shadow root).
+  const DIALOG_CSS = [
+    '.spyt-overlay{position:fixed;inset:0;z-index:2147483647;display:flex;align-items:flex-end;justify-content:center;width:100%;height:100dvh;max-width:none;max-height:none;margin:0;padding:16px;padding-bottom:max(16px,env(safe-area-inset-bottom));border:none;overflow:hidden;box-sizing:border-box;background:var(--spyt-scrim);color:var(--spyt-fg);font:14px/1.45 var(--spyt-font)}',
+    '.spyt-overlay *{box-sizing:border-box}',
+    '.spyt-card{width:min(440px,100%);max-height:85dvh;overflow:auto;margin:0;padding:16px;background:var(--spyt-popover);color:var(--spyt-fg);border:1px solid var(--spyt-border);border-radius:var(--spyt-radius-lg);box-shadow:var(--spyt-shadow)}',
+    '.spyt-title{margin:0 0 12px;font-size:16px;font-weight:600}',
+    '.spyt-label{display:block;font-size:12px;color:var(--spyt-muted-fg)}',
+    '.spyt-input{display:block;width:100%;min-height:44px;margin:8px 0 16px;padding:0 12px;border:1px solid var(--spyt-input);border-radius:var(--spyt-radius);background:var(--spyt-bg);color:var(--spyt-fg);font:16px var(--spyt-font)}',
+    '.spyt-input:focus{outline:2px solid var(--spyt-ring);outline-offset:1px}',
+    '.spyt-actions{display:flex;gap:8px}',
+    '.spyt-btn{flex:1;min-height:44px;padding:0 16px;border:1px solid var(--spyt-border);border-radius:var(--spyt-radius);background:transparent;color:var(--spyt-fg);font:14px var(--spyt-font);cursor:pointer}',
+    '.spyt-btn-primary{background:var(--spyt-primary);border-color:var(--spyt-primary);color:var(--spyt-primary-fg)}',
+    '.spyt-btn:focus-visible,.spyt-overlay button:focus-visible{outline:2px solid var(--spyt-ring);outline-offset:2px}',
+  ].join('');
 
   const clip = (value) => {
     const text = String(value ?? '');
@@ -79,6 +131,12 @@ import {
 
   const record = (entry) => {
     if (!currentSettings.masterLogs) return;
+    if (
+      entry.section === 'console' &&
+      isBoxSeparator(String(entry.message || ''))
+    ) {
+      return;
+    }
     if (entry.section === 'console') {
       if (entry.level && !currentSettings.consoleLevels.includes(entry.level)) {
         return;
@@ -97,7 +155,22 @@ import {
         return;
       }
     }
-    logs.push({ time: new Date().toISOString(), ...entry });
+    const stored = { time: new Date().toISOString(), ...entry };
+    logs.push(stored);
+    const section = stored.section;
+    sectionCounts[section] = (sectionCounts[section] || 0) + 1;
+    if (sectionCounts[section] > MAX_ENTRIES) {
+      const oldest = logs.findIndex((item) => item.section === section);
+      if (oldest >= 0) {
+        logs.splice(oldest, 1);
+        sectionCounts[section] -= 1;
+      }
+    }
+    subscribers.forEach((notify) => {
+      try {
+        notify(stored);
+      } catch (e) {}
+    });
   };
 
   const describeRequestBody = async (body) => {
@@ -189,9 +262,25 @@ import {
   };
 
   let installed = false;
+  const replayEarlyLogs = () => {
+    const early = window.__pageSpyEarlyLogs || [];
+    window.__pageSpyEarlyLogs = [];
+    early.forEach((item) => {
+      const args = item.args || [];
+      const rawMessage = args.map(asText).join(' ');
+      record({
+        section: 'console',
+        level: item.level || 'log',
+        args,
+        message: clip(stripAnsi(rawMessage)),
+        time: item.time ? new Date(item.time).toISOString() : undefined,
+      });
+    });
+  };
   const install = () => {
     if (installed) return;
     installed = true;
+    replayEarlyLogs();
 
     let boxTimer = null;
     const grouper = createBoxLineGrouper((item) => {
@@ -208,7 +297,11 @@ import {
     });
 
     ['debug', 'info', 'log', 'warn', 'error'].forEach((level) => {
-      const original = console[level].bind(console);
+      const current = console[level];
+      const original =
+        current && current.__pageSpyOriginal
+          ? current.__pageSpyOriginal
+          : current.bind(console);
       console[level] = (...args) => {
         const safeArgs = args.map((item) => {
           if (item == null || typeof item !== 'object') return item;
@@ -428,7 +521,16 @@ import {
   const snapshot = () => {
     const device = deviceInfo();
     return {
-      exportedAt: new Date().toISOString(),
+      exportedAt: new Date().toLocaleString('en-GB', {
+        timeZone: 'Asia/Tehran',
+        hourCycle: 'h23',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }),
       deviceId: device.id,
       device,
       console: logs.filter((item) => item.section === 'console'),
@@ -456,7 +558,19 @@ import {
 
   const defaultFileName = () => {
     const device = deviceInfo();
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const stamp = new Date()
+      .toLocaleString('en-GB', {
+        timeZone: 'Asia/Tehran',
+        hourCycle: 'h23',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      })
+      .replace(/[^0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
     return (
       [
         'pagespy',
@@ -486,17 +600,21 @@ import {
 
   const askFileName = (initialName) =>
     new Promise((resolve) => {
+      ensureTokens();
       const overlay = document.createElement('div');
-      overlay.style.cssText =
-        'position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:flex-end;justify-content:center;padding:16px;border:none;margin:0;width:100vw;height:100dvh;box-sizing:border-box;';
+      overlay.className = 'spyt-overlay';
       overlay.innerHTML =
-        '<form style="width:min(420px,100%);background:#fff;border-radius:16px;padding:16px;box-shadow:0 12px 40px rgba(0,0,0,.2);font:16px/1.4 system-ui,sans-serif;color:#172033">' +
-        '<div style="font-weight:700;margin-bottom:8px">Save logs</div>' +
-        '<label style="display:block;font-size:13px;color:#667">File name</label>' +
-        '<input name="fileName" style="width:100%;box-sizing:border-box;margin:8px 0 14px;padding:12px;border:1px solid #d7dce8;border-radius:10px;font:inherit" />' +
-        '<div style="display:flex;gap:8px">' +
-        '<button type="button" data-cancel style="flex:1;padding:12px;border-radius:10px;border:1px solid #d7dce8;background:#fff;color:#172033">Cancel</button>' +
-        '<button type="submit" style="flex:1;padding:12px;border:0;border-radius:10px;background:#6d28d9;color:#fff">Save</button>' +
+        '<style>' +
+        DIALOG_CSS +
+        '</style>' +
+        '<form class="spyt-card">' +
+        '<div class="spyt-title">Save logs</div>' +
+        '<label class="spyt-label">File name' +
+        '<input class="spyt-input" name="fileName" autocomplete="off" />' +
+        '</label>' +
+        '<div class="spyt-actions">' +
+        '<button type="button" class="spyt-btn" data-cancel>Cancel</button>' +
+        '<button type="submit" class="spyt-btn spyt-btn-primary">Save</button>' +
         '</div></form>';
       const input = overlay.querySelector('input');
       input.value = initialName;
@@ -669,17 +787,46 @@ import {
       requestPayload: item.requestBody,
     });
 
+  const responsePlain = (value) => {
+    const deepened = deepen(value);
+    if (deepened == null || deepened === '') return 'None';
+    if (typeof deepened === 'string') {
+      const trimmed = deepened.trim();
+      if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+        try {
+          return JSON.stringify(JSON.parse(trimmed), null, 2);
+        } catch (error) {
+          return deepened;
+        }
+      }
+      return deepened;
+    }
+    try {
+      return JSON.stringify(deepened, null, 2);
+    } catch (error) {
+      return String(deepened);
+    }
+  };
+
+  const fullNetworkText = (item) =>
+    [
+      curlText(item),
+      '',
+      '# Response',
+      responsePlain(item.error || item.responseBody),
+    ].join('\n');
+
   const syncMasterButtons = () => {
     const label = currentSettings.masterLogs ? 'Logs ON' : 'Logs OFF';
     const modal =
       window.$pageSpy &&
       window.$pageSpy.constructor &&
       window.$pageSpy.constructor.modal;
-    const span =
+    const toggle =
       modal &&
       modal.root &&
-      modal.root.querySelector('#page-spy-logs-toggle span');
-    if (span) span.textContent = label;
+      modal.root.querySelector('#page-spy-logs-toggle input');
+    if (toggle) toggle.checked = currentSettings.masterLogs;
   };
 
   const toggleMaster = () => {
@@ -690,24 +837,25 @@ import {
   };
 
   const mountSettingsOverlay = (overlay) => {
+    ensureTokens();
     overlay.classList.add('pagespy-settings');
-    if (!document.getElementById('pagespy-settings-style')) {
-      const style = document.createElement('style');
-      style.id = 'pagespy-settings-style';
-      style.textContent = [
-        '.pagespy-settings{position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:2147483647;display:flex;align-items:flex-end;justify-content:center;padding:16px;border:none;margin:0;width:100vw;height:100dvh}',
-        '.pagespy-settings .settings-card{width:min(440px,100%);max-height:85vh;overflow:auto;background:#fff;border-radius:16px;padding:16px;color:#172033;font:14px/1.45 system-ui,sans-serif;box-shadow:0 16px 48px rgba(0,0,0,.2)}',
-        '.pagespy-settings h2{margin:0;font-size:16px;font-weight:700}',
-        '.pagespy-settings h4{margin:12px 0 6px;font-size:13px;color:#667}',
-        '.pagespy-settings .settings-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f0f2f6}',
-        '.pagespy-settings .settings-switch{cursor:pointer;border-radius:999px;padding:3px 10px;font-size:12px;border:1px solid #d7dce8;background:#eef1f7;color:#172033}',
-        '.pagespy-settings .settings-switch[data-on="true"]{background:#067647;color:#fff;border-color:#067647}',
-        '.pagespy-settings .settings-chips{display:flex;flex-wrap:wrap;gap:6px}',
-        '.pagespy-settings .chip{border:1px solid #d7dce8;border-radius:999px;background:#eef1f7;color:#172033;padding:4px 10px;font-size:12px;cursor:pointer}',
-        '.pagespy-settings .chip[data-active="true"]{background:#6d28d9;color:#fff;border-color:#6d28d9}',
-      ].join('');
-      document.head.append(style);
-    }
+    const style = document.createElement('style');
+    style.textContent = [
+      DIALOG_CSS,
+      '.pagespy-settings h2{margin:0;font-size:16px;font-weight:600}',
+      '.pagespy-settings h4{margin:16px 0 8px;font-size:12px;font-weight:600;color:var(--spyt-muted-fg)}',
+      '.pagespy-settings .settings-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}',
+      '.pagespy-settings .settings-row{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:44px;padding:4px 0;border-bottom:1px solid var(--spyt-border)}',
+      '.pagespy-settings .settings-switch,.pagespy-settings .chip{min-height:44px;border:1px solid var(--spyt-border);border-radius:var(--spyt-radius);background:transparent;color:var(--spyt-fg);font:14px var(--spyt-font);cursor:pointer}',
+      '.pagespy-settings .settings-switch{min-width:72px;padding:0 14px;font-weight:600}',
+      '.pagespy-settings .settings-switch[data-on="true"]{background:var(--spyt-primary);border-color:var(--spyt-primary);color:var(--spyt-primary-fg)}',
+      '.pagespy-settings .settings-chips{display:flex;flex-wrap:wrap;gap:8px}',
+      '.pagespy-settings .chip{padding:0 12px}',
+      '.pagespy-settings .chip[data-active="true"]{background:var(--spyt-primary);border-color:var(--spyt-primary);color:var(--spyt-primary-fg)}',
+      '.pagespy-settings .chip[data-active="true"]::before{content:"✓ "}',
+      '.pagespy-settings .settings-empty{font-size:12px;color:var(--spyt-muted-fg)}',
+    ].join('');
+    overlay.prepend(style);
     const close = () => {
       try {
         if (typeof overlay.hidePopover === 'function') overlay.hidePopover();
@@ -734,17 +882,17 @@ import {
       else existing.remove();
     }
     const overlay = document.createElement('div');
-    overlay.className = 'settings-overlay';
+    overlay.className = 'spyt-overlay';
     const card = document.createElement('div');
-    card.className = 'settings-card';
+    card.className = 'settings-card spyt-card';
     const header = document.createElement('div');
-    header.style.cssText =
-      'display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;';
+    header.className = 'settings-head';
     const title = document.createElement('h2');
     title.textContent = 'Capture Settings';
     const doneBtn = document.createElement('button');
     doneBtn.type = 'button';
     doneBtn.className = 'chip';
+    doneBtn.dataset.active = 'false';
     doneBtn.textContent = 'Done';
     doneBtn.onclick = () => {
       if (overlay.__closeSettings) overlay.__closeSettings();
@@ -823,7 +971,7 @@ import {
     currentSettings.disabledTags.forEach((t) => seenTags.add(t));
     if (seenTags.size === 0) {
       const noTags = document.createElement('span');
-      noTags.style.cssText = 'font-size:12px;color:#98a2b3;';
+      noTags.className = 'settings-empty';
       noTags.textContent = 'No tags detected yet';
       tagChips.append(noTags);
     } else {
@@ -877,6 +1025,257 @@ import {
     mountSettingsOverlay(overlay);
   };
 
+  const VIEWER_PAGE = 50;
+  const VIEWER_MAX_DOM = 400;
+  const LEVEL_GLYPH = {
+    log: '•',
+    info: 'ℹ',
+    warn: '▲',
+    error: '✕',
+    debug: '◆',
+  };
+
+  const VIEWER_CSS = (() => {
+    const V = '#pagespy-log-viewer';
+    const rule = (selectors, body) =>
+      selectors
+        .split(',')
+        .map((s) => (s.startsWith('@root') ? V + s.slice(5) : V + ' ' + s))
+        .join(',') +
+      '{' +
+      body +
+      '}';
+    return [
+      rule(
+        '@root',
+        'position:fixed;inset:0;z-index:2147483646;width:100%;max-width:100%;min-width:0;height:100dvh;margin:0;overflow:hidden;display:flex;flex-direction:column;padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);background:var(--spyt-bg);color:var(--spyt-fg);font:14px/1.45 var(--spyt-font);-webkit-tap-highlight-color:transparent',
+      ),
+      rule('*', 'box-sizing:border-box'),
+      rule('[hidden]', 'display:none!important'),
+      rule('button,input', 'font:inherit;margin:0'),
+      rule(
+        'button:focus-visible,input:focus-visible',
+        'outline:2px solid var(--spyt-ring);outline-offset:2px',
+      ),
+      rule(
+        '.btn',
+        'min-height:34px;padding:0 10px;border:1px solid var(--spyt-border);border-radius:var(--spyt-radius);background:transparent;color:var(--spyt-fg);font-size:13px;cursor:pointer',
+      ),
+      rule(
+        '.icon-btn',
+        'width:36px;height:36px;min-height:36px;padding:0;display:flex;align-items:center;justify-content:center;flex:none;border:1px solid var(--spyt-border);border-radius:var(--spyt-radius);background:transparent;color:var(--spyt-fg);cursor:pointer',
+      ),
+      rule('.search-nav', 'display:flex;align-items:center;gap:2px'),
+      rule(
+        '.search-nav .icon-btn',
+        'border:0;background:transparent;width:32px;height:32px;min-height:32px',
+      ),
+      rule(
+        '.search-count',
+        'min-width:3.2em;text-align:center;font:12px var(--spyt-mono);color:var(--spyt-muted-fg)',
+      ),
+      rule(
+        '.card[data-hit="current"],.pair[data-hit="current"]',
+        'outline:2px solid var(--spyt-primary);outline-offset:-2px',
+      ),
+      rule(
+        '.btn-danger,.clear-btn',
+        'color:var(--spyt-destructive);border-color:var(--spyt-border)',
+      ),
+      rule(
+        '.bar',
+        'display:flex;align-items:center;gap:8px;padding:8px 12px;padding-top:max(8px,env(safe-area-inset-top));background:var(--spyt-card);border-bottom:1px solid var(--spyt-border)',
+      ),
+      rule('.bar strong', 'flex:1;font-size:16px;font-weight:600'),
+      rule(
+        '.tabs',
+        'display:flex;flex:none;height:calc(46px + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom);background:var(--spyt-card);border-top:1px solid var(--spyt-border)',
+      ),
+      rule(
+        '.tabs button',
+        'position:relative;flex:1 1 0;min-width:0;min-height:46px;padding:6px 2px 0;border:0;border-radius:0;background:transparent;color:var(--spyt-muted-fg);font-size:11px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer',
+      ),
+      rule(
+        '.tabs button[data-active="true"]',
+        'background:transparent;color:var(--spyt-primary-text);font-weight:600',
+      ),
+      rule(
+        '.tabs button[data-active="true"]::before',
+        'content:"";position:absolute;top:0;left:12px;right:12px;height:2px;background:var(--spyt-primary)',
+      ),
+      rule(
+        '.filters',
+        'position:relative;flex:none;width:100%;max-width:100%;min-width:0;overflow:hidden;background:var(--spyt-card);border-bottom:1px solid var(--spyt-border)',
+      ),
+      rule(
+        '.filter-row',
+        'display:flex;flex-direction:row;direction:ltr;align-items:stretch;width:100%;max-width:100%;min-width:0;overflow:hidden',
+      ),
+      rule(
+        '.filter-bar',
+        'display:flex;flex:1 1 0%;width:0;min-width:0;flex-wrap:nowrap;gap:6px;padding:6px 8px;align-items:center;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;touch-action:pan-x;-webkit-overflow-scrolling:touch;scrollbar-width:thin',
+      ),
+      rule(
+        '.filter-more',
+        'flex:0 0 36px;width:36px;min-height:36px;display:flex;align-items:center;justify-content:center;border:0;border-left:1px solid var(--spyt-border);background:var(--spyt-card);color:var(--spyt-fg);font-size:18px;line-height:1;cursor:pointer',
+      ),
+      rule(
+        '.filter-menu',
+        'position:fixed;z-index:2147483647;min-width:200px;max-width:min(280px,calc(100vw - 16px));max-height:min(60vh,420px);overflow:auto;padding:4px;border:1px solid var(--spyt-border);border-radius:var(--spyt-radius);background:var(--spyt-popover);box-shadow:var(--spyt-shadow)',
+      ),
+      rule(
+        '.filter-menu button',
+        'display:flex;width:100%;min-height:36px;padding:0 10px;border:0;border-radius:6px;background:transparent;color:var(--spyt-fg);font-size:13px;text-align:left;cursor:pointer',
+      ),
+      rule('.chip,.clear-btn,.search-input,.filter-count', 'flex:0 0 auto'),
+      rule(
+        '.chip',
+        'min-height:32px;padding:0 10px;border:1px solid var(--spyt-border);border-radius:var(--spyt-radius);background:transparent;color:var(--spyt-fg);font-size:13px;cursor:pointer;user-select:none',
+      ),
+      rule(
+        '.chip[data-active="true"]',
+        'background:var(--spyt-primary);border-color:var(--spyt-primary);color:var(--spyt-primary-fg)',
+      ),
+      rule('.chip[data-active="true"]::before', 'content:"✓ "'),
+      rule(
+        '.clear-btn',
+        'min-height:32px;padding:0 10px;border:1px solid var(--spyt-border);border-radius:var(--spyt-radius);background:transparent;font-size:13px;cursor:pointer',
+      ),
+      rule(
+        '.search-input',
+        'width:160px;min-height:44px;padding:0 12px;border:1px solid var(--spyt-input);border-radius:var(--spyt-radius);background:var(--spyt-bg);color:var(--spyt-fg);font-size:16px',
+      ),
+      rule('.search-input::placeholder', 'color:var(--spyt-muted-fg)'),
+      rule(
+        '.filter-count',
+        'font:12px var(--spyt-mono);color:var(--spyt-muted-fg)',
+      ),
+      rule(
+        '.sheet',
+        'flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding-bottom:12px',
+      ),
+      rule(
+        '.empty',
+        'min-height:160px;display:flex;align-items:center;justify-content:center;color:var(--spyt-muted-fg);padding:24px',
+      ),
+      rule('.more', 'display:block;width:calc(100% - 24px);margin:8px 12px'),
+      rule(
+        '.card',
+        'border-bottom:1px solid var(--spyt-border);background:var(--spyt-card);color:var(--spyt-fg)',
+      ),
+      rule('.card[data-level="info"]', 'color:var(--spyt-info)'),
+      rule('.card[data-level="debug"]', 'color:var(--spyt-primary-text)'),
+      rule(
+        '.card[data-level="warn"]',
+        'color:var(--spyt-warning);background:var(--spyt-warning-bg)',
+      ),
+      rule(
+        '.card[data-level="error"]',
+        'color:var(--spyt-destructive);background:var(--spyt-destructive-bg)',
+      ),
+      rule(
+        '.log',
+        'display:block;width:100%;min-height:34px;padding:0 0 0 10px;border:0;border-radius:0;background:transparent;color:inherit;text-align:left;cursor:pointer',
+      ),
+      rule(
+        '.net-row',
+        'display:flex;align-items:stretch;width:100%;direction:ltr',
+      ),
+      rule(
+        '.net',
+        'flex:1;min-width:0;display:flex;flex-direction:column;align-items:stretch;gap:2px;min-height:34px;padding:6px 0 6px 10px;border:0;border-radius:0;background:transparent;color:inherit;text-align:left;cursor:pointer',
+      ),
+      rule(
+        '.net-meta',
+        'display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:11px;line-height:1.3;color:var(--spyt-muted-fg)',
+      ),
+      rule('.line > .log', 'flex:1;width:auto;min-width:0'),
+      rule('.row-actions', 'display:flex;gap:8px;padding:0 12px 10px'),
+      rule(
+        '.action',
+        'min-height:32px;padding:0 10px;border:1px solid var(--spyt-border);border-radius:var(--spyt-radius);background:var(--spyt-bg);color:var(--spyt-fg);font-size:13px;cursor:pointer',
+      ),
+      rule(
+        '.line',
+        'display:flex;align-items:center;gap:6px;width:100%;min-height:34px',
+      ),
+      rule(
+        '.lvl',
+        'flex:none;display:inline-flex;align-items:center;gap:4px;min-width:62px;font-size:12px;font-weight:600;text-transform:uppercase',
+      ),
+      rule(
+        '.when',
+        'flex:none;font:11px var(--spyt-mono);color:var(--spyt-muted-fg)',
+      ),
+      rule(
+        '.sub',
+        'display:block;padding:0 12px 6px 0;font:11px var(--spyt-mono);color:var(--spyt-muted-fg)',
+      ),
+      rule(
+        '.preview',
+        'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:12px var(--spyt-mono)',
+      ),
+      rule(
+        '.copy',
+        'flex:none;min-width:40px;min-height:34px;padding:0 8px;border:0;border-left:1px solid var(--spyt-border);border-radius:0;background:transparent;color:var(--spyt-muted-fg);font-size:12px;cursor:pointer',
+      ),
+      rule(
+        '.url',
+        'display:block;width:100%;padding:0;overflow-wrap:anywhere;word-break:normal;font:13px/1.35 var(--spyt-mono);color:var(--spyt-fg)',
+      ),
+      rule('.net-row > .copy', 'align-self:center;margin-left:auto'),
+      rule('.status', 'flex:none;font:600 12px var(--spyt-mono)'),
+      rule('.status.ok', 'color:var(--spyt-success)'),
+      rule('.status.bad', 'color:var(--spyt-destructive)'),
+      rule(
+        '.method',
+        'flex:none;border:1px solid currentColor;border-radius:4px;padding:1px 6px;font:600 11px var(--spyt-mono);color:var(--spyt-info)',
+      ),
+      rule('.method[data-method="post"]', 'color:var(--spyt-success)'),
+      rule(
+        '.method[data-method="put"],.method[data-method="patch"]',
+        'color:var(--spyt-warning)',
+      ),
+      rule('.method[data-method="delete"]', 'color:var(--spyt-destructive)'),
+      rule(
+        '.detail',
+        'background:var(--spyt-bg);color:var(--spyt-fg);border-top:1px solid var(--spyt-border)',
+      ),
+      rule(
+        '.detail h3',
+        'margin:0;padding:10px 12px 0;font-size:12px;font-weight:600;color:var(--spyt-muted-fg);background:transparent',
+      ),
+      rule(
+        'pre',
+        'width:100%;margin:0;padding:8px 12px 12px;white-space:pre-wrap;word-break:break-word;background:transparent;color:var(--spyt-fg);font:12px/1.5 var(--spyt-mono)',
+      ),
+      rule(
+        '.pair',
+        'display:grid;grid-template-columns:minmax(96px,34%) minmax(0,1fr);gap:8px;align-items:center;width:100%;min-height:44px;padding:6px 12px;border-bottom:1px solid var(--spyt-border);background:var(--spyt-card)',
+      ),
+      rule('.pair span', 'color:var(--spyt-muted-fg);word-break:break-word'),
+      rule(
+        '.pair b',
+        'font:12px var(--spyt-mono);font-weight:500;word-break:break-word',
+      ),
+      rule(
+        'h3',
+        'margin:0;padding:12px 12px 6px;font-size:12px;font-weight:600;color:var(--spyt-muted-fg);background:var(--spyt-bg)',
+      ),
+      rule('.j-key', 'color:var(--spyt-primary-text)'),
+      rule('.j-str', 'color:var(--spyt-success)'),
+      rule('.j-num', 'color:var(--spyt-info)'),
+      rule('.j-bool', 'color:var(--spyt-warning)'),
+      rule('.j-nil', 'color:var(--spyt-muted-fg)'),
+      rule('.j-punct', 'color:var(--spyt-muted-fg)'),
+      rule(
+        '.floating-scroll-btn',
+        'position:fixed;right:max(12px,env(safe-area-inset-right));bottom:calc(58px + env(safe-area-inset-bottom));width:36px;height:36px;padding:0;border-radius:50%;background:var(--spyt-primary);color:var(--spyt-primary-fg);border:1px solid var(--spyt-primary);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:100',
+      ),
+      rule('.floating-scroll-btn svg', 'width:20px;height:20px'),
+    ].join('');
+  })();
+
   const openViewer = () => {
     if (
       typeof window !== 'undefined' &&
@@ -890,88 +1289,49 @@ import {
       } catch (e) {}
     }
 
+    ensureTokens();
     const data = snapshot();
     const existing = document.getElementById('pagespy-log-viewer');
-    if (existing) existing.remove();
+    if (existing) {
+      if (existing.__dispose) existing.__dispose();
+      existing.remove();
+    }
     const root = document.createElement('div');
     root.id = 'pagespy-log-viewer';
     const style = document.createElement('style');
-    style.textContent = [
-      '#pagespy-log-viewer{position:fixed;inset:0;z-index:2147483646;width:100vw;height:100dvh;max-width:none;margin:0;display:flex;flex-direction:column;background:#f3f5fa;color:#172033;font:15px/1.45 system-ui,sans-serif}',
-      '#pagespy-log-viewer *{box-sizing:border-box}',
-      '#pagespy-log-viewer .bar{display:flex;align-items:center;gap:8px;min-height:52px;padding:10px 12px;padding-top:max(10px,env(safe-area-inset-top));background:#6d28d9;color:#fff}',
-      '#pagespy-log-viewer .bar strong{flex:1;font-size:17px}',
-      '#pagespy-log-viewer .bar button,#pagespy-log-viewer .tabs button,#pagespy-log-viewer .net{margin:0;border:0;font:inherit;cursor:pointer}',
-      '#pagespy-log-viewer .bar button{background:transparent;color:#fff;padding:8px}',
-      '#pagespy-log-viewer .bar-btn{border:1px solid rgba(255,255,255,.3)!important;border-radius:8px!important;background:rgba(255,255,255,.15)!important;color:#fff!important;padding:4px 10px!important;font-size:12px!important}',
-      '#pagespy-log-viewer .tabs{display:flex;width:100%;gap:6px;padding:8px;background:#fff;border-bottom:1px solid #e4e8f2}',
-      '#pagespy-log-viewer .tabs button{flex:1 1 0;min-width:0;border-radius:999px;padding:8px 4px;background:#eef1f7;color:#172033;font-size:13px}',
-      '#pagespy-log-viewer .tabs button[data-active="true"]{background:#6d28d9;color:#fff}',
-      '#pagespy-log-viewer .sheet{flex:1;min-height:0;width:100%;max-width:none;margin:0;overflow:auto;background:transparent;border-radius:0;box-shadow:none;padding:0 0 max(64px,calc(env(safe-area-inset-bottom) + 64px))}',
-      '#pagespy-log-viewer .empty{min-height:100%;display:flex;align-items:center;justify-content:center;color:#667;padding:24px}',
-      '#pagespy-log-viewer .row{width:100%;padding:10px 12px;border-bottom:1px solid #e6e9f2;background:#fff}',
-      '#pagespy-log-viewer .row b{display:inline-block;min-width:52px;margin-right:8px;font-size:12px;text-transform:uppercase}',
-      '#pagespy-log-viewer .msg{white-space:pre-wrap;word-break:break-word}',
-      '#pagespy-log-viewer .log{display:block;width:100%;background:#fff;text-align:left;padding:10px 12px;color:#172033;border:0}',
-      '#pagespy-log-viewer .preview{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-      '#pagespy-log-viewer .net{display:block;width:100%;background:#fff;text-align:left;padding:10px 12px;color:#172033;border-bottom:1px solid #e6e9f2}',
-      '#pagespy-log-viewer .line{display:flex;gap:8px;align-items:baseline;width:100%}',
-      '#pagespy-log-viewer .url{flex:1;min-width:0;word-break:break-all}',
-      '#pagespy-log-viewer .status{font-weight:700}',
-      '#pagespy-log-viewer .status.ok{color:#067647}',
-      '#pagespy-log-viewer .status.bad{color:#b42318}',
-      '#pagespy-log-viewer pre{width:100%;max-width:none;margin:0;padding:10px 12px 14px;white-space:pre-wrap;word-break:break-word;background:#f8f9fd;font:12px/1.45 ui-monospace,SFMono-Regular,monospace}',
-      '#pagespy-log-viewer .pair{display:grid;grid-template-columns:minmax(96px,34%) minmax(0,1fr);gap:8px;width:100%;padding:10px 12px;border-bottom:1px solid #e6e9f2;background:#fff}',
-      '#pagespy-log-viewer .pair span{color:#667;word-break:break-word}',
-      '#pagespy-log-viewer .pair b{font-weight:600;word-break:break-word}',
-      '#pagespy-log-viewer h3{margin:0;padding:12px 12px 4px;font-size:13px;color:#667;background:#f3f5fa}',
-      '#pagespy-log-viewer .card{margin:8px;border:1px solid #e6e9f2;border-radius:12px;overflow:hidden;background:#fff}',
-      '#pagespy-log-viewer .method{border-radius:999px;padding:2px 6px;font-size:11px;color:#fff;background:#175cd3}',
-      '#pagespy-log-viewer .method[data-method=post]{background:#067647}',
-      '#pagespy-log-viewer .method[data-method=put]{background:#b54708}',
-      '#pagespy-log-viewer .method[data-method=delete]{background:#b42318}',
-      '#pagespy-log-viewer .copy{flex:none;border:1px solid #d7dce8;border-radius:999px;background:#fff;color:#172033;padding:4px 8px;font-size:12px;cursor:pointer}',
-      '#pagespy-log-viewer .when{display:block;margin:4px 0 0;font-size:11px;font-weight:400;line-height:1.3;color:#98a2b3;text-align:left}',
-      '#pagespy-log-viewer .detail{background:#0f172a;color:#e2e8f0}',
-      '#pagespy-log-viewer .detail h3{background:transparent;color:#94a3b8;padding:10px 12px 0}',
-      '#pagespy-log-viewer .detail pre{background:transparent;color:#e2e8f0;padding:8px 12px 12px}',
-      '#pagespy-log-viewer .j-key{color:#c4b5fd}',
-      '#pagespy-log-viewer .j-str{color:#86efac}',
-      '#pagespy-log-viewer .j-num{color:#93c5fd}',
-      '#pagespy-log-viewer .j-bool{color:#fdba74}',
-      '#pagespy-log-viewer .j-nil{color:#94a3b8}',
-      '#pagespy-log-viewer .j-punct{color:#cbd5e1}',
-      '#pagespy-log-viewer .filters{flex:none;background:#fff;border-bottom:1px solid #e4e8f2}',
-      '#pagespy-log-viewer .filter-bar{display:flex;flex-wrap:nowrap;gap:6px;padding:8px 12px;background:#fff;align-items:center;overflow-x:auto;-webkit-overflow-scrolling:touch}',
-      '#pagespy-log-viewer .chip,#pagespy-log-viewer .clear-btn,#pagespy-log-viewer .search-input,#pagespy-log-viewer .filter-count{flex:0 0 auto}',
-      '#pagespy-log-viewer .chip{border:1px solid #d7dce8;border-radius:999px;background:#eef1f7;color:#172033;padding:4px 10px;font-size:12px;cursor:pointer;user-select:none;transition:background .15s}',
-      '#pagespy-log-viewer .chip[data-active="true"]{background:#6d28d9;color:#fff;border-color:#6d28d9}',
-      '#pagespy-log-viewer .search-input{width:148px;border:1px solid #d7dce8;border-radius:999px;padding:4px 10px;font-size:12px;outline:none;background:#f8f9fd}',
-      '#pagespy-log-viewer .search-input:focus{border-color:#6d28d9;background:#fff}',
-      '#pagespy-log-viewer .clear-btn{border:1px solid #fee4e2;border-radius:999px;background:#fef3f2;color:#b42318;padding:4px 10px;font-size:12px;cursor:pointer}',
-      '#pagespy-log-viewer .floating-scroll-btn{position:fixed;right:16px;bottom:max(16px,calc(env(safe-area-inset-bottom) + 16px));width:42px;height:42px;border-radius:50%;background:#6d28d9;color:#fff;border:none;box-shadow:0 4px 14px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:100}',
-      '#pagespy-log-viewer .floating-scroll-btn svg{width:20px;height:20px}',
-      '#pagespy-log-viewer .settings-overlay{position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px}',
-      '#pagespy-log-viewer .settings-card{width:min(440px,100%);max-height:85vh;overflow-y:auto;background:#fff;border-radius:16px;padding:16px;color:#172033;font-size:14px;box-shadow:0 16px 48px rgba(0,0,0,.2)}',
-      '#pagespy-log-viewer .settings-card h2{margin:0 0 12px;font-size:16px;font-weight:700}',
-      '#pagespy-log-viewer .settings-card h4{margin:12px 0 6px;font-size:13px;color:#667}',
-      '#pagespy-log-viewer .settings-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f0f2f6}',
-      '#pagespy-log-viewer .settings-switch{cursor:pointer;border-radius:999px;padding:3px 10px;font-size:12px;border:1px solid #d7dce8;background:#eef1f7;color:#172033}',
-      '#pagespy-log-viewer .settings-switch[data-on="true"]{background:#067647;color:#fff;border-color:#067647}',
-      '#pagespy-log-viewer .settings-chips{display:flex;flex-wrap:wrap;gap:6px}',
-    ].join('');
+    style.textContent = VIEWER_CSS;
     root.append(style);
 
     const bar = document.createElement('div');
     bar.className = 'bar';
-    bar.innerHTML = '<strong>Logs</strong>';
+    bar.innerHTML = '<strong>Spy Tobank logs</strong>';
 
-    const close = document.createElement('button');
-    close.type = 'button';
-    close.textContent = 'Close';
-    close.onclick = () => root.remove();
-
-    bar.append(close);
+    const glyph = (paths) =>
+      '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      paths +
+      '</svg>';
+    const iconBtn = (label, paths) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'icon-btn';
+      button.setAttribute('aria-label', label);
+      button.innerHTML = glyph(paths);
+      return button;
+    };
+    const searchNav = document.createElement('div');
+    searchNav.className = 'search-nav';
+    searchNav.hidden = true;
+    const searchPrev = iconBtn('Previous match', '<path d="M6 14l6-6 6 6"/>');
+    const searchCount = document.createElement('span');
+    searchCount.className = 'search-count';
+    const searchNext = iconBtn('Next match', '<path d="M6 10l6 6 6-6"/>');
+    searchNav.append(searchPrev, searchCount, searchNext);
+    const searchOpenBtn = iconBtn(
+      'Search',
+      '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
+    );
+    const close = iconBtn('Close', '<path d="M6 6l12 12M18 6L6 18"/>');
+    bar.append(searchNav, searchOpenBtn, close);
 
     const tabs = document.createElement('div');
     tabs.className = 'tabs';
@@ -984,13 +1344,14 @@ import {
     scrollBottomBtn.type = 'button';
     scrollBottomBtn.className = 'floating-scroll-btn';
     scrollBottomBtn.title = 'Scroll to bottom';
+    scrollBottomBtn.setAttribute('aria-label', 'Scroll to bottom');
     scrollBottomBtn.innerHTML =
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>';
     scrollBottomBtn.onclick = () => {
       sheet.scrollTop = sheet.scrollHeight;
     };
 
-    root.append(bar, tabs, filters, sheet, scrollBottomBtn);
+    root.append(bar, filters, sheet, tabs, scrollBottomBtn);
 
     const empty = (label) => {
       const node = document.createElement('div');
@@ -1018,39 +1379,419 @@ import {
       return wrap;
     };
 
+    const cleanMessage = (item) => {
+      if (item.__clean === undefined) {
+        Object.defineProperty(item, '__clean', {
+          value: stripBoxBorder(stripAnsi(String(item.message ?? ''))),
+          enumerable: false,
+        });
+      }
+      return item.__clean;
+    };
+    const timeLabel = (iso) => {
+      const date = new Date(iso);
+      if (Number.isNaN(date.getTime())) return '';
+      return date.toLocaleString('en-GB', {
+        timeZone: 'Asia/Tehran',
+        hourCycle: 'h23',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      });
+    };
+
     // Filter states for view
     const viewConsoleLevels = new Set();
     let viewConsoleKeyword = '';
     const viewDisabledTags = new Set();
     let viewNetworkKind = 'All';
 
+    let activeSection = 'Console';
+    let searchQuery = '';
+    let searchCursor = 0;
+    let activeList = null;
+    let refreshBadge = null;
+    let flushTimer = null;
+    let pending = [];
+
     const buttons = [];
     const updateTabCounts = () => {
-      const consoleCount = logs.filter((it) => it.section === 'console').length;
-      const networkCount = logs.filter((it) => it.section === 'network').length;
       buttons.forEach((btn) => {
         if (btn.dataset.section === 'Console') {
-          btn.textContent = `Console ${consoleCount}`;
+          btn.textContent = `Console ${sectionCounts.console || 0}`;
         }
         if (btn.dataset.section === 'Network') {
-          btn.textContent = `Network ${networkCount}`;
+          btn.textContent = `Network ${sectionCounts.network || 0}`;
         }
       });
+    };
+
+    // Appends rows in batches of VIEWER_PAGE (newest last); older rows load on demand.
+    const createList = (container, items, buildRow, emptyLabel) => {
+      const more = document.createElement('button');
+      more.type = 'button';
+      more.className = 'btn more';
+      const emptyNode = empty(emptyLabel);
+      const rows = document.createElement('div');
+      let start = Math.max(
+        0,
+        items.length - (searchQuery ? VIEWER_MAX_DOM : VIEWER_PAGE),
+      );
+      const build = (from, to) => {
+        const fragment = document.createDocumentFragment();
+        for (let index = from; index < to; index += 1) {
+          fragment.append(buildRow(items[index]));
+        }
+        return fragment;
+      };
+      const sync = () => {
+        more.hidden = start <= 0;
+        more.textContent = `Load older (${start})`;
+        emptyNode.hidden = items.length > 0;
+      };
+      rows.append(build(start, items.length));
+      more.onclick = () => {
+        const before = sheet.scrollHeight;
+        const from = Math.max(0, start - VIEWER_PAGE);
+        rows.prepend(build(from, start));
+        start = from;
+        sheet.scrollTop += sheet.scrollHeight - before;
+        sync();
+      };
+      container.append(more, emptyNode, rows);
+      sync();
+      sheet.scrollTop = sheet.scrollHeight;
+      return {
+        append(item) {
+          items.push(item);
+          const stick =
+            sheet.scrollHeight - sheet.scrollTop - sheet.clientHeight < 80;
+          rows.append(buildRow(item));
+          while (rows.childElementCount > VIEWER_MAX_DOM) {
+            rows.firstElementChild.remove();
+            start += 1;
+          }
+          if (stick) sheet.scrollTop = sheet.scrollHeight;
+          sync();
+        },
+      };
+    };
+
+    const toggleDetail = (toggle, body, fill) => {
+      toggle.setAttribute('aria-expanded', 'false');
+      toggle.onclick = () => {
+        if (!body.firstChild) fill(body);
+        body.hidden = !body.hidden;
+        toggle.setAttribute('aria-expanded', String(!body.hidden));
+      };
+    };
+
+    const consoleMatches = (item) => {
+      if (isBoxSeparator(String(item.message || ''))) return false;
+      if (viewConsoleLevels.size > 0 && !viewConsoleLevels.has(item.level)) {
+        return false;
+      }
+      const msg = cleanMessage(item);
+      if (
+        viewConsoleKeyword &&
+        !msg.toLowerCase().includes(viewConsoleKeyword)
+      ) {
+        return false;
+      }
+      const matches = msg.match(/\[([A-Z0-9_]+)\]/g);
+      if (matches && matches.length > 0) {
+        const names = matches.map((tag) => tag.slice(1, -1));
+        const anyActive = names.some((tag) => !viewDisabledTags.has(tag));
+        if (!anyActive) return false;
+      }
+      return true;
+    };
+
+    const buildConsoleRow = (item) => {
+      const block = document.createElement('div');
+      block.className = 'card';
+      const levelName = LEVEL_GLYPH[item.level] ? item.level : 'log';
+      block.dataset.level = levelName;
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.className = 'log';
+
+      const line = document.createElement('div');
+      line.className = 'line';
+
+      const level = document.createElement('b');
+      level.className = 'lvl';
+      level.textContent = LEVEL_GLYPH[levelName] + ' ' + levelName;
+
+      const when = document.createElement('span');
+      when.className = 'when';
+      when.textContent = timeLabel(item.time);
+
+      const preview = document.createElement('span');
+      preview.className = 'preview';
+      preview.textContent = cleanMessage(item);
+
+      const copyBtn = document.createElement('button');
+      copyBtn.type = 'button';
+      copyBtn.className = 'copy';
+      copyBtn.textContent = 'Copy';
+      copyBtn.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        copyText(cleanMessage(item), (ok) => {
+          copyBtn.textContent = ok ? 'Copied' : 'Failed';
+          setTimeout(() => {
+            copyBtn.textContent = 'Copy';
+          }, 1200);
+        });
+      };
+
+      line.append(level, when, preview);
+      toggle.append(line);
+
+      const body = document.createElement('div');
+      body.className = 'detail';
+      body.hidden = true;
+      toggleDetail(toggle, body, (target) => {
+        const full =
+          item.args && item.args.length
+            ? item.args.length === 1
+              ? item.args[0]
+              : item.args
+            : item.message;
+        target.append(jsonBlock(full));
+      });
+
+      const head = document.createElement('div');
+      head.className = 'line';
+      head.append(toggle, copyBtn);
+      block.append(head, body);
+      return block;
+    };
+
+    let filterMenu = null;
+    let filterMenuCloser = null;
+    const closeFilterMenu = () => {
+      if (filterMenu) {
+        filterMenu.remove();
+        filterMenu = null;
+      }
+      if (filterMenuCloser) {
+        document.removeEventListener('pointerdown', filterMenuCloser, true);
+        filterMenuCloser = null;
+      }
+    };
+    const wireHorizontalScroll = (bar) => {
+      bar.addEventListener(
+        'wheel',
+        (event) => {
+          if (bar.scrollWidth <= bar.clientWidth + 1) return;
+          if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
+          event.preventDefault();
+          bar.scrollLeft += event.deltaY;
+        },
+        { passive: false },
+      );
+      // Chips are buttons, so a touch on them does not scroll the row.
+      let drag = null;
+      bar.addEventListener('pointerdown', (event) => {
+        if (event.button !== 0) return;
+        drag = {
+          id: event.pointerId,
+          x: event.clientX,
+          left: bar.scrollLeft,
+          moved: false,
+        };
+      });
+      bar.addEventListener('pointermove', (event) => {
+        if (!drag || event.pointerId !== drag.id) return;
+        const dx = event.clientX - drag.x;
+        if (!drag.moved && Math.abs(dx) < 6) return;
+        drag.moved = true;
+        bar.scrollLeft = drag.left - dx;
+        if (bar.setPointerCapture) {
+          try {
+            bar.setPointerCapture(event.pointerId);
+          } catch (err) {}
+        }
+      });
+      const endDrag = (event) => {
+        if (!drag || event.pointerId !== drag.id) return;
+        const moved = drag.moved;
+        drag = null;
+        if (!moved) return;
+        const stopClick = (clickEvent) => {
+          clickEvent.preventDefault();
+          clickEvent.stopPropagation();
+          bar.removeEventListener('click', stopClick, true);
+        };
+        bar.addEventListener('click', stopClick, true);
+      };
+      bar.addEventListener('pointerup', endDrag);
+      bar.addEventListener('pointercancel', endDrag);
+    };
+    const mountFilters = (bar, menuItems) => {
+      closeFilterMenu();
+      wireHorizontalScroll(bar);
+      const row = document.createElement('div');
+      row.className = 'filter-row';
+      const more = document.createElement('button');
+      more.type = 'button';
+      more.className = 'filter-more';
+      more.setAttribute('aria-label', 'Filters');
+      more.title = 'Filters';
+      more.textContent = '\u22ee';
+      more.onclick = (event) => {
+        event.stopPropagation();
+        if (filterMenu) {
+          closeFilterMenu();
+          return;
+        }
+        if (!document.getElementById('spyt-filter-menu')) {
+          const menuStyle = document.createElement('style');
+          menuStyle.id = 'spyt-filter-menu';
+          menuStyle.textContent =
+            '.filter-menu{position:fixed;z-index:2147483647;min-width:200px;max-width:min(280px,calc(100vw - 16px));max-height:min(60vh,420px);overflow:auto;padding:4px;border:1px solid var(--spyt-border);border-radius:var(--spyt-radius);background:var(--spyt-popover);color:var(--spyt-fg);box-shadow:var(--spyt-shadow)}' +
+            '.filter-menu button{display:flex;width:100%;min-height:44px;align-items:center;padding:0 12px;border:0;border-radius:6px;background:transparent;color:var(--spyt-fg);font:14px var(--spyt-font);text-align:left;cursor:pointer}';
+          (document.head || document.documentElement).append(menuStyle);
+        }
+        const menu = document.createElement('div');
+        menu.className = 'filter-menu';
+        menuItems.forEach((item) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.textContent = (item.active ? '\u2713 ' : '') + item.label;
+          btn.onclick = (clickEvent) => {
+            clickEvent.stopPropagation();
+            item.onClick();
+          };
+          menu.append(btn);
+        });
+        const rect = more.getBoundingClientRect();
+        menu.style.top =
+          Math.min(rect.bottom + 4, window.innerHeight - 48) + 'px';
+        menu.style.right = Math.max(8, window.innerWidth - rect.right) + 'px';
+        document.body.append(menu);
+        filterMenu = menu;
+        filterMenuCloser = (pointerEvent) => {
+          const target = pointerEvent.target;
+          if (!filterMenu) return;
+          if (filterMenu.contains(target) || more.contains(target)) return;
+          closeFilterMenu();
+        };
+        document.addEventListener('pointerdown', filterMenuCloser, true);
+      };
+      row.append(bar, more);
+      filters.append(row);
+    };
+
+    const refreshSearch = () => {
+      const query = searchQuery.trim().toLowerCase();
+      const nodes = [...sheet.querySelectorAll('.card, .pair')];
+      const hits = [];
+      nodes.forEach((node) => {
+        node.removeAttribute('data-hit');
+        if (!query) return;
+        if ((node.textContent || '').toLowerCase().includes(query))
+          hits.push(node);
+      });
+      searchOpenBtn.hidden = Boolean(query);
+      searchNav.hidden = !query;
+      if (!query) return;
+      if (!hits.length) {
+        searchCursor = 0;
+        searchCount.textContent = '0/0';
+        return;
+      }
+      if (searchCursor >= hits.length) searchCursor = 0;
+      if (searchCursor < 0) searchCursor = hits.length - 1;
+      hits.forEach((node, index) => {
+        node.dataset.hit = index === searchCursor ? 'current' : 'yes';
+      });
+      searchCount.textContent = searchCursor + 1 + '/' + hits.length;
+      hits[searchCursor].scrollIntoView({ block: 'center', inline: 'nearest' });
+    };
+    const endSearch = () => {
+      searchQuery = '';
+      searchCursor = 0;
+      show(activeSection);
+    };
+    const openFindDialog = () => {
+      const overlay = document.createElement('div');
+      overlay.className = 'spyt-overlay';
+      overlay.innerHTML =
+        '<style>' +
+        DIALOG_CSS +
+        '.spyt-input{padding-right:40px}' +
+        '</style>' +
+        '<form class="spyt-card">' +
+        '<div class="spyt-title">Search this section</div>' +
+        '<label class="spyt-label">Text' +
+        '<span class="spyt-field" style="position:relative;display:block">' +
+        '<input class="spyt-input" name="q" dir="auto" maxlength="200" autocomplete="off" placeholder="Find in this section" />' +
+        '<button type="button" class="spyt-clear" data-clear aria-label="Clear" style="position:absolute;right:6px;top:8px;width:32px;height:32px;border:0;background:transparent;color:var(--spyt-muted-fg);font-size:18px;cursor:pointer">×</button>' +
+        '</span></label>' +
+        '<div class="spyt-actions">' +
+        '<button type="button" class="spyt-btn" data-cancel>Cancel</button>' +
+        '<button type="submit" class="spyt-btn spyt-btn-primary">Search</button>' +
+        '</div></form>';
+      const input = overlay.querySelector('input');
+      input.value = searchQuery;
+      const closeDialog = () => {
+        try {
+          if (typeof overlay.hidePopover === 'function') overlay.hidePopover();
+        } catch (e) {}
+        overlay.remove();
+      };
+      overlay.querySelector('[data-clear]').onclick = () => {
+        input.value = '';
+        input.focus();
+      };
+      overlay.querySelector('[data-cancel]').onclick = closeDialog;
+      overlay.onsubmit = (event) => {
+        event.preventDefault();
+        searchQuery = input.value.trim();
+        searchCursor = 0;
+        closeDialog();
+        show(activeSection);
+      };
+      mountOverlay(overlay);
+      input.focus();
+    };
+    searchOpenBtn.onclick = openFindDialog;
+    searchPrev.onclick = () => {
+      searchCursor -= 1;
+      refreshSearch();
+    };
+    searchNext.onclick = () => {
+      searchCursor += 1;
+      refreshSearch();
     };
 
     const renderConsole = () => {
       filters.replaceChildren();
       sheet.replaceChildren();
+      activeList = null;
+      refreshBadge = null;
 
       const filterBar = document.createElement('div');
       filterBar.className = 'filter-bar';
 
-      ALL_CONSOLE_LEVELS.forEach((level) => {
+      [
+        ['log', 'User'],
+        ['error', 'Errors'],
+        ['warn', 'Warnings'],
+        ['info', 'Info'],
+        ['debug', 'Verbose'],
+      ].forEach(([level, label]) => {
         const chip = document.createElement('button');
         chip.type = 'button';
         chip.className = 'chip';
         chip.dataset.active = String(viewConsoleLevels.has(level));
-        chip.textContent = level;
+        chip.textContent = label;
         chip.onclick = () => {
           if (viewConsoleLevels.has(level)) {
             viewConsoleLevels.delete(level);
@@ -1062,27 +1803,26 @@ import {
         filterBar.append(chip);
       });
 
-      const searchInput = document.createElement('input');
-      searchInput.type = 'search';
-      searchInput.className = 'search-input';
-      searchInput.placeholder = 'Search console...';
-      searchInput.value = viewConsoleKeyword;
-      searchInput.oninput = (e) => {
-        viewConsoleKeyword = e.target.value.trim().toLowerCase();
-        renderConsoleList();
+      const listContainer = document.createElement('div');
+      const rebuild = () => {
+        listContainer.replaceChildren();
+        const items = logs.filter(
+          (item) => item.section === 'console' && consoleMatches(item),
+        );
+        activeList = createList(
+          listContainer,
+          items,
+          buildConsoleRow,
+          'No matching console logs',
+        );
       };
-      filterBar.append(searchInput);
 
       const clearBtn = document.createElement('button');
       clearBtn.type = 'button';
       clearBtn.className = 'clear-btn';
       clearBtn.textContent = 'Clear';
       clearBtn.onclick = () => {
-        for (let i = logs.length - 1; i >= 0; i--) {
-          if (logs[i].section === 'console') {
-            logs.splice(i, 1);
-          }
-        }
+        removeSection('console');
         console.clear();
         renderConsole();
         updateTabCounts();
@@ -1090,24 +1830,55 @@ import {
       filterBar.append(clearBtn);
 
       // Tag chips stay on the same scrolling row
-      const currentConsoleLogs = logs.filter(
-        (item) => item.section === 'console',
-      );
       const bufferTags = new Set();
-      currentConsoleLogs.forEach((item) => {
-        const msg = String(item.message ?? '');
-        const matches = msg.match(/\[([A-Z0-9_]+)\]/g);
-        if (matches) {
-          matches.forEach((t) => bufferTags.add(t));
-        }
+      logs.forEach((item) => {
+        if (item.section !== 'console') return;
+        const matches = String(item.message ?? '').match(/\[([A-Z0-9_]+)\]/g);
+        if (matches) matches.forEach((tag) => bufferTags.add(tag.slice(1, -1)));
       });
 
+      const menuItems = [
+        {
+          label: 'Select all',
+          active: false,
+          onClick: () => {
+            ['log', 'error', 'warn', 'info', 'debug'].forEach((level) =>
+              viewConsoleLevels.add(level),
+            );
+            viewDisabledTags.clear();
+            renderConsole();
+          },
+        },
+        {
+          label: 'Unselect all',
+          active: false,
+          onClick: () => {
+            viewConsoleLevels.clear();
+            bufferTags.forEach((tag) => viewDisabledTags.add(tag));
+            renderConsole();
+          },
+        },
+        ...[
+          ['log', 'User'],
+          ['error', 'Errors'],
+          ['warn', 'Warnings'],
+          ['info', 'Info'],
+          ['debug', 'Verbose'],
+        ].map(([level, label]) => ({
+          label,
+          active: viewConsoleLevels.has(level),
+          onClick: () => {
+            if (viewConsoleLevels.has(level)) viewConsoleLevels.delete(level);
+            else viewConsoleLevels.add(level);
+            renderConsole();
+          },
+        })),
+      ];
       bufferTags.forEach((tag) => {
         const chip = document.createElement('button');
         chip.type = 'button';
         chip.className = 'chip';
-        const isEnabled = !viewDisabledTags.has(tag);
-        chip.dataset.active = String(isEnabled);
+        chip.dataset.active = String(!viewDisabledTags.has(tag));
         chip.textContent = tag;
         chip.onclick = () => {
           if (viewDisabledTags.has(tag)) {
@@ -1118,275 +1889,233 @@ import {
           renderConsole();
         };
         filterBar.append(chip);
-      });
-      filters.append(filterBar);
-
-      const listContainer = document.createElement('div');
-      sheet.append(listContainer);
-
-      const renderConsoleList = () => {
-        listContainer.replaceChildren();
-        const activeLogs = logs.filter((item) => item.section === 'console');
-        const filtered = activeLogs.filter((item) => {
-          if (
-            viewConsoleLevels.size > 0 &&
-            !viewConsoleLevels.has(item.level)
-          ) {
-            return false;
-          }
-          const msg = stripBoxBorder(stripAnsi(String(item.message ?? '')));
-          if (
-            viewConsoleKeyword &&
-            !msg.toLowerCase().includes(viewConsoleKeyword)
-          ) {
-            return false;
-          }
-          const matches = msg.match(/\[([A-Z0-9_]+)\]/g);
-          if (matches && matches.length > 0) {
-            const anyActive = matches.some((t) => !viewDisabledTags.has(t));
-            if (!anyActive) return false;
-          }
-          return true;
+        menuItems.push({
+          label: tag,
+          active: !viewDisabledTags.has(tag),
+          onClick: () => {
+            if (viewDisabledTags.has(tag)) viewDisabledTags.delete(tag);
+            else viewDisabledTags.add(tag);
+            renderConsole();
+          },
         });
+      });
+      mountFilters(filterBar, menuItems);
 
-        if (!filtered.length) {
-          listContainer.append(empty('No matching console logs'));
-          return;
-        }
+      sheet.append(listContainer);
+      rebuild();
+      refreshSearch();
+    };
 
-        filtered.forEach((item) => {
-          const block = document.createElement('div');
-          block.className = 'card';
-          const toggle = document.createElement('button');
-          toggle.type = 'button';
-          toggle.className = 'log';
+    const networkMatches = (item) => {
+      if (viewNetworkKind === 'All') return true;
+      const k = item.kind || 'Other';
+      if (viewNetworkKind === 'Other') {
+        return (
+          k === 'Other' ||
+          !['Fetch/XHR', 'CSS', 'JS', 'Img', 'Socket'].includes(k)
+        );
+      }
+      return k === viewNetworkKind;
+    };
 
-          const line = document.createElement('div');
-          line.className = 'line';
+    const buildNetworkRow = (item) => {
+      const status = String(item.status);
+      const ok = item.ok || (Number(status) >= 200 && Number(status) < 400);
+      const block = document.createElement('div');
+      block.className = 'card';
+      const row = document.createElement('div');
+      row.className = 'net-row';
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.className = 'net';
 
-          const level = document.createElement('b');
-          level.textContent = item.level;
-          level.style.color =
-            item.level === 'error'
-              ? '#b42318'
-              : item.level === 'warn'
-              ? '#b54708'
-              : '#344054';
+      const url = document.createElement('span');
+      url.className = 'url';
+      url.textContent = item.url || '';
 
-          const preview = document.createElement('span');
-          preview.className = 'preview';
-          preview.textContent = stripBoxBorder(
-            stripAnsi(String(item.message ?? '')),
-          );
+      const meta = document.createElement('span');
+      meta.className = 'net-meta';
 
-          const copyBtn = document.createElement('button');
-          copyBtn.type = 'button';
-          copyBtn.className = 'copy';
-          copyBtn.textContent = 'Copy';
-          copyBtn.onclick = (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            const cleanText = stripBoxBorder(
-              stripAnsi(String(item.message ?? '')),
-            );
-            copyText(cleanText, (ok) => {
-              copyBtn.textContent = ok ? 'Copied' : 'Failed';
-              setTimeout(() => {
-                copyBtn.textContent = 'Copy';
-              }, 1200);
-            });
-          };
+      const method = document.createElement('b');
+      method.className = 'method';
+      method.dataset.method = (item.method || 'GET').toLowerCase();
+      method.textContent = item.method || 'GET';
 
-          line.append(level, preview, copyBtn);
+      const code = document.createElement('span');
+      code.className = 'status ' + (ok ? 'ok' : 'bad');
+      code.textContent = (ok ? '\u2713 ' : '\u2715 ') + status;
 
-          const when = document.createElement('div');
-          when.className = 'when';
-          const date = new Date(item.time);
-          when.textContent = Number.isNaN(date.getTime())
-            ? ''
-            : date.toLocaleString(undefined, {
-                hour: 'numeric',
-                minute: '2-digit',
-                second: '2-digit',
-              });
+      const when = document.createElement('span');
+      when.className = 'when';
+      when.textContent = timeLabel(item.time);
+      if (item.costTime != null && item.costTime !== '') {
+        when.textContent =
+          (when.textContent ? when.textContent + ' \u00b7 ' : '') +
+          item.costTime +
+          ' ms';
+      }
+      meta.append(method, code, when);
+      toggle.append(url, meta);
 
-          toggle.append(line, when);
+      const body = document.createElement('div');
+      body.className = 'detail';
+      body.hidden = true;
+      toggleDetail(toggle, body, (target) => {
+        const requestLabel = document.createElement('h3');
+        requestLabel.textContent = 'Request';
+        const responseLabel = document.createElement('h3');
+        responseLabel.textContent = 'Response';
+        target.append(
+          requestLabel,
+          jsonBlock(item.requestBody),
+          responseLabel,
+          jsonBlock(item.error || item.responseBody),
+        );
+      });
 
-          const body = document.createElement('div');
-          body.className = 'detail';
-          body.hidden = true;
-
-          const full =
-            item.args && item.args.length
-              ? item.args.length === 1
-                ? item.args[0]
-                : item.args
-              : item.message;
-          body.append(jsonBlock(full));
-
-          toggle.onclick = () => {
-            body.hidden = !body.hidden;
-          };
-
-          block.append(toggle, body);
-          listContainer.append(block);
+      const copyButton = document.createElement('button');
+      copyButton.type = 'button';
+      copyButton.className = 'copy';
+      copyButton.textContent = 'Copy';
+      copyButton.setAttribute('aria-label', 'Copy request and response');
+      copyButton.onclick = (event) => {
+        event.stopPropagation();
+        copyText(fullNetworkText(item), (copied) => {
+          copyButton.textContent = copied ? 'Copied' : 'Failed';
+          setTimeout(() => {
+            copyButton.textContent = 'Copy';
+          }, 1200);
         });
       };
 
-      renderConsoleList();
+      row.append(toggle, copyButton);
+      block.append(row, body);
+      return block;
     };
 
     const renderNetwork = () => {
       filters.replaceChildren();
       sheet.replaceChildren();
+      activeList = null;
+      refreshBadge = null;
 
       const filterBar = document.createElement('div');
       filterBar.className = 'filter-bar';
 
-      const chips = ['All', 'Fetch/XHR', 'CSS', 'JS', 'Img', 'Socket', 'Other'];
-      chips.forEach((kind) => {
-        const chip = document.createElement('button');
-        chip.type = 'button';
-        chip.className = 'chip';
-        chip.dataset.active = String(viewNetworkKind === kind);
-        chip.textContent = kind;
-        chip.onclick = () => {
-          viewNetworkKind = kind;
-          renderNetwork();
-        };
-        filterBar.append(chip);
-      });
+      ['All', 'Fetch/XHR', 'CSS', 'JS', 'Img', 'Socket', 'Other'].forEach(
+        (kind) => {
+          const chip = document.createElement('button');
+          chip.type = 'button';
+          chip.className = 'chip';
+          chip.dataset.active = String(viewNetworkKind === kind);
+          chip.textContent = kind;
+          chip.onclick = () => {
+            viewNetworkKind = kind;
+            renderNetwork();
+          };
+          filterBar.append(chip);
+        },
+      );
 
       const clearBtn = document.createElement('button');
       clearBtn.type = 'button';
       clearBtn.className = 'clear-btn';
       clearBtn.textContent = 'Clear';
       clearBtn.onclick = () => {
-        for (let i = logs.length - 1; i >= 0; i--) {
-          if (logs[i].section === 'network') {
-            logs.splice(i, 1);
-          }
-        }
+        removeSection('network');
         renderNetwork();
         updateTabCounts();
       };
 
-      const networkLogs = logs.filter((item) => item.section === 'network');
-      const filtered = networkLogs.filter((item) => {
-        if (viewNetworkKind === 'All') return true;
-        const k = item.kind || 'Other';
-        if (viewNetworkKind === 'Other') {
-          return (
-            k === 'Other' ||
-            !['Fetch/XHR', 'CSS', 'JS', 'Img', 'Socket'].includes(k)
-          );
-        }
-        return k === viewNetworkKind;
-      });
-
+      const items = logs.filter(
+        (item) => item.section === 'network' && networkMatches(item),
+      );
       const countBadge = document.createElement('span');
       countBadge.className = 'filter-count';
-      countBadge.style.cssText = 'font-size:12px;color:#667;';
-      countBadge.textContent = `${filtered.length} / ${networkLogs.length}`;
+      let shown = items.length;
+      refreshBadge = () => {
+        countBadge.textContent = `${shown} / ${sectionCounts.network || 0}`;
+      };
+      refreshBadge();
       filterBar.append(countBadge, clearBtn);
-
-      filters.append(filterBar);
+      mountFilters(
+        filterBar,
+        ['All', 'Fetch/XHR', 'CSS', 'JS', 'Img', 'Socket', 'Other'].map(
+          (kind) => ({
+            label: kind,
+            active: viewNetworkKind === kind,
+            onClick: () => {
+              viewNetworkKind = kind;
+              renderNetwork();
+            },
+          }),
+        ),
+      );
 
       const listContainer = document.createElement('div');
       sheet.append(listContainer);
+      const list = createList(
+        listContainer,
+        items,
+        buildNetworkRow,
+        'No matching network logs',
+      );
+      activeList = {
+        append(item) {
+          list.append(item);
+          shown = items.length;
+          refreshSearch();
+        },
+      };
+      refreshSearch();
+    };
 
-      if (!filtered.length) {
-        listContainer.append(empty('No matching network logs'));
+    const flush = () => {
+      flushTimer = null;
+      const batch = pending;
+      pending = [];
+      if (!root.isConnected) return;
+      batch.forEach((entry) => {
+        if (!activeList) return;
+        if (activeSection === 'Console' && entry.section === 'console') {
+          if (consoleMatches(entry)) activeList.append(entry);
+        } else if (activeSection === 'Network' && entry.section === 'network') {
+          if (networkMatches(entry)) activeList.append(entry);
+        }
+      });
+      if (refreshBadge) refreshBadge();
+      updateTabCounts();
+    };
+    const onLog = (entry) => {
+      if (!root.isConnected) {
+        subscribers.delete(onLog);
         return;
       }
-
-      filtered.forEach((item) => {
-        const status = String(item.status);
-        const ok = item.ok || (Number(status) >= 200 && Number(status) < 400);
-        const block = document.createElement('div');
-        block.className = 'card';
-        const toggle = document.createElement('button');
-        toggle.type = 'button';
-        toggle.className = 'net';
-
-        const line = document.createElement('div');
-        line.className = 'line';
-
-        const method = document.createElement('b');
-        method.className = 'method';
-        method.dataset.method = (item.method || 'GET').toLowerCase();
-        method.textContent = item.method || 'GET';
-
-        const code = document.createElement('span');
-        code.className = 'status ' + (ok ? 'ok' : 'bad');
-        code.textContent = status;
-
-        const url = document.createElement('span');
-        url.className = 'url';
-        url.textContent = item.url || '';
-
-        const copyButton = document.createElement('button');
-        copyButton.type = 'button';
-        copyButton.className = 'copy';
-        copyButton.textContent = 'Copy cURL';
-        copyButton.onclick = (event) => {
-          event.stopPropagation();
-          const text = curlText(item);
-          copyText(text, (ok) => {
-            copyButton.textContent = ok ? 'Copied' : 'Failed';
-            setTimeout(() => {
-              copyButton.textContent = 'Copy cURL';
-            }, 1200);
-          });
-        };
-
-        line.append(method, code, url, copyButton);
-
-        const when = document.createElement('div');
-        when.className = 'when';
-        const date = new Date(item.time);
-        when.textContent = Number.isNaN(date.getTime())
-          ? ''
-          : date.toLocaleString(undefined, {
-              month: 'short',
-              day: 'numeric',
-              hour: 'numeric',
-              minute: '2-digit',
-              second: '2-digit',
-            });
-        if (item.costTime != null && item.costTime !== '') {
-          when.textContent =
-            (when.textContent ? when.textContent + ' · ' : '') +
-            item.costTime +
-            ' ms';
-        }
-
-        const body = document.createElement('div');
-        body.className = 'detail';
-        body.hidden = true;
-
-        const requestLabel = document.createElement('h3');
-        requestLabel.textContent = 'Request';
-        const responseLabel = document.createElement('h3');
-        responseLabel.textContent = 'Response';
-        body.append(
-          requestLabel,
-          jsonBlock(item.requestBody),
-          responseLabel,
-          jsonBlock(item.error || item.responseBody),
-        );
-
-        toggle.append(line, when);
-        toggle.onclick = () => {
-          body.hidden = !body.hidden;
-        };
-
-        block.append(toggle, body);
-        listContainer.append(block);
-      });
+      pending.push(entry);
+      if (!flushTimer) flushTimer = setTimeout(flush, 200);
+    };
+    subscribers.add(onLog);
+    root.__dispose = () => {
+      subscribers.delete(onLog);
+      clearTimeout(flushTimer);
+      flushTimer = null;
+      pending = [];
+    };
+    close.onclick = () => {
+      if (searchQuery) {
+        endSearch();
+        return;
+      }
+      refreshOpenViewer = null;
+      closeFilterMenu();
+      root.__dispose();
+      root.remove();
     };
 
     const show = (name) => {
+      activeSection = name;
+      activeList = null;
+      refreshBadge = null;
       buttons.forEach((button) => {
         button.dataset.active = String(button.dataset.section === name);
       });
@@ -1406,16 +2135,18 @@ import {
           storageGroup('Session storage', data.storage.sessionStorage),
         );
         sheet.append(pair('Cookie', data.storage.cookie));
+        refreshSearch();
         return;
       }
       Object.entries(data.device).forEach(([key, value]) => {
         sheet.append(pair(key, String(value ?? '')));
       });
+      refreshSearch();
     };
 
     [
-      ['Console', logs.filter((it) => it.section === 'console').length],
-      ['Network', logs.filter((it) => it.section === 'network').length],
+      ['Console', sectionCounts.console || 0],
+      ['Network', sectionCounts.network || 0],
       ['Storage', null],
       ['Device', null],
     ].forEach(([name, count]) => {
@@ -1428,8 +2159,288 @@ import {
       tabs.append(button);
     });
 
-    show('Console');
     document.body.appendChild(root);
+    refreshOpenViewer = () => {
+      updateTabCounts();
+      show(activeSection);
+    };
+    show('Console');
+  };
+
+  // ---- Recordings: manual "Upload logs" -------------------------------------
+  // The patched SDK forwards every "public-data" message here (see
+  // scripts/patch-sdk-network.mjs). Items use the same shape the DataHarbor
+  // plugin stores, so the panel's /log/upload consumers read them unchanged.
+  const HARBOR_MAX_ITEMS = 5000;
+  const HARBOR_MAX_CHARS = 40000000;
+  const HARBOR_TYPES = ['console', 'network', 'storage', 'system'];
+  const harbor = [];
+  let harborChars = 0;
+
+  const onPublicData = (msg) => {
+    if (!msg || !currentSettings.masterLogs) return;
+    const type = msg.type;
+    if (!HARBOR_TYPES.includes(type)) return;
+    let json;
+    try {
+      json = JSON.stringify(msg.data);
+    } catch (error) {
+      return;
+    }
+    if (typeof json !== 'string') return;
+    harbor.push({ type, timestamp: Date.now(), json });
+    harborChars += json.length;
+    syncUploadButton();
+    while (
+      harbor.length > HARBOR_MAX_ITEMS ||
+      (harborChars > HARBOR_MAX_CHARS && harbor.length > 1)
+    ) {
+      harborChars -= harbor.shift().json.length;
+    }
+  };
+
+  const hasUploadableLogs = () => harbor.some((item) => item.type !== 'system');
+
+  // DataHarbor stores `data` as a zlib-compressed latin1 string. Do the same
+  // when CompressionStream exists, otherwise ship the plain object (the panel
+  // accepts both).
+  const packData = async (json) => {
+    if (typeof CompressionStream !== 'function') return JSON.parse(json);
+    const stream = new Blob([json])
+      .stream()
+      .pipeThrough(new CompressionStream('deflate'));
+    const bytes = new Uint8Array(await new Response(stream).arrayBuffer());
+    let out = '';
+    for (let i = 0; i < bytes.length; i += 8192) {
+      out += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+    }
+    return out;
+  };
+
+  const spyInstance = () =>
+    window.$pageSpy || (window.PageSpy && window.PageSpy.instance) || null;
+
+  const spyConfig = () => {
+    try {
+      const spy = spyInstance();
+      return spy && spy.config && spy.config.get ? spy.config.get() : null;
+    } catch (error) {
+      return null;
+    }
+  };
+
+  const spyDeviceId = () => {
+    try {
+      const room = sessionStorage.getItem('page-spy-room');
+      if (room) return JSON.parse(room).address || '--';
+    } catch (error) {}
+    const spy = spyInstance();
+    return (spy && spy.address) || '--';
+  };
+
+  const buildUpload = async (logTitle, remark) => {
+    const title = String(logTitle || '').trim();
+    const note = String(remark || '').trim();
+    if (!title) throw new Error('A title is required.');
+    if (!note) throw new Error('A description is required.');
+    const config = spyConfig();
+    if (!config || !config.api)
+      throw new Error('PageSpy api is not configured');
+    const apiBase =
+      (config.enableSSL ? 'https://' : 'http://') +
+      String(config.api).replace(/\/+$/, '');
+    const items = [];
+    for (let i = 0; i < harbor.length; i += 50) {
+      const part = await Promise.all(
+        harbor.slice(i, i + 50).map(async (item) => ({
+          type: item.type,
+          timestamp: item.timestamp,
+          data: await packData(item.json),
+        })),
+      );
+      items.push(...part);
+    }
+    const startTime = harbor[0] ? harbor[0].timestamp : Date.now();
+    const endTime = harbor.length
+      ? harbor[harbor.length - 1].timestamp
+      : startTime;
+    items.push({
+      type: 'meta',
+      timestamp: endTime,
+      data: await packData(
+        JSON.stringify({
+          ua: navigator.userAgent,
+          title: document.title,
+          url: window.location.href,
+          startTime,
+          endTime,
+          logTitle: title,
+          remark: note,
+        }),
+      ),
+    });
+    const fileName =
+      new Date()
+        .toLocaleString('en-GB', { timeZone: 'Asia/Tehran', hour12: false })
+        .replace(/[^\w]/g, '_') + '.json';
+    const file = new File([JSON.stringify(items)], fileName, {
+      type: 'application/json',
+    });
+    const body = new FormData();
+    body.append('log', file);
+    const query = new URLSearchParams({
+      project: config.project || '',
+      title: config.title || '',
+      deviceId: spyDeviceId(),
+      userAgent: navigator.userAgent,
+      logTitle: title,
+      remark: note,
+    }).toString();
+    return {
+      url: apiBase + '/api/v1/log/upload?' + query,
+      body,
+      count: harbor.length,
+    };
+  };
+
+  const uploadLogs = async (logTitle, remark) => {
+    const request = await buildUpload(logTitle, remark);
+    const response = await fetch(request.url, {
+      method: 'POST',
+      body: request.body,
+    });
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    const result = await response.json();
+    if (!result.success) throw new Error(result.message || 'Upload failed');
+    return { count: request.count };
+  };
+
+  const mountOverlay = (overlay) => {
+    const host = document.getElementById('__pageSpy');
+    if (typeof overlay.showPopover === 'function') {
+      overlay.setAttribute('popover', 'manual');
+      document.body.appendChild(overlay);
+      try {
+        overlay.showPopover();
+      } catch (e) {}
+    } else if (host && host.shadowRoot) {
+      overlay.style.zIndex = '20000';
+      host.shadowRoot.appendChild(overlay);
+    } else {
+      document.body.appendChild(overlay);
+    }
+  };
+
+  const openUploadDialog = () => {
+    ensureTokens();
+    const overlay = document.createElement('div');
+    overlay.className = 'spyt-overlay';
+    overlay.innerHTML =
+      '<style>' +
+      DIALOG_CSS +
+      '.spyt-textarea{display:block;width:100%;min-height:168px;margin:8px 0 12px;padding:10px 40px 10px 12px;border:1px solid var(--spyt-input);border-radius:var(--spyt-radius);background:var(--spyt-bg);color:var(--spyt-fg);font:16px/1.45 var(--spyt-font);resize:vertical}' +
+      '.spyt-field{position:relative;display:block}' +
+      '.spyt-field .spyt-input{padding-right:40px}' +
+      '.spyt-clear{position:absolute;top:8px;right:6px;width:32px;height:32px;border:0;border-radius:6px;background:transparent;color:var(--spyt-muted-fg);font-size:18px;line-height:1;cursor:pointer}' +
+      '.spyt-textarea:focus{outline:2px solid var(--spyt-ring);outline-offset:1px}' +
+      '.spyt-status{min-height:20px;margin:0 0 12px;font-size:13px;color:var(--spyt-muted-fg)}' +
+      '.spyt-btn:disabled{opacity:.5;cursor:not-allowed}' +
+      '</style>' +
+      '<form class="spyt-card">' +
+      '<div class="spyt-title">Upload logs</div>' +
+      '<label class="spyt-label">Title' +
+      '<span class="spyt-field">' +
+      '<input class="spyt-input" name="logTitle" dir="auto" maxlength="80" autocomplete="off" placeholder="Short title for this log" />' +
+      '<button type="button" class="spyt-clear" data-clear="logTitle" aria-label="Clear title">×</button>' +
+      '</span></label>' +
+      '<label class="spyt-label">Description' +
+      '<span class="spyt-field">' +
+      '<textarea class="spyt-textarea" name="remark" dir="auto" rows="6" maxlength="1000" placeholder="What did you do, what went wrong?"></textarea>' +
+      '<button type="button" class="spyt-clear" data-clear="remark" aria-label="Clear description">×</button>' +
+      '</span></label>' +
+      '<div class="spyt-status" role="status" aria-live="polite"></div>' +
+      '<div class="spyt-actions">' +
+      '<button type="button" class="spyt-btn" data-cancel>Cancel</button>' +
+      '<button type="submit" class="spyt-btn spyt-btn-primary" data-upload>Upload</button>' +
+      '</div></form>';
+    const titleInput = overlay.querySelector('input[name="logTitle"]');
+    const textarea = overlay.querySelector('textarea');
+    overlay.querySelector('[data-clear="logTitle"]').onclick = () => {
+      titleInput.value = '';
+      titleInput.focus();
+    };
+    overlay.querySelector('[data-clear="remark"]').onclick = () => {
+      textarea.value = '';
+      textarea.focus();
+    };
+    const status = overlay.querySelector('.spyt-status');
+    const cancel = overlay.querySelector('[data-cancel]');
+    const submit = overlay.querySelector('[data-upload]');
+    const close = () => {
+      try {
+        if (typeof overlay.hidePopover === 'function') overlay.hidePopover();
+      } catch (e) {}
+      overlay.remove();
+    };
+    cancel.onclick = close;
+    overlay.onsubmit = async (event) => {
+      event.preventDefault();
+      if (submit.disabled) return;
+      const logTitle = titleInput.value.trim();
+      const remark = textarea.value.trim();
+      if (!logTitle) {
+        status.style.color = 'var(--spyt-destructive)';
+        status.textContent = 'A title is required.';
+        titleInput.focus();
+        return;
+      }
+      if (!remark) {
+        status.style.color = 'var(--spyt-destructive)';
+        status.textContent = 'A description is required.';
+        textarea.focus();
+        return;
+      }
+      submit.disabled = true;
+      cancel.disabled = true;
+      status.style.color = 'var(--spyt-muted-fg)';
+      status.textContent = 'Uploading…';
+      try {
+        const result = await uploadLogs(logTitle, remark);
+        status.style.color = 'var(--spyt-success)';
+        status.textContent = 'Uploaded (' + result.count + ' events)';
+        cancel.textContent = 'Close';
+        titleInput.disabled = true;
+        textarea.disabled = true;
+      } catch (error) {
+        status.style.color = 'var(--spyt-destructive)';
+        status.textContent =
+          'Upload failed: ' + (error && error.message ? error.message : error);
+        submit.disabled = false;
+        submit.textContent = 'Retry';
+      }
+      cancel.disabled = false;
+    };
+    mountOverlay(overlay);
+    titleInput.focus();
+  };
+
+  const syncUploadButton = () => {
+    const host = document.getElementById('__pageSpy');
+    const root = host && host.shadowRoot ? host.shadowRoot : document;
+    const button = root.querySelector('#page-spy-upload-logs');
+    if (button) refreshUploadButton(button);
+  };
+
+  const refreshUploadButton = (button) => {
+    // Only touch the DOM when something changed: the dialog is watched by a
+    // MutationObserver that calls this again, so an unconditional write loops.
+    const ready = hasUploadableLogs();
+    if (button.disabled !== !ready) button.disabled = !ready;
+    const title = ready ? '' : 'Nothing recorded yet. Reproduce the bug first.';
+    if (button.title !== title) button.title = title;
+    const span = button.querySelector('span');
+    const label = ready ? 'Upload logs' : 'Upload logs (nothing yet)';
+    if (span && span.textContent !== label) span.textContent = label;
   };
 
   const download = async () => {
@@ -1440,7 +2451,14 @@ import {
 
   const clear = () => {
     logs.length = 0;
+    harbor.length = 0;
+    harborChars = 0;
+    Object.keys(sectionCounts).forEach((k) => {
+      sectionCounts[k] = 0;
+    });
     console.clear();
+    syncUploadButton();
+    if (refreshOpenViewer) refreshOpenViewer();
   };
 
   const icon = (paths) =>
@@ -1458,12 +2476,19 @@ import {
     view: icon(
       '<path d="M2 12s4-6 10-6 10 6 10 6-4 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.5"/>',
     ),
+    upload: icon(
+      '<path d="M12 16V5"/><path d="M8 9l4-4 4 4"/><path d="M5 20h14"/>',
+    ),
     clear: icon(
       '<path d="M4 7h16"/><path d="M9 7V5h6v2"/><path d="M7 7l1 13h8l1-13"/>',
+    ),
+    settings: icon(
+      '<circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/>',
     ),
   };
 
   const mountDialogActions = () => {
+    ensureTokens();
     const host = document.getElementById('__pageSpy');
     const root = host && host.shadowRoot ? host.shadowRoot : document;
     const copyButton = root.querySelector('#page-spy-copy-link');
@@ -1473,15 +2498,27 @@ import {
         document.querySelector('.page-spy-modal-footer');
     if (!copyButton || !footer) return;
     const sdkAlreadyBuilt = !!footer.querySelector('#page-spy-download-logs');
-    if (sdkAlreadyBuilt && footer.querySelector('#page-spy-logs-toggle'))
+    if (
+      sdkAlreadyBuilt &&
+      footer.querySelector('#page-spy-logs-toggle') &&
+      footer.querySelector('#page-spy-upload-logs')
+    ) {
+      refreshUploadButton(footer.querySelector('#page-spy-upload-logs'));
       return;
+    }
     if (!root.querySelector('#pagespy-action-style')) {
       const style = document.createElement('style');
       style.id = 'pagespy-action-style';
       style.textContent = [
-        '#page-spy-copy-link,#page-spy-download-logs,#page-spy-see-logs,#page-spy-logs-toggle,#page-spy-log-settings,#page-spy-clear-logs{width:100% !important;min-height:42px;margin:0 !important;display:flex !important;align-items:center;justify-content:center;gap:8px;padding:0 12px !important;border:1px solid #e6e8f0 !important;border-radius:10px !important;background:#fff !important;color:#1f2430 !important;box-shadow:none !important;font:14px/1 system-ui,sans-serif !important}',
-        '#page-spy-copy-link svg,#page-spy-download-logs svg,#page-spy-see-logs svg,#page-spy-clear-logs svg{flex:none}',
-        '#page-spy-clear-logs{color:#b42318}',
+        '#page-spy-copy-link,#page-spy-download-logs,#page-spy-see-logs,#page-spy-upload-logs,#page-spy-log-settings,#page-spy-clear-logs{width:100% !important;min-height:40px;margin:0 !important;display:flex !important;align-items:center;justify-content:center;gap:8px;padding:0 12px !important;border:1px solid var(--spyt-border) !important;border-radius:var(--spyt-radius) !important;background:transparent !important;color:var(--spyt-fg) !important;box-shadow:none !important;font:13px/1 var(--spyt-font) !important;cursor:pointer}',
+        '#page-spy-logs-toggle{width:100%;min-height:40px;margin:0;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 12px;border:1px solid var(--spyt-border);border-radius:var(--spyt-radius);background:transparent;color:var(--spyt-fg);font:13px/1 var(--spyt-font);cursor:pointer}',
+        '#page-spy-logs-toggle input{appearance:none;width:40px;height:24px;margin:0;border-radius:999px;background:#3a4150;position:relative;cursor:pointer;flex:none}',
+        '#page-spy-logs-toggle input::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff}',
+        '#page-spy-logs-toggle input:checked{background:var(--spyt-primary)}',
+        '#page-spy-logs-toggle input:checked::after{transform:translateX(16px)}',
+        '#page-spy-copy-link{background:var(--spyt-primary) !important;border-color:var(--spyt-primary) !important;color:var(--spyt-primary-fg) !important}',
+        '#page-spy-copy-link svg,#page-spy-download-logs svg,#page-spy-see-logs svg,#page-spy-upload-logs svg,#page-spy-log-settings svg,#page-spy-clear-logs svg{flex:none}',
+        '#page-spy-clear-logs{color:var(--spyt-destructive) !important}',
       ].join('');
       (host && host.shadowRoot ? host.shadowRoot : document.head).append(style);
       if (
@@ -1496,11 +2533,28 @@ import {
     footer.style.flexDirection = 'column';
     footer.style.gap = '8px';
     footer.style.width = '100%';
-    footer.style.padding = '4px 16px 16px';
+    footer.style.padding = '12px 16px max(16px, env(safe-area-inset-bottom))';
     footer.style.boxSizing = 'border-box';
     const paint = (button, kind, label) => {
       button.innerHTML = actionIcons[kind] + '<span></span>';
       button.querySelector('span').textContent = label;
+    };
+    const makeLogsSwitch = () => {
+      const row = document.createElement('label');
+      row.id = 'page-spy-logs-toggle';
+      const name = document.createElement('span');
+      name.textContent = 'Logs';
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.setAttribute('role', 'switch');
+      input.setAttribute('aria-label', 'Logs');
+      input.checked = !!currentSettings.masterLogs;
+      input.addEventListener('change', () => {
+        saveSettings({ masterLogs: input.checked });
+      });
+      row.addEventListener('click', (event) => event.stopPropagation());
+      row.append(name, input);
+      return row;
     };
     paint(copyButton, 'copy', 'Copy debug link');
     const makeButton = (id, kind, label) => {
@@ -1514,27 +2568,52 @@ import {
       });
       return button;
     };
+    let uploadButton = footer.querySelector('#page-spy-upload-logs');
+    if (!uploadButton) {
+      uploadButton = makeButton(
+        'page-spy-upload-logs',
+        'upload',
+        'Upload logs',
+      );
+      uploadButton.addEventListener('click', () => {
+        if (uploadButton.disabled) return;
+        const sdk = window.$pageSpy;
+        if (sdk && sdk.constructor && sdk.constructor.modal) {
+          try {
+            sdk.constructor.modal.close();
+          } catch (e) {}
+        }
+        openUploadDialog();
+      });
+      const clearTarget = footer.querySelector('#page-spy-clear-logs');
+      if (clearTarget) clearTarget.before(uploadButton);
+      else footer.append(uploadButton);
+    }
+    refreshUploadButton(uploadButton);
     if (sdkAlreadyBuilt) {
-      if (!footer.querySelector('#page-spy-logs-toggle')) {
-        const masterButton = makeButton(
-          'page-spy-logs-toggle',
-          'view',
-          currentSettings.masterLogs ? 'Logs ON' : 'Logs OFF',
-        );
-        const settingsButton = makeButton(
+      const existingToggle = footer.querySelector('#page-spy-logs-toggle');
+      if (!existingToggle || !existingToggle.querySelector('input')) {
+        const masterButton = makeLogsSwitch();
+        if (existingToggle) existingToggle.replaceWith(masterButton);
+        else {
+          const see = footer.querySelector('#page-spy-see-logs');
+          if (see) see.after(masterButton);
+          else footer.append(masterButton);
+        }
+      }
+      let settingsButton = footer.querySelector('#page-spy-log-settings');
+      if (!settingsButton) {
+        settingsButton = makeButton(
           'page-spy-log-settings',
-          'view',
+          'settings',
           'Settings',
         );
-        masterButton.addEventListener('click', () => {
-          const on = toggleMaster();
-          const span = masterButton.querySelector('span');
-          if (span) span.textContent = on ? 'Logs ON' : 'Logs OFF';
-        });
         settingsButton.addEventListener('click', () => openSettings());
-        const see = footer.querySelector('#page-spy-see-logs');
-        if (see) see.after(masterButton, settingsButton);
-        else footer.append(masterButton, settingsButton);
+        const toggle = footer.querySelector('#page-spy-logs-toggle');
+        if (toggle) toggle.after(settingsButton);
+        else footer.append(settingsButton);
+      } else if (!settingsButton.querySelector('svg')) {
+        paint(settingsButton, 'settings', 'Settings');
       }
       return;
     }
@@ -1549,23 +2628,14 @@ import {
       'clear',
       'Clear logs',
     );
-    const masterButton = makeButton(
-      'page-spy-logs-toggle',
-      'view',
-      currentSettings.masterLogs ? 'Logs ON' : 'Logs OFF',
-    );
+    const masterButton = makeLogsSwitch();
     const settingsButton = makeButton(
       'page-spy-log-settings',
-      'view',
+      'settings',
       'Settings',
     );
     downloadButton.addEventListener('click', () => download());
     viewButton.addEventListener('click', () => openViewer());
-    masterButton.addEventListener('click', () => {
-      const on = toggleMaster();
-      const span = masterButton.querySelector('span');
-      if (span) span.textContent = on ? 'Logs ON' : 'Logs OFF';
-    });
     settingsButton.addEventListener('click', () => openSettings());
     clearButton.addEventListener('click', () => clear());
     if (!sdkAlreadyBuilt) {
@@ -1576,6 +2646,7 @@ import {
         settingsButton,
         clearButton,
       );
+      clearButton.before(uploadButton);
     } else if (!footer.querySelector('#page-spy-logs-toggle')) {
       const see = footer.querySelector('#page-spy-see-logs');
       if (see) see.after(masterButton, settingsButton);
@@ -1590,6 +2661,10 @@ import {
     openViewer,
     download,
     record,
+    onPublicData,
+    buildUpload,
+    uploadLogs,
+    openUploadDialog,
     getSettings: () => currentSettings,
     saveSettings,
     toggleMaster,
@@ -1598,23 +2673,67 @@ import {
 })();
 
 if (typeof document !== 'undefined') {
+  let mounting = false;
+  let hostObserver = null;
+
+  const footerReady = () => {
+    const host = document.getElementById('__pageSpy');
+    const root = host && host.shadowRoot ? host.shadowRoot : document;
+    const footer =
+      root.querySelector('.page-spy-modal-footer') ||
+      document.querySelector('.page-spy-modal-footer');
+    if (!footer) return false;
+    return !!(
+      footer.querySelector('#page-spy-upload-logs') &&
+      footer.querySelector('#page-spy-logs-toggle input') &&
+      footer.querySelector('#page-spy-log-settings svg') &&
+      footer.querySelector('#page-spy-download-logs') &&
+      footer.querySelector('#page-spy-see-logs') &&
+      footer.querySelector('#page-spy-clear-logs') &&
+      footer.querySelector('#page-spy-log-settings')
+    );
+  };
+
+  const watchHost = () => {
+    const host = document.getElementById('__pageSpy');
+    if (!host) return;
+    if (!hostObserver) hostObserver = new MutationObserver(() => runMount());
+    hostObserver.disconnect();
+    hostObserver.observe(host, { childList: true, subtree: true });
+  };
+
   const runMount = () => {
+    if (mounting || footerReady()) return;
+    mounting = true;
+    if (hostObserver) hostObserver.disconnect();
     try {
       if (window.PageSpyClientLogs) {
         window.PageSpyClientLogs.mountDialogActions();
       }
     } catch (e) {}
+    mounting = false;
+    watchHost();
   };
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', runMount);
+    document.addEventListener('DOMContentLoaded', () => {
+      runMount();
+      watchHost();
+    });
   } else {
     runMount();
+    watchHost();
   }
-  const observer = new MutationObserver(runMount);
-  observer.observe(document.documentElement, {
-    childList: true,
-    subtree: true,
-  });
+  if (!document.getElementById('__pageSpy')) {
+    const waitForHost = new MutationObserver(() => {
+      if (!document.getElementById('__pageSpy')) return;
+      waitForHost.disconnect();
+      watchHost();
+      runMount();
+    });
+    // The SDK mounts #__pageSpy on <html>, not <body>. childList only, no subtree.
+    waitForHost.observe(document.documentElement, { childList: true });
+  }
   window.addEventListener('modal:show', runMount);
   document.addEventListener(
     'click',
@@ -1624,8 +2743,6 @@ if (typeof document !== 'undefined') {
         (e.target.closest('.page-spy-logo') || e.target.closest('#__pageSpy'))
       ) {
         setTimeout(runMount, 0);
-        setTimeout(runMount, 50);
-        setTimeout(runMount, 200);
       }
     },
     true,

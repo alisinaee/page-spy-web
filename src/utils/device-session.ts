@@ -1,3 +1,4 @@
+import { formatTehranDateTime } from '@/utils/tehran';
 import { useSocketMessageStore } from '@/store/socket-message';
 import { redactSecrets } from '../../smoke-test/log-format.js';
 
@@ -30,9 +31,9 @@ const normalizeValue = (
   if (valueType === 'string' || valueType === 'boolean') return value;
   if (valueType === 'number')
     return Number.isFinite(value as number) ? value : null;
-  if (valueType === 'bigint') return value.toString();
+  if (valueType === 'bigint') return (value as bigint).toString();
   if (valueType === 'undefined' || valueType === 'function') return undefined;
-  if (valueType === 'symbol') return value.toString();
+  if (valueType === 'symbol') return (value as symbol).toString();
 
   if (value instanceof Error) {
     return {
@@ -64,7 +65,7 @@ const normalizeValue = (
       return result === undefined ? null : result;
     });
   } else if (value instanceof Date) {
-    normalized = value.toISOString();
+    normalized = formatTehranDateTime(value);
   } else {
     const record = value as Record<string, unknown>;
     normalized = Object.entries(record).reduce<Record<string, JsonValue>>(
@@ -100,7 +101,7 @@ export const ensurePageSnapshot = async (timeoutMs = 2000) => {
 export const createDeviceSessionSnapshot = (deviceId: string) => {
   const state = useSocketMessageStore.getState();
   return {
-    exportedAt: new Date().toISOString(),
+    exportedAt: formatTehranDateTime(new Date()),
     deviceId: deviceId || 'unknown',
     clientInfo: state.clientInfo,
     console: state.consoleMsg,
@@ -126,7 +127,9 @@ const cleanNamePart = (value: string | undefined, fallback: string) =>
 
 export const suggestDeviceLogName = (deviceId: string, section = 'all') => {
   const info = useSocketMessageStore.getState().clientInfo;
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const stamp = formatTehranDateTime(new Date())
+    .replace(/[^0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
   const shortId = (deviceId || 'device').split('.')[0].slice(0, 8);
   return (
     [

@@ -14,15 +14,9 @@ cp "${root}/smoke-test/log-format.js" "${target_sdk}/log-format.js"
 
 # Official plugins
 target_plugin="${root}/public/plugin"
-# @huolala-tech/page-spy-plugin-rrweb
-mkdir -p "${target_plugin}/rrweb"
-cp "${root}/node_modules/@huolala-tech/page-spy-plugin-rrweb/dist/iife/index.min.js" "${root}/public/plugin/rrweb/index.min.js"
 # @huolala-tech/page-spy-plugin-data-harbor
 mkdir -p "${target_plugin}/data-harbor"
 cp "${root}/node_modules/@huolala-tech/page-spy-plugin-data-harbor/dist/iife/index.min.js" "${root}/public/plugin/data-harbor/index.min.js"
-# @huolala-tech/page-spy-plugin-ospy
-mkdir -p "${target_plugin}/ospy"
-cp "${root}/node_modules/@huolala-tech/page-spy-plugin-ospy/dist/iife/index.min.js" "${root}/public/plugin/ospy/index.min.js"
 
 # source-map
 target_sourcemap="${root}/public/source-map"

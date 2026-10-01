@@ -1,0 +1,10 @@
+/* Panel nesting depends on the DOM position of the atom node. */
+.property-panel {
+  margin-left: 12px;
+}
+.atom-node:not(.atom-node .atom-node) > .property-panel {
+  margin-left: 20px;
+}
+.property-panel .spread-controller {
+  margin-left: -12px;
+}

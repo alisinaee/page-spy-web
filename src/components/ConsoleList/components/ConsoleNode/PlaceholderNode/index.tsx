@@ -3,7 +3,6 @@ import { isString, pullAt } from 'lodash-es';
 import ConsoleNode from '../index';
 import { getStyleObjectFromString } from './utils';
 import { ReactNode, memo } from 'react';
-import './index.less';
 
 /**
  * %o or %O: <object>
@@ -131,5 +130,9 @@ export const PlaceholderNode = memo(({ data }: PlaceholderNodeProps) => {
       result.push(<ConsoleNode data={i} key={i.id} />);
     });
   }
-  return <code className="placeholder-node">{result}</code>;
+  return (
+    <code className="placeholder-node inline-flex flex-wrap items-start gap-1.5 break-words text-xs">
+      {result}
+    </code>
+  );
 });

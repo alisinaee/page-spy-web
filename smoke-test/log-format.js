@@ -263,10 +263,6 @@ export function createBoxLineGrouper(onFlush) {
         const content = stripBoxBorder(rawStr);
         if (!firstMeta) firstMeta = meta;
         lines.push(content);
-        if (lines.length >= 150) {
-          flush();
-          inBox = true;
-        }
         return;
       }
 

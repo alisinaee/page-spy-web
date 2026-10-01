@@ -1,9 +1,8 @@
 import type { SpyMessage, SpySocket } from '@huolala-tech/page-spy-types';
-import { message, notification } from 'antd';
+import { message, notification } from '@/utils/message';
 import * as SERVER_TYPE from './server-type';
 import * as MESSAGE_TYPE from './message-type';
 import { getTranslation } from '@/assets/locales';
-import { MessageInstance } from 'antd/es/message/interface';
 
 const CLIENT_ID = 'Client';
 const ERROR_CODE = {
@@ -124,7 +123,7 @@ export class SocketStore extends EventTarget {
 
   handleErrorMessage(code: string) {
     let i18nKey = '';
-    let messageType: keyof MessageInstance = 'warning';
+    let messageType: 'warning' | 'error' | 'info' | 'success' = 'warning';
     switch (code) {
       case ERROR_CODE.RoomClose:
       case ERROR_CODE.RoomNotFound:

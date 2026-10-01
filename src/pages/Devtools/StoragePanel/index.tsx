@@ -1,90 +1,104 @@
-import type { SpyStorage } from '@huolala-tech/page-spy-types';
-import { Button, Col, Layout, Menu, Row, Tooltip } from 'antd';
-import { Space } from 'antd';
-import { SectionLogActions } from '../SectionLogActions';
-import { useEffect, useMemo, useState } from 'react';
-import './index.less';
-import { useSocketMessageStore } from '@/store/socket-message';
-import Icon, { ReloadOutlined } from '@ant-design/icons';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { RefreshCw, Trash2 } from 'lucide-react';
+import type { SpyStorage } from '@huolala-tech/page-spy-types';
+import { Button } from '@/components/ui/button';
+import { useSocketMessageStore } from '@/store/socket-message';
 import { StorageType, useStorageTypes } from '@/store/platform-config';
 import { DBTable } from '@/components/DBTable';
+import { StorageDetail } from '@/components/StorageTable';
+import { DetailPane, FilterChip, PanelToolbar } from '@/components/panel';
 import { StorageContent } from './StorageContent';
-import { ResizableDetail } from '@/components/ResizableDetail';
 import { useShallow } from 'zustand/react/shallow';
-const { Sider, Content } = Layout;
 
 export const StoragePanel = () => {
   const { t } = useTranslation();
-  const refresh = useSocketMessageStore(useShallow((state) => state.refresh));
-
+  const [refresh, clearRecord] = useSocketMessageStore(
+    useShallow((state) => [state.refresh, state.clearRecord]),
+  );
   const storageTypes = useStorageTypes();
 
-  const [activeTab, setActiveTab] = useState<StorageType | 'indexedDB'>(() => {
-    if (storageTypes.length > 0) {
-      return storageTypes[0].name;
-    }
-    return 'localStorage';
-  });
+  const [activeTab, setActiveTab] = useState<StorageType | 'indexedDB'>(() =>
+    storageTypes.length > 0 ? storageTypes[0].name : 'localStorage',
+  );
+  const [selected, setSelected] = useState<SpyStorage.Data | null>(null);
 
   useEffect(() => {
     if (
       storageTypes.length > 0 &&
-      !storageTypes.some((t) => t.name === activeTab)
+      !storageTypes.some((s) => s.name === activeTab)
     ) {
       setActiveTab(storageTypes[0].name);
     }
   }, [storageTypes, activeTab]);
 
-  const storageList = useMemo(() => {
-    return storageTypes.map((st) => {
-      return {
-        key: st.name,
-        label: st.label,
-        icon: <Icon component={st.icon} />,
-      };
-    });
-  }, [storageTypes]);
+  useEffect(() => setSelected(null), [activeTab]);
 
   return (
-    <div className="storage-panel">
-      <Row justify="end">
-        <Col>
-          <Space>
-            <SectionLogActions section="storage" />
-            <Tooltip title={t('common.refresh')}>
-              <Button
-                onClick={() => {
-                  refresh(activeTab);
-                }}
-              >
-                <ReloadOutlined />
-              </Button>
-            </Tooltip>
-          </Space>
-        </Col>
-      </Row>
-      <Layout className="storage-panel__layout">
-        <Sider className="storage-panel__sider">
-          <Menu
-            className="storage-panel__menu"
-            mode="inline"
-            selectedKeys={[activeTab]}
-            onSelect={({ key }) => setActiveTab(key as SpyStorage.DataType)}
-            items={storageList}
-          />
-        </Sider>
-        <Layout>
-          <Content className="storage-panel__content">
-            {activeTab === 'indexedDB' ? (
-              <DBTable />
-            ) : (
-              <StorageContent activeTab={activeTab} />
-            )}
-          </Content>
-          {activeTab !== 'indexedDB' && <ResizableDetail />}
-        </Layout>
-      </Layout>
+    <div className="flex h-full min-h-0 flex-col bg-background">
+      <PanelToolbar
+        actions={
+          <>
+            <Button
+              variant="ghost"
+              size="icon-touch"
+              aria-label={t('common.refresh')!}
+              className="md:size-8 md:min-h-0 md:min-w-0"
+              onClick={() => refresh(activeTab)}
+            >
+              <RefreshCw />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-touch"
+              aria-label={t('common.clear')!}
+              className="md:size-8 md:min-h-0 md:min-w-0"
+              onClick={() => {
+                clearRecord('storage');
+                setSelected(null);
+              }}
+            >
+              <Trash2 />
+            </Button>
+          </>
+        }
+      >
+        {storageTypes.map((st) => {
+          const Icon = st.icon;
+          return (
+            <FilterChip
+              key={st.name}
+              active={activeTab === st.name}
+              onClick={() => setActiveTab(st.name)}
+              icon={Icon && <Icon />}
+            >
+              {st.label}
+            </FilterChip>
+          );
+        })}
+      </PanelToolbar>
+      {activeTab === 'indexedDB' ? (
+        <div className="min-h-0 flex-1">
+          <DBTable />
+        </div>
+      ) : (
+        <div className="flex min-h-0 flex-1">
+          <div className="min-w-0 flex-1 overflow-auto">
+            <StorageContent
+              activeTab={activeTab}
+              selected={selected}
+              onSelect={setSelected}
+            />
+          </div>
+          <DetailPane
+            open={!!selected}
+            onClose={() => setSelected(null)}
+            title={selected?.name ?? ''}
+          >
+            {selected && <StorageDetail row={selected} />}
+          </DetailPane>
+        </div>
+      )}
     </div>
   );
 };

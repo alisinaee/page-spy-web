@@ -30,7 +30,10 @@ export const LoadMore = React.memo(
         {current.map(render)}
         {rest.length > 0 ? (
           !expand ? (
-            <div onClick={() => setExpand(true)} className="load-more-btn">
+            <div
+              onClick={() => setExpand(true)}
+              className="load-more-btn cursor-pointer text-primary-text hover:underline"
+            >
               ({rest.length} more ...)
             </div>
           ) : (

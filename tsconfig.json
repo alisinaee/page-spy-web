@@ -12,12 +12,13 @@
     "sourceMap": true,
     "baseUrl": "./",
     "strict": true,
-    "types": ["vite-plugin-svgr/client", "mdx"],
+    "types": ["vite-plugin-svgr/client"],
     "paths": {
       "@/*": ["src/*"]
     },
     "allowSyntheticDefaultImports": true,
-    "useDefineForClassFields": false
+    "useDefineForClassFields": false,
+    "skipLibCheck": true
   },
   "include": ["src/**/*"]
 }

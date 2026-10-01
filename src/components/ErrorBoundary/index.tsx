@@ -1,49 +1,34 @@
-import { GithubOutlined, ReloadOutlined } from '@ant-design/icons';
-import { Row, Col, Button } from 'antd';
-import Title from 'antd/es/typography/Title';
+import { RotateCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Component, ReactNode } from 'react';
-import './index.less';
-import Link from 'antd/es/typography/Link';
-import { Trans, useTranslation } from 'react-i18next';
+import './index.css';
+import { useTranslation } from 'react-i18next';
 
 const ErrorElement = ({ error }: { error: Error }) => {
   const { t } = useTranslation();
   return (
-    <div className="error-boundary">
+    <div className="error-boundary flex h-dvh w-screen items-center justify-center">
       <div className="error-container">
-        <Row align="middle" gutter={32}>
-          <Col>
-            <div className="logo" />
-          </Col>
-          <Col>
-            <Title level={3}>😱 {t('error.oops')}</Title>
-            <p className="error-actions">
-              <Trans i18nKey="error.actions">
-                You can take a
-                <Button
-                  size="middle"
-                  icon={<ReloadOutlined />}
-                  onClick={() => {
-                    window.location.reload();
-                  }}
-                >
-                  Try again
-                </Button>
-                or
-                <Button size="middle" icon={<GithubOutlined />}>
-                  <Link
-                    href={`${import.meta.env.VITE_GITHUB_REPO}/issues`}
-                    target="_blank"
-                  >
-                    Report
-                  </Link>
-                </Button>
-                the issue.
-              </Trans>
+        <div className="flex items-center gap-8 flex-col sm:flex-row">
+          <div className="logo relative size-20 shrink-0 grayscale-[0.4]" />
+          <div>
+            <h3 className="text-xl font-bold mb-2">{t('error.oops')}</h3>
+            <p className="error-actions flex items-center flex-wrap gap-2 text-sm text-muted-foreground">
+              {t('error.actions')}
+              <Button
+                size="touch"
+                variant="outline"
+                onClick={() => {
+                  window.location.reload();
+                }}
+              >
+                <RotateCw />
+                {t('error.try-again')}
+              </Button>
             </p>
-          </Col>
-        </Row>
-        <div className="error-detail">
+          </div>
+        </div>
+        <div className="error-detail mt-8 max-h-[400px] max-w-[55vw] overflow-auto rounded-lg border-2 border-border p-3 text-sm text-destructive">
           <pre>{error.stack}</pre>
         </div>
       </div>

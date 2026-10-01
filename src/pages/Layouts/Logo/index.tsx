@@ -1,47 +1,13 @@
-import { isClient } from '@/utils/constants';
-import { version } from '../../../../package.json';
 import { Link } from 'react-router-dom';
-import { useMemo } from 'react';
-import LogoSvg from '@/assets/image/logo.svg?react';
-import OSpySvg from '@/assets/image/o-spy.svg?react';
-import Icon from '@ant-design/icons';
-import Title from 'antd/es/typography/Title';
-import './index.less';
-import { useWhere } from '@/utils/useWhere';
 import { BRAND_NAME } from '@/utils/brand';
-import clsx from 'clsx';
 
 export const Logo = () => {
-  const where = useWhere();
-
-  const config = useMemo(() => {
-    const { isOSpy } = where;
-    if (isOSpy) {
-      return {
-        image: OSpySvg,
-        name: 'O-Spy',
-        link: '/o-spy',
-      };
-    }
-    return {
-      image: LogoSvg,
-      name: BRAND_NAME,
-      link: '/',
-    };
-  }, [where]);
-
   return (
     <Link
-      to={config.link}
-      className={clsx('logo', {
-        'in-ospy': where.isOSpy,
-      })}
+      to="/room-list"
+      className="flex h-12 items-center text-sm font-semibold tracking-tight text-foreground"
     >
-      <Icon component={config.image} className="logo-icon" />
-      <Title level={4} className="logo-name">
-        {config.name}
-        {isClient && <span className="page-spy-version">v{version}</span>}
-      </Title>
+      {BRAND_NAME}
     </Link>
   );
 };

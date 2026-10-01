@@ -108,3 +108,15 @@ export const getRowClassName = (row: ResolvedNetworkInfo) => {
 
   return '';
 };
+
+/** Best-effort payload size: Content-Length header, else string length. */
+export const getSizeText = (row: ResolvedNetworkInfo) => {
+  const header = row.responseHeader?.find(
+    ([key]) => key.toLowerCase() === 'content-length',
+  );
+  const fromHeader = header ? Number(header[1]) : NaN;
+  if (Number.isFinite(fromHeader)) return semanticSize(fromHeader);
+  if (typeof row.response === 'string' && row.response.length)
+    return semanticSize(row.response.length);
+  return '-';
+};

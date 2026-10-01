@@ -1,19 +1,15 @@
 import React from 'react';
-import { RouteObject } from 'react-router-dom';
+import { Navigate, RouteObject } from 'react-router-dom';
 import { useRoutes } from 'react-router-dom';
 
 import { Page404, To404 } from '@/404';
 import { Layouts } from '@/pages/Layouts';
-import { Main } from '@/pages/Main';
-import { OSpy } from '@/pages/OSpy';
 import ProtectedRoute from '@/components/ProtectedRoute';
 
 const Devtools = React.lazy(() => import('@/pages/Devtools'));
 const RoomList = React.lazy(() => import('@/pages/RoomList'));
-const MainDocs = React.lazy(() => import('@/pages/MainDocs'));
-const Replay = React.lazy(() => import('@/pages/Replay'));
-const LogList = React.lazy(() => import('@/pages/LogList'));
-const OSpyDocs = React.lazy(() => import('@/pages/OSpyDocs'));
+const Recordings = React.lazy(() => import('@/pages/Recordings'));
+const RecordingViewer = React.lazy(() => import('@/pages/Recordings/Viewer'));
 
 export interface RouteInfo {
   icon?: any;
@@ -30,7 +26,7 @@ const routes: RouteObject[] = [
     children: [
       {
         index: true,
-        element: <Main />,
+        element: <Navigate to="room-list" replace />,
       },
       {
         path: 'devtools',
@@ -49,38 +45,20 @@ const routes: RouteObject[] = [
         ),
       },
       {
-        path: 'log-list',
+        path: 'recordings',
         element: (
           <ProtectedRoute>
-            <LogList />
+            <Recordings />
           </ProtectedRoute>
         ),
       },
       {
-        path: 'docs/*',
-        element: <MainDocs />,
-      },
-      {
-        path: 'replay',
+        path: 'recordings/view',
         element: (
           <ProtectedRoute>
-            <Replay />
+            <RecordingViewer />
           </ProtectedRoute>
         ),
-      },
-    ],
-  },
-  {
-    path: '/o-spy',
-    element: <Layouts />,
-    children: [
-      {
-        index: true,
-        element: <OSpy />,
-      },
-      {
-        path: 'docs/*',
-        element: <OSpyDocs />,
       },
     ],
   },

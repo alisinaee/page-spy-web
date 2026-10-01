@@ -1,160 +1,95 @@
 import { memo, useMemo } from 'react';
-import { Card, Col, Empty, Row, Typography } from 'antd';
-import './index.less';
-import { FeatureItem } from '@/components/FeatureItem';
 import { useTranslation } from 'react-i18next';
+import { Check, X } from 'lucide-react';
 import { parseUserAgent } from '@/utils/brand';
 import { SpySystem } from '@huolala-tech/page-spy-types';
-import { useReplayStore } from '@/store/replay';
-import MPSysInfo from './MPSysInfo';
-
-const { Title } = Typography;
 
 interface SystemContentProps {
   data: SpySystem.DataItem[];
 }
 
-const SystemContent = memo(({ data }: SystemContentProps) => {
-  const { t } = useTranslation('translation', { keyPrefix: 'system' });
-  const { features, system, mp } = data[0] || {};
-  const clientInfo = useMemo(() => {
-    return parseUserAgent(system?.ua);
-  }, [system]);
+const Section = ({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) => (
+  <section>
+    <h3 className="border-b border-border bg-muted/40 px-3 py-2 text-xs font-medium text-muted-foreground">
+      {title}
+    </h3>
+    <div>{children}</div>
+  </section>
+);
 
-  const mpSysInfo = useMemo(() => {
-    if (mp) {
-      try {
-        const sysInfo = JSON.parse(mp);
-        return sysInfo;
-      } catch (e) {
-        console.error(e);
-        // if parse error, the client is still mp, should display the mp panel.
-        return {};
-      }
-    }
-    return null;
-  }, [mp]);
+const Row = ({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) => (
+  <div className="flex min-h-11 items-center justify-between gap-4 border-b border-border px-3 py-2 text-sm md:min-h-9">
+    <span className="shrink-0 text-muted-foreground">{label}</span>
+    <span className="min-w-0 text-right font-mono text-xs break-all md:text-sm">
+      {children}
+    </span>
+  </div>
+);
 
-  const noSupport = useMemo(() => {
-    if (!features) return [];
-    return Object.values(features).reduce((acc, cur) => {
-      cur.forEach((item) => {
-        if (!item.supported) {
-          acc.push(item);
-        }
-      });
-      return acc;
-    }, []);
-  }, [features]);
-
-  const isExpand = useReplayStore((state) => state.isExpand);
-  const spanValue = useMemo(() => {
-    if (isExpand) {
-      return {
-        overviewSpan: 10,
-        featSpan: 24,
-        xxlFeatSpan: 12,
-      };
-    }
-    return {
-      overviewSpan: 4,
-      featSpan: 8,
-      xxlFeatSpan: 6,
-    };
-  }, [isExpand]);
-
-  if (data.length === 0) {
-    return <Empty description={false} />;
-  }
-  if (mpSysInfo) {
-    return (
-      <MPSysInfo
-        sysInfo={mpSysInfo}
-        clientInfo={clientInfo}
-        spanValue={spanValue}
-      />
-    );
-  }
+const FeatureRow = ({ title, supported }: SpySystem.FeatureDescriptor) => {
+  const { t } = useTranslation();
   return (
-    <div className="system-content">
-      <div className="system-info">
-        <Title level={3}>{t('overview')}</Title>
-        <Card>
-          <Row>
-            <Col span={spanValue.overviewSpan} className="system-info__label">
-              System:
-            </Col>
-            <Col className="system-info__value">{`${clientInfo?.os.name}/${clientInfo?.os.version}`}</Col>
-          </Row>
-          <Row>
-            <Col span={spanValue.overviewSpan} className="system-info__label">
-              Platform:
-            </Col>
-            <Col className="system-info__value">{`${clientInfo?.browser.name}/${clientInfo?.browser.version}`}</Col>
-          </Row>
-          <Row wrap={false}>
-            <Col span={spanValue.overviewSpan} className="system-info__label">
-              User Agent:
-            </Col>
-            <Col className="system-info__value">{system.ua}</Col>
-          </Row>
-        </Card>
-      </div>
+    <div className="flex min-h-11 items-center justify-between gap-4 border-b border-border px-3 py-2 text-sm md:min-h-9">
+      <span className="min-w-0">{title}</span>
+      <span
+        className={
+          supported
+            ? 'flex shrink-0 items-center gap-1 text-success'
+            : 'flex shrink-0 items-center gap-1 text-muted-foreground'
+        }
+      >
+        {supported ? (
+          <Check className="size-4" aria-hidden />
+        ) : (
+          <X className="size-4" aria-hidden />
+        )}
+        {supported
+          ? t('system.supported', { defaultValue: 'Supported' })
+          : t('system.not-supported', { defaultValue: 'Not supported' })}
+      </span>
+    </div>
+  );
+};
 
-      {Object.keys(features).length > 0 && (
-        <>
-          <div className="system-info">
-            <Title level={3}>{t('feature')}</Title>
-            {!!noSupport.length && (
-              <>
-                <Title level={5} style={{ color: 'rgb(216, 30, 6)' }}>
-                  <span>{t('unsupport')}</span>
-                </Title>
-                <Card
-                  style={{
-                    borderColor: 'rgb(216, 30, 6)',
-                    backgroundColor: 'rgba(216, 30, 6, 0.1)',
-                  }}
-                >
-                  <Row>
-                    {noSupport.map((feature) => (
-                      <Col
-                        span={spanValue.featSpan}
-                        xxl={{
-                          span: spanValue.xxlFeatSpan,
-                        }}
-                        key={feature.title}
-                      >
-                        <FeatureItem {...feature} />
-                      </Col>
-                    ))}
-                  </Row>
-                </Card>
-              </>
-            )}
-          </div>
-          {Object.entries(features).map(([key, value]) => {
-            return (
-              <div className="system-info" key={key}>
-                <Title level={5}>{key}</Title>
-                <Card>
-                  <Row>
-                    {value.map((feature) => (
-                      <Col
-                        span={spanValue.featSpan}
-                        xxl={{ span: spanValue.xxlFeatSpan }}
-                        key={feature.title}
-                      >
-                        <FeatureItem {...feature} />
-                      </Col>
-                    ))}
-                  </Row>
-                </Card>
-              </div>
-            );
-          })}
-        </>
-      )}
+const SystemContent = memo(({ data }: SystemContentProps) => {
+  const { t } = useTranslation();
+  const { features = {}, system } = data[0] || {};
+  const clientInfo = useMemo(() => parseUserAgent(system?.ua), [system]);
+
+  return (
+    <div className="system-content mx-auto max-w-3xl">
+      <Section title={t('system.device', { defaultValue: 'Device' })}>
+        <Row label={t('system.os', { defaultValue: 'System' })}>
+          {`${clientInfo?.os.name}/${clientInfo?.os.version}`}
+        </Row>
+      </Section>
+      <Section title={t('system.browser', { defaultValue: 'Browser' })}>
+        <Row label={t('system.platform', { defaultValue: 'Platform' })}>
+          {`${clientInfo?.browser.name}/${clientInfo?.browser.version}`}
+        </Row>
+        <Row label="User Agent">{system?.ua}</Row>
+      </Section>
+      {Object.entries(
+        features as Record<string, SpySystem.FeatureDescriptor[]>,
+      ).map(([key, value]) => (
+        <Section key={key} title={`${t('system.feature')} · ${key}`}>
+          {value.map((feature) => (
+            <FeatureRow key={feature.title} {...feature} />
+          ))}
+        </Section>
+      ))}
     </div>
   );
 });

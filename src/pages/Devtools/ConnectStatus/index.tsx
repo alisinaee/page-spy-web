@@ -1,33 +1,17 @@
 import { SpySocket } from '@huolala-tech/page-spy-types';
-import { Row, Col, Space, Divider } from 'antd';
 import { memo, useEffect, useState } from 'react';
-import './index.less';
-import UserSvg from '@/assets/image/user-1.svg?react';
-import Icon from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { useSocketMessageStore } from '@/store/socket-message';
 import { CUSTOM_EVENT } from '@/store/socket-message/socket';
 import { useShallow } from 'zustand/react/shallow';
+import clsx from 'clsx';
 
 interface ConnectionStatus {
   client?: SpySocket.Connection | null;
   debug?: SpySocket.Connection | null;
 }
 
-const UserStatus = ({ online }: { online: boolean }) => {
-  return (
-    <Icon
-      component={UserSvg}
-      style={{
-        color: online ? '#2fbf2f' : '#aaa',
-        fontSize: 16,
-      }}
-    />
-  );
-};
-
-export const ConnectStatus = memo(() => {
-  const { t } = useTranslation();
+const useConnections = () => {
   const socket = useSocketMessageStore(useShallow((state) => state.socket));
   const [connections, setConnections] = useState<ConnectionStatus>(() => ({
     client: socket?.clientConnection,
@@ -46,23 +30,49 @@ export const ConnectStatus = memo(() => {
     };
   }, [socket]);
 
+  return connections;
+};
+
+const StatusItem = ({ online, name }: { online: boolean; name: string }) => (
+  <div
+    className={clsx(
+      'flex items-center gap-2 text-sm',
+      online ? 'text-success' : 'text-muted-foreground',
+    )}
+  >
+    <span className="size-2 rounded-full bg-current" />
+    <span>{name}</span>
+  </div>
+);
+
+/** Compact "Live / Offline" pill for the top bar. */
+export const ConnectStatus = memo(() => {
+  const { t } = useTranslation();
+  const { client, debug } = useConnections();
+  const live = !!client && !!debug;
+
   return (
-    <Row justify="center" className="connect-status">
-      <Col>
-        <div className="connect-status-widget">
-          <Space>
-            <Space>
-              <UserStatus online={!!connections.debug} />
-              {t('socket.debug-name')}
-            </Space>
-            <Divider type="vertical" />
-            <Space>
-              <UserStatus online={!!connections.client} />
-              {t('socket.client-name')}
-            </Space>
-          </Space>
-        </div>
-      </Col>
-    </Row>
+    <div
+      className={clsx(
+        'flex shrink-0 items-center gap-1 text-xs font-medium',
+        live ? 'text-success' : 'text-muted-foreground',
+      )}
+    >
+      <span className="size-2 rounded-full bg-current" />
+      <span>{live ? t('devtool.live') : t('devtool.offline')}</span>
+    </div>
+  );
+});
+
+/** You / Client detail, shown inside the device info sheet. */
+export const ConnectDetail = memo(() => {
+  const { t } = useTranslation();
+  const { client, debug } = useConnections();
+
+  return (
+    <div className="flex flex-col gap-2">
+      <StatusItem online={!!debug} name={t('socket.debug-name')} />
+      <StatusItem online={!!client} name={t('socket.client-name')} />
+    </div>
   );
 });

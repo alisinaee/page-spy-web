@@ -229,6 +229,11 @@ export function parseUserAgent(uaString: string = '') {
       if (match) {
         osInfo.type = os;
         osInfo.version = match[match.length - 1]?.replaceAll('_', '.');
+        // Chrome freezes every Android phone as "Android 10; K". That is not
+        // the real OS version, so do not show 10.
+        if (os === 'android' && /Android 10; K\)/.test(uaString)) {
+          osInfo.version = '';
+        }
         break;
       }
     }

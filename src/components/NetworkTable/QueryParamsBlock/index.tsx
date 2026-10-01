@@ -1,39 +1,33 @@
-import { Space } from 'antd';
 import { useState, useMemo } from 'react';
-import { EntriesBody } from '@/components/EntriesBody';
+import { DetailSection, KeyValueList } from '../DetailParts';
 
-export const QueryParamsBlock: React.FC<{ data: [string, string][] }> = ({
-  data,
-}) => {
+export const QueryParamsBlock = ({ data }: { data: [string, string][] }) => {
   const [decoded, setDecoded] = useState(true);
-  const decodedData = useMemo(() => {
-    if (!decoded) {
-      return data.reduce((acc, [key, value]) => {
-        acc.push([key, encodeURIComponent(value)]);
-        return acc;
-      }, [] as [string, string][]);
-    }
-    return data;
-  }, [data, decoded]);
-
-  const toggleText = useMemo(() => {
-    return decoded ? 'view URL-encoded' : 'view decoded';
-  }, [decoded]);
+  const shown = useMemo(
+    () =>
+      decoded
+        ? data
+        : data.map(([key, value]): [string, string] => [
+            key,
+            encodeURIComponent(value),
+          ]),
+    [data, decoded],
+  );
 
   return (
-    <div className="detail-block">
-      <Space className="detail-block__label">
-        <span>Query String Parameters</span>
-        <span
+    <DetailSection
+      label="Query String Parameters"
+      action={
+        <button
+          type="button"
           onClick={() => setDecoded(!decoded)}
-          style={{ fontWeight: 'normal', cursor: 'pointer' }}
+          className="min-h-11 px-2 text-xs font-normal text-primary-text md:min-h-6"
         >
-          {toggleText}
-        </span>
-      </Space>
-      <div className="detail-block__content">
-        <EntriesBody data={decodedData} />
-      </div>
-    </div>
+          {decoded ? 'view URL-encoded' : 'view decoded'}
+        </button>
+      }
+    >
+      <KeyValueList data={shown} />
+    </DetailSection>
   );
 };

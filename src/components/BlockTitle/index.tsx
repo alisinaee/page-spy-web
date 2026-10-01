@@ -1,21 +1,18 @@
-import { Typography } from 'antd';
-import type { TitleProps } from 'antd/lib/typography/Title';
-import './index.less';
-
-const { Title } = Typography;
+import React from 'react';
 
 export const BlockTitle = ({
   title,
   level = 3,
 }: {
   title: React.ReactNode;
-  level?: TitleProps['level'];
+  level?: 1 | 2 | 3 | 4 | 5;
 }) => {
+  const HeadingTag = `h${level}` as keyof JSX.IntrinsicElements;
   return (
-    <div className="block-title">
-      <Title level={level} style={{ color: 'rgba(0, 0, 0, 0.65)' }}>
+    <div className="block-title relative pl-4 before:absolute before:left-0 before:top-1/2 before:block before:h-3/5 before:w-1 before:-translate-y-1/2 before:bg-primary before:content-[''] [&~.block-title]:mt-8">
+      <HeadingTag className="text-foreground/80 font-semibold tracking-tight my-2">
         {title}
-      </Title>
+      </HeadingTag>
     </div>
   );
 };

@@ -1,10 +1,11 @@
-import { Col, Empty, Row, Space } from 'antd';
-import { SectionLogActions } from '../SectionLogActions';
+import { useTranslation } from 'react-i18next';
+import { PanelEmpty } from '@/components/panel';
 import { useEffect, useRef, useState } from 'react';
 import { PCFrame } from '../BrowserFrame';
-import './index.less';
 import { useSocketMessageStore } from '@/store/socket-message';
 import { useShallow } from 'zustand/react/shallow';
+import { FileQuestion, RotateCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 function insertStyle(doc: Document, text: string) {
   const style = doc.createElement('style');
@@ -17,6 +18,7 @@ const PagePanel = () => {
   const [html, refresh] = useSocketMessageStore(
     useShallow((state) => [state.pageMsg.html, state.refresh]),
   );
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const parser = useRef<DOMParser>(new DOMParser());
   const frameRef = useRef<HTMLIFrameElement | null>(null);
@@ -49,10 +51,10 @@ const PagePanel = () => {
           height: 10px;
         }
         ::-webkit-scrollbar-thumb {
-          background: rgba(0, 0, 0, 0.15);
+          background: rgba(255, 255, 255, 0.15);
         }
         ::-webkit-scrollbar-thumb:active {
-          background: rgba(0, 0, 0, 0.25);
+          background: rgba(255, 255, 255, 0.25);
         }
       `,
       );
@@ -78,36 +80,44 @@ const PagePanel = () => {
   }, [html]);
 
   return (
-    <div className="page-panel">
-      <Row justify="end">
-        <Col>
-          <Space>
-            <SectionLogActions section="page" />
-          </Space>
-        </Col>
-      </Row>
-      <div className="page-panel__content">
-        {!html ? (
-          <Empty description={false} />
-        ) : (
-          <PCFrame
-            loading={loading}
-            onRefresh={() => {
-              setLoading(true);
-              refresh('page');
-            }}
-          >
-            <iframe
-              className="client-iframe"
-              ref={frameRef}
-              width="100%"
-              height="100%"
-              sandbox="allow-same-origin"
-              referrerPolicy="strict-origin-when-cross-origin"
-            />
-          </PCFrame>
-        )}
-      </div>
+    <div className="flex h-full min-h-0 w-full flex-col">
+      {!html ? (
+        <PanelEmpty
+          icon={<FileQuestion />}
+          title={t('page.empty', { defaultValue: 'No page snapshot' })}
+          action={
+            <Button
+              variant="outline"
+              size="touch"
+              className="md:h-9 md:min-h-0 md:text-sm"
+              onClick={() => {
+                setLoading(true);
+                refresh('page');
+              }}
+            >
+              <RotateCw />
+              {t('common.refresh')}
+            </Button>
+          }
+        />
+      ) : (
+        <PCFrame
+          loading={loading}
+          onRefresh={() => {
+            setLoading(true);
+            refresh('page');
+          }}
+        >
+          <iframe
+            className="client-iframe block border-0"
+            ref={frameRef}
+            width="100%"
+            height="100%"
+            sandbox="allow-same-origin"
+            referrerPolicy="strict-origin-when-cross-origin"
+          />
+        </PCFrame>
+      )}
     </div>
   );
 };

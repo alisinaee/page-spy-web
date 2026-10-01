@@ -12,26 +12,10 @@ export const isBrowser = (browser: SpyClient.Browser) => {
   return AllBrowserTypes.includes(browser);
 };
 
-export const isMiniProgram = (browser: SpyClient.Browser) => {
-  return browser.startsWith('mp-');
-};
-
-export const isUniAppNative = (browser: SpyClient.Browser) => {
-  return browser === 'uni-native';
-};
-
-export const isHarmonyApp = (browser: SpyClient.Browser) => {
-  return browser === 'harmony';
-};
-
-export const isReactNative = (browser: SpyClient.Browser) => {
-  return browser === 'react-native';
-};
-
 export const STORAGE_TYPES: {
   name: StorageType | 'indexedDB';
   label: string;
-  icon: FunctionComponent;
+  icon: FunctionComponent<any>;
   visible: (browser: SpyClient.Browser) => boolean;
 }[] = [
   {
@@ -57,26 +41,6 @@ export const STORAGE_TYPES: {
     label: 'IndexedDB',
     icon: DatabaseSvg,
     visible: isBrowser,
-  },
-  {
-    name: 'mpStorage',
-    label: 'Mini Program Storage',
-    icon: StorageSvg,
-    visible: (browser) => {
-      return isMiniProgram(browser) || isUniAppNative(browser);
-    },
-  },
-  {
-    name: 'AppStorage',
-    label: 'AppStorage',
-    icon: StorageSvg,
-    visible: isHarmonyApp,
-  },
-  {
-    name: 'asyncStorage',
-    label: 'Async Storage',
-    icon: StorageSvg,
-    visible: isReactNative,
   },
 ];
 
