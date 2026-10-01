@@ -94,6 +94,45 @@ export const useSocketMessageStore = create<SocketMessage>()(
       const _socket = get().socket;
       if (_socket) return;
 
+      try {
+        const saved = sessionStorage.getItem(`spy-tobank-logs:${roomID}`);
+        if (saved) {
+          const parsed = JSON.parse(saved) as {
+            consoleMsg?: SpyConsole.DataItem[];
+            networkMsg?: ResolvedNetworkInfo[];
+          };
+          set((state) => {
+            if (!state.consoleMsg.length && Array.isArray(parsed.consoleMsg)) {
+              state.consoleMsg = parsed.consoleMsg;
+            }
+            if (!state.networkMsg.length && Array.isArray(parsed.networkMsg)) {
+              state.networkMsg = parsed.networkMsg;
+            }
+          });
+        }
+      } catch (error) {
+        /* a bad cache must not block the socket */
+      }
+
+      let persistTimer = 0;
+      const schedulePersist = () => {
+        window.clearTimeout(persistTimer);
+        persistTimer = window.setTimeout(() => {
+          const state = get();
+          try {
+            sessionStorage.setItem(
+              `spy-tobank-logs:${roomID}`,
+              JSON.stringify({
+                consoleMsg: state.consoleMsg,
+                networkMsg: state.networkMsg,
+              }),
+            );
+          } catch (error) {
+            /* quota: the live socket is still the source of new lines */
+          }
+        }, 400);
+      };
+
       const [, protocol] = resolveProtocol();
       const url = `${protocol}${API_BASE_URL}/api/v1/ws/room/join?address=${roomID}&userId=${USER_ID}&secret=${secret}`;
 
@@ -106,8 +145,11 @@ export const useSocketMessageStore = create<SocketMessage>()(
       });
       socket.addListener('console', (data: SpyConsole.DataItem) => {
         set((state) => {
+          if (data.id && state.consoleMsg.some((item) => item.id === data.id))
+            return;
           state.consoleMsg.push(data);
         });
+        schedulePersist();
       });
       socket.addListener('system', (data: SpySystem.DataItem) => {
         set((state) => {
@@ -187,6 +229,7 @@ export const useSocketMessageStore = create<SocketMessage>()(
             );
           });
         }
+        schedulePersist();
       });
       socket.addListener('connect', (data: string) => {
         set((state) => {
@@ -387,6 +430,14 @@ export const useSocketMessageStore = create<SocketMessage>()(
           data: null,
         };
       });
+      try {
+        Object.keys(sessionStorage).forEach((key) => {
+          if (key.startsWith('spy-tobank-logs:'))
+            sessionStorage.removeItem(key);
+        });
+      } catch (error) {
+        /* ignore */
+      }
     },
     refresh: (key: string) => {
       const socket = get().socket;

@@ -5,7 +5,9 @@ import {
   isBoxSeparator,
   stripAnsi,
   stripBoxBorder,
-} from './log-format.js';
+} from './log-format.js?v=10';
+import { buildRouteTrace, routeWindow } from './route-trace.js?v=10';
+import { formatTehranDateTime, formatTehranStamp } from './tehran-time.js?v=10';
 
 (() => {
   const logs = [];
@@ -171,6 +173,56 @@ import {
         notify(stored);
       } catch (e) {}
     });
+    if (stored.section === 'console') scheduleRouteMarkers();
+  };
+
+  let forwardConsole = null;
+  let routeEmitTimer = null;
+  const emittedRouteKeys = new Set();
+  const routeEntries = () => {
+    const entries = [];
+    logs.forEach((item, index) => {
+      if (item.section !== 'console') return;
+      entries.push({
+        index,
+        time: item.time ? new Date(item.time).getTime() : 0,
+        text: item.message || '',
+      });
+    });
+    return entries;
+  };
+  const flushRouteMarkers = () => {
+    if (typeof forwardConsole !== 'function') return;
+    buildRouteTrace(routeEntries()).forEach((node) => {
+      const key = [
+        node.time,
+        node.operation,
+        node.kind,
+        node.address,
+        node.name,
+        node.jsonUrl,
+      ].join('|');
+      if (emittedRouteKeys.has(key)) return;
+      emittedRouteKeys.add(key);
+      forwardConsole(
+        [
+          '[ROUTE]',
+          node.operation,
+          node.kind,
+          node.name || '',
+          node.address || '',
+          node.jsonUrl || '',
+          String(node.time || 0),
+        ].join('\x1f'),
+      );
+    });
+  };
+  const scheduleRouteMarkers = () => {
+    if (routeEmitTimer) return;
+    routeEmitTimer = setTimeout(() => {
+      routeEmitTimer = null;
+      flushRouteMarkers();
+    }, 400);
   };
 
   const describeRequestBody = async (body) => {
@@ -230,6 +282,16 @@ import {
     return new TextDecoder('utf-8').decode(bytes);
   };
 
+  const absoluteUrl = (url) => {
+    const raw = String(url || '');
+    if (!raw || /^(https?:|wss?:|data:|blob:)/i.test(raw)) return raw;
+    try {
+      return new URL(raw, location.href).href;
+    } catch (error) {
+      return raw;
+    }
+  };
+
   const describeXhrResponse = async (xhr) => {
     let type = '';
     try {
@@ -237,18 +299,25 @@ import {
     } catch (error) {
       type = '';
     }
-    if (/^(image|video|audio)\//.test(type)) return `[${type}]`;
+    const binary =
+      /^(image|video|audio|font)\//.test(type) || type.includes('octet-stream');
+    if (binary) return `[${type}]`;
     if (xhr.responseType === 'arraybuffer' || xhr.responseType === 'blob') {
-      return describeRequestBody(xhr.response);
+      const described = await describeRequestBody(xhr.response);
+      if (described) return described;
+      return '[' + (type || xhr.responseType || 'binary') + ']';
     }
-    if (xhr.responseType === 'json') return xhr.response;
+    if (xhr.responseType === 'json') {
+      if (xhr.response != null && xhr.response !== '') return xhr.response;
+      return type ? '[' + type + ']' : '';
+    }
     try {
       if (typeof xhr.responseText === 'string' && xhr.responseText)
         return xhr.responseText;
     } catch (error) {
-      return '';
+      return type ? '[' + type + ']' : '';
     }
-    return '';
+    return type ? '[' + type + ']' : '';
   };
 
   const classifyKind = (url, fallback = 'Fetch/XHR') => {
@@ -302,6 +371,7 @@ import {
         current && current.__pageSpyOriginal
           ? current.__pageSpyOriginal
           : current.bind(console);
+      if (level === 'log') forwardConsole = original;
       console[level] = (...args) => {
         const safeArgs = args.map((item) => {
           if (item == null || typeof item !== 'object') return item;
@@ -350,7 +420,9 @@ import {
     window.fetch = async (...args) => {
       const input = args[0];
       const init = args[1] || {};
-      const url = typeof input === 'string' ? input : input && input.url;
+      const url = absoluteUrl(
+        typeof input === 'string' ? input : input && input.url,
+      );
       const method = String(
         init.method || (input && input.method) || 'GET',
       ).toUpperCase();
@@ -464,7 +536,7 @@ import {
           section: 'network',
           kind: classifyKind(meta.url, 'Fetch/XHR'),
           method: meta.method,
-          url: meta.url,
+          url: absoluteUrl(meta.url),
           status: xhr.status || 'failed',
           ok: xhr.status >= 200 && xhr.status < 400,
           costTime: Date.now() - meta.started,
@@ -475,6 +547,7 @@ import {
       });
       return originalSend.apply(this, arguments);
     };
+    scheduleRouteMarkers();
   };
 
   const storageEntries = (storage) => {
@@ -521,20 +594,17 @@ import {
   const snapshot = () => {
     const device = deviceInfo();
     return {
-      exportedAt: new Date().toLocaleString('en-GB', {
-        timeZone: 'Asia/Tehran',
-        hourCycle: 'h23',
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      }),
+      exportedAt: formatTehranDateTime(new Date()),
       deviceId: device.id,
       device,
       console: logs.filter((item) => item.section === 'console'),
-      network: logs.filter((item) => item.section === 'network'),
+      network: logs
+        .filter((item) => item.section === 'network')
+        .map((item) => ({
+          ...item,
+          url: absoluteUrl(item.url),
+        })),
+      routes: buildRouteTrace(routeEntries()),
       page: { title: document.title, href: location.href },
       storage: {
         localStorage: storageEntries(localStorage),
@@ -558,19 +628,7 @@ import {
 
   const defaultFileName = () => {
     const device = deviceInfo();
-    const stamp = new Date()
-      .toLocaleString('en-GB', {
-        timeZone: 'Asia/Tehran',
-        hourCycle: 'h23',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      })
-      .replace(/[^0-9]+/g, '-')
-      .replace(/^-|-$/g, '');
+    const stamp = formatTehranStamp(new Date());
     return (
       [
         'pagespy',
@@ -781,7 +839,7 @@ import {
 
   const curlText = (item) =>
     buildCurlCommand({
-      url: item.url,
+      url: absoluteUrl(item.url),
       method: item.method,
       requestHeader: item.requestHeaders,
       requestPayload: item.requestBody,
@@ -789,7 +847,7 @@ import {
 
   const responsePlain = (value) => {
     const deepened = deepen(value);
-    if (deepened == null || deepened === '') return 'None';
+    if (deepened == null || deepened === '') return '(empty)';
     if (typeof deepened === 'string') {
       const trimmed = deepened.trim();
       if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
@@ -808,13 +866,14 @@ import {
     }
   };
 
-  const fullNetworkText = (item) =>
-    [
-      curlText(item),
-      '',
-      '# Response',
-      responsePlain(item.error || item.responseBody),
-    ].join('\n');
+  const fullNetworkText = (item) => {
+    const status =
+      item.status == null || item.status === '' ? '' : String(item.status);
+    const lines = [curlText(item), ''];
+    if (status) lines.push('# Status', status, '');
+    lines.push('# Response', responsePlain(item.error || item.responseBody));
+    return lines.join('\n');
+  };
 
   const syncMasterButtons = () => {
     const label = currentSettings.masterLogs ? 'Logs ON' : 'Logs OFF';
@@ -1075,6 +1134,50 @@ import {
         'min-width:3.2em;text-align:center;font:12px var(--spyt-mono);color:var(--spyt-muted-fg)',
       ),
       rule(
+        '.route-map',
+        'display:flex;flex-direction:column;padding:8px 12px 16px',
+      ),
+      rule('.route-node', 'display:flex;gap:10px;padding:8px 0'),
+      rule(
+        '.route-rail',
+        'display:flex;flex-direction:column;align-items:center;width:14px;flex:none',
+      ),
+      rule(
+        '.route-dot',
+        'width:12px;height:12px;border-radius:999px;background:var(--spyt-primary);flex:none',
+      ),
+      rule(
+        '.route-dot[data-kind="dialog"],.route-dot[data-kind="sheet"]',
+        'background:#e8b931',
+      ),
+      rule(
+        '.route-line',
+        'width:1px;flex:1;background:var(--spyt-border);min-height:12px',
+      ),
+      rule(
+        '.route-body',
+        'min-width:0;flex:1;display:flex;flex-direction:column;gap:8px;align-items:stretch',
+      ),
+      rule('.route-actions', 'display:flex;flex-wrap:wrap;gap:6px'),
+      rule(
+        '.route-actions .btn',
+        'min-height:32px;padding:0 8px;font-size:12px',
+      ),
+      rule('.route-copy', 'min-width:0;flex:1'),
+      rule(
+        '.route-copy strong',
+        'display:block;font-size:14px;font-weight:600',
+      ),
+      rule(
+        '.route-meta',
+        'font:12px var(--spyt-mono);color:var(--spyt-muted-fg);overflow-wrap:anywhere',
+      ),
+      rule(
+        '.route-head',
+        'display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--spyt-border);background:var(--spyt-card)',
+      ),
+      rule('.route-head .btn', 'flex:none'),
+      rule(
         '.card[data-hit="current"],.pair[data-hit="current"]',
         'outline:2px solid var(--spyt-primary);outline-offset:-2px',
       ),
@@ -1331,7 +1434,12 @@ import {
       '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
     );
     const close = iconBtn('Close', '<path d="M6 6l12 12M18 6L6 18"/>');
+    const backBtn = iconBtn('Back', '<path d="M15 18l-6-6 6-6"/>');
+    backBtn.classList.add('route-back');
+    backBtn.hidden = true;
+    const barTitle = bar.querySelector('strong');
     bar.append(searchNav, searchOpenBtn, close);
+    bar.prepend(backBtn);
 
     const tabs = document.createElement('div');
     tabs.className = 'tabs';
@@ -1388,20 +1496,7 @@ import {
       }
       return item.__clean;
     };
-    const timeLabel = (iso) => {
-      const date = new Date(iso);
-      if (Number.isNaN(date.getTime())) return '';
-      return date.toLocaleString('en-GB', {
-        timeZone: 'Asia/Tehran',
-        hourCycle: 'h23',
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      });
-    };
+    const timeLabel = (iso) => formatTehranDateTime(iso);
 
     // Filter states for view
     const viewConsoleLevels = new Set();
@@ -1410,6 +1505,20 @@ import {
     let viewNetworkKind = 'All';
 
     let activeSection = 'Console';
+    let routeFocus = null;
+    let routeLogTab = 'console';
+    const syncRouteBar = (node) => {
+      const open = !!(node && routeFocus);
+      backBtn.hidden = !open;
+      barTitle.textContent = open
+        ? node.name || node.address || 'Route'
+        : 'Spy Tobank logs';
+    };
+    backBtn.onclick = () => {
+      routeFocus = null;
+      syncRouteBar(null);
+      if (activeSection === 'Routes') renderRoutes();
+    };
     let searchQuery = '';
     let searchCursor = 0;
     let activeList = null;
@@ -2112,8 +2221,226 @@ import {
       root.remove();
     };
 
+    const logsOnPage = (nodes, node) => {
+      const span = routeWindow(nodes, node.id);
+      const found = [];
+      logs.forEach((item, index) => {
+        if (item.section !== 'console' && item.section !== 'network') return;
+        const time = item.time ? new Date(item.time).getTime() : 0;
+        const byTime = time >= span.start && time < span.end;
+        const byIndex = index >= span.startIndex && index < span.endIndex;
+        if (byTime || byIndex) found.push(item);
+      });
+      return found;
+    };
+
+    const pageDump = (node, items) => {
+      const consoleLines = items
+        .filter((item) => item.section === 'console')
+        .map((item) => timeLabel(item.time) + ' ' + cleanMessage(item));
+      const networkBlocks = items
+        .filter((item) => item.section === 'network')
+        .map((item) => fullNetworkText(item));
+      return [
+        '# Page',
+        node.name || node.address || node.kind || 'Route',
+        [node.operation, node.address, node.jsonUrl].filter(Boolean).join('\n'),
+        '',
+        '# Console',
+        consoleLines.join('\n') || '(none)',
+        '',
+        '# Network',
+        networkBlocks.join('\n\n') || '(none)',
+      ].join('\n');
+    };
+
+    const downloadPage = (node, items) => {
+      const stamp = formatTehranStamp(new Date());
+      const fileName =
+        [
+          'pagespy',
+          'route',
+          cleanPart(node.name || node.address || node.kind, 'page'),
+          stamp,
+        ].join('_') + '.json';
+      saveBlob(
+        fileName,
+        redactSecrets({
+          exportedAt: formatTehranDateTime(new Date()),
+          page: {
+            name: node.name || '',
+            operation: node.operation || '',
+            kind: node.kind || '',
+            address: node.address || '',
+            jsonUrl: node.jsonUrl || '',
+          },
+          console: items.filter((item) => item.section === 'console'),
+          network: items
+            .filter((item) => item.section === 'network')
+            .map((item) => ({ ...item, url: absoluteUrl(item.url) })),
+        }),
+      );
+    };
+
+    const renderRoutes = () => {
+      filters.replaceChildren();
+      sheet.replaceChildren();
+      activeList = null;
+      refreshBadge = null;
+      const entries = routeEntries();
+      const nodes = buildRouteTrace(entries);
+      const selected = routeFocus
+        ? nodes.find((node) => node.id === routeFocus)
+        : null;
+
+      if (!nodes.length) {
+        syncRouteBar(null);
+        sheet.append(empty('No routes yet. Open a page, dialog, or sheet.'));
+        return;
+      }
+
+      if (selected) {
+        syncRouteBar(selected);
+        const span = routeWindow(nodes, selected.id);
+        const inPage = (item, index) => {
+          const time = item.time ? new Date(item.time).getTime() : 0;
+          const byTime = time >= span.start && time < span.end;
+          const byIndex = index >= span.startIndex && index < span.endIndex;
+          return byTime || byIndex;
+        };
+        const items = [];
+        const counts = { console: 0, network: 0 };
+        logs.forEach((item, index) => {
+          if (!inPage(item, index)) return;
+          if (item.section === 'console' || item.section === 'network') {
+            counts[item.section] += 1;
+          }
+          if (item.section === routeLogTab) items.push(item);
+        });
+        const row = document.createElement('div');
+        row.className = 'filter-row';
+        const bar = document.createElement('div');
+        bar.className = 'filter-bar';
+        ['console', 'network'].forEach((key) => {
+          const chip = document.createElement('button');
+          chip.type = 'button';
+          chip.className = 'chip';
+          chip.dataset.active = String(routeLogTab === key);
+          chip.textContent =
+            key[0].toUpperCase() + key.slice(1) + ' ' + counts[key];
+          chip.onclick = () => {
+            routeLogTab = key;
+            renderRoutes();
+          };
+          bar.append(chip);
+        });
+        const pageItems = logsOnPage(nodes, selected);
+        const copyPage = document.createElement('button');
+        copyPage.type = 'button';
+        copyPage.className = 'chip';
+        copyPage.textContent = 'Copy all';
+        copyPage.onclick = () => {
+          copyText(pageDump(selected, pageItems), (ok) => {
+            copyPage.textContent = ok ? 'Copied' : 'Failed';
+            setTimeout(() => {
+              copyPage.textContent = 'Copy all';
+            }, 1200);
+          });
+        };
+        const downloadPageBtn = document.createElement('button');
+        downloadPageBtn.type = 'button';
+        downloadPageBtn.className = 'chip';
+        downloadPageBtn.textContent = 'Download all';
+        downloadPageBtn.onclick = () => downloadPage(selected, pageItems);
+        bar.append(copyPage, downloadPageBtn);
+        row.append(bar);
+        filters.append(row);
+
+        const listContainer = document.createElement('div');
+        activeList = createList(
+          listContainer,
+          items,
+          routeLogTab === 'console' ? buildConsoleRow : buildNetworkRow,
+          'No logs on this page',
+        );
+        sheet.append(listContainer);
+        return;
+      }
+
+      syncRouteBar(null);
+      const map = document.createElement('div');
+      map.className = 'route-map';
+      nodes.forEach((node, index) => {
+        const row = document.createElement('div');
+        row.className = 'route-node';
+        if (node.kind !== 'page') row.style.paddingLeft = '22px';
+        const rail = document.createElement('div');
+        rail.className = 'route-rail';
+        const dot = document.createElement('span');
+        dot.className = 'route-dot';
+        dot.dataset.kind = node.kind;
+        rail.append(dot);
+        if (index < nodes.length - 1) {
+          const line = document.createElement('span');
+          line.className = 'route-line';
+          rail.append(line);
+        }
+        const body = document.createElement('div');
+        body.className = 'route-body';
+        const copyNode = document.createElement('div');
+        copyNode.className = 'route-copy';
+        const heading = document.createElement('strong');
+        heading.textContent = node.name || node.address || node.kind;
+        const meta = document.createElement('div');
+        meta.className = 'route-meta';
+        meta.textContent = [node.operation, node.address, node.jsonUrl]
+          .filter(Boolean)
+          .join(' · ');
+        copyNode.append(heading, meta);
+        body.append(copyNode);
+        if (node.operation !== 'close' && node.operation !== 'pop') {
+          const actions = document.createElement('div');
+          actions.className = 'route-actions';
+          const logsBtn = document.createElement('button');
+          logsBtn.type = 'button';
+          logsBtn.className = 'btn';
+          logsBtn.textContent = 'Logs';
+          logsBtn.onclick = () => {
+            routeFocus = node.id;
+            routeLogTab = 'console';
+            renderRoutes();
+          };
+          const copyAll = document.createElement('button');
+          copyAll.type = 'button';
+          copyAll.className = 'btn';
+          copyAll.textContent = 'Copy all';
+          copyAll.onclick = () => {
+            const text = pageDump(node, logsOnPage(nodes, node));
+            copyText(text, (ok) => {
+              copyAll.textContent = ok ? 'Copied' : 'Failed';
+              setTimeout(() => {
+                copyAll.textContent = 'Copy all';
+              }, 1200);
+            });
+          };
+          const downloadAll = document.createElement('button');
+          downloadAll.type = 'button';
+          downloadAll.className = 'btn';
+          downloadAll.textContent = 'Download all';
+          downloadAll.onclick = () =>
+            downloadPage(node, logsOnPage(nodes, node));
+          actions.append(logsBtn, copyAll, downloadAll);
+          body.append(actions);
+        }
+        row.append(rail, body);
+        map.append(row);
+      });
+      sheet.append(map);
+    };
+
     const show = (name) => {
       activeSection = name;
+      if (name !== 'Routes') syncRouteBar(null);
       activeList = null;
       refreshBadge = null;
       buttons.forEach((button) => {
@@ -2125,6 +2452,10 @@ import {
       }
       if (name === 'Network') {
         renderNetwork();
+        return;
+      }
+      if (name === 'Routes') {
+        renderRoutes();
         return;
       }
       filters.replaceChildren();
@@ -2147,6 +2478,7 @@ import {
     [
       ['Console', sectionCounts.console || 0],
       ['Network', sectionCounts.network || 0],
+      ['Routes', null],
       ['Storage', null],
       ['Device', null],
     ].forEach(([name, count]) => {
@@ -2279,10 +2611,7 @@ import {
         }),
       ),
     });
-    const fileName =
-      new Date()
-        .toLocaleString('en-GB', { timeZone: 'Asia/Tehran', hour12: false })
-        .replace(/[^\w]/g, '_') + '.json';
+    const fileName = formatTehranStamp(new Date()) + '.json';
     const file = new File([JSON.stringify(items)], fileName, {
       type: 'application/json',
     });

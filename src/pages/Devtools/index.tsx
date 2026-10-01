@@ -5,6 +5,7 @@ import NetworkPanel from './NetworkPanel';
 import SystemPanel from './SystemPanel';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import PagePanel from './PagePanel';
+import RoutePanel from './RoutePanel';
 import clsx from 'clsx';
 import { StoragePanel } from './StoragePanel';
 import useSearch from '@/utils/useSearch';
@@ -59,13 +60,20 @@ import {
   Globe,
   MonitorSmartphone,
   MoreHorizontal,
+  Route,
   MoreVertical,
   Terminal,
   Trash2,
   type LucideIcon,
 } from 'lucide-react';
 
-type MenuType = 'Console' | 'Network' | 'Page' | 'Storage' | 'System';
+type MenuType =
+  | 'Console'
+  | 'Network'
+  | 'Page'
+  | 'Storage'
+  | 'System'
+  | 'Routing';
 
 const MENU_COMPONENTS: Record<
   MenuType,
@@ -98,6 +106,9 @@ const MENU_COMPONENTS: Record<
       return isBrowser(browser);
     },
   },
+  Routing: {
+    component: RoutePanel,
+  },
 };
 
 const useDevtoolsBadge = (active: MenuType) => {
@@ -107,6 +118,7 @@ const useDevtoolsBadge = (active: MenuType) => {
     Page: false,
     Storage: false,
     System: false,
+    Routing: false,
   });
 
   useEventListener(
@@ -160,8 +172,15 @@ const MENU_ICONS: Record<MenuType, LucideIcon> = {
   Storage: Database,
   System: Cpu,
   Page: MonitorSmartphone,
+  Routing: Route,
 };
-const TAB_MENUS: MenuType[] = ['Console', 'Network', 'Storage', 'System'];
+const TAB_MENUS: MenuType[] = [
+  'Console',
+  'Network',
+  'Storage',
+  'System',
+  'Routing',
+];
 
 const UnreadDot = ({
   label,

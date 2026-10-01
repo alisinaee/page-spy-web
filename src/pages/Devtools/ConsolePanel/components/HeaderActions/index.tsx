@@ -43,6 +43,19 @@ export const HeaderActions = () => {
     [],
   );
   const [keyword, setKeyword] = useState('');
+  const [match, setMatch] = useState({ index: 0, count: 0 });
+
+  useEffect(() => {
+    const onState = (event: Event) => {
+      const detail = (event as CustomEvent<{ index: number; count: number }>)
+        .detail;
+      if (!detail) return;
+      setMatch(detail);
+    };
+    window.addEventListener('devtools:console-search-state', onState);
+    return () =>
+      window.removeEventListener('devtools:console-search-state', onState);
+  }, []);
 
   const toggleLevel = (level: SpyConsole.ProxyType) => {
     const next = selectedLevels.includes(level)
@@ -180,6 +193,18 @@ export const HeaderActions = () => {
           label={t('console.keyword-filter', {
             defaultValue: 'Keyword filter',
           })}
+          resultIndex={match.index}
+          resultCount={keyword.trim() ? match.count : undefined}
+          onPrev={() =>
+            window.dispatchEvent(
+              new CustomEvent('devtools:console-search-step', { detail: -1 }),
+            )
+          }
+          onNext={() =>
+            window.dispatchEvent(
+              new CustomEvent('devtools:console-search-step', { detail: 1 }),
+            )
+          }
         />
       }
     >

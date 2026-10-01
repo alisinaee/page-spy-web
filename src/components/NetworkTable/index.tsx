@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
   type MouseEvent as ReactMouseEvent,
+  type MutableRefObject,
 } from 'react';
 import { createPortal } from 'react-dom';
 import { FixedSizeList, ListChildComponentProps } from 'react-window';
@@ -178,6 +179,9 @@ interface NetworkTableProps {
   filterKeyword: string;
   cookie?: SpyStorage.GetTypeDataItem['data'];
   onActivate?: (row: ResolvedNetworkInfo) => void;
+  /** 1-based index of the open match, and how many rows match the keyword. */
+  onMatchState?: (state: { index: number; count: number }) => void;
+  searchStepRef?: MutableRefObject<(delta: number) => void>;
 }
 
 const RowContextMenu = ({
@@ -252,6 +256,8 @@ export const NetworkTable = ({
   filterType = 'All',
   filterKeyword = '',
   onActivate,
+  onMatchState,
+  searchStepRef,
 }: NetworkTableProps) => {
   const { t } = useTranslation();
   const isDesktop = useIsDesktop();
@@ -317,6 +323,70 @@ export const NetworkTable = ({
     if (key === 'ArrowDown' && index < data.length - 1)
       setActiveRow(data[index + 1]);
   });
+
+  const stepTo = useCallback(
+    (delta: number) => {
+      if (!data.length) return;
+      const current = activeRow
+        ? data.findIndex((item) => item.id === activeRow.id)
+        : -1;
+      const next =
+        current < 0
+          ? delta < 0
+            ? data.length - 1
+            : 0
+          : (current + delta + data.length) % data.length;
+      const row = data[next];
+      useMiscStore.getState().setIsAutoScroll(false);
+      setActiveRow(row);
+      setShowDetail(true);
+      onActivate?.(row);
+      requestAnimationFrame(() => listRef.current?.scrollToItem(next, 'smart'));
+    },
+    [activeRow, data, onActivate],
+  );
+
+  useEffect(() => {
+    if (searchStepRef) searchStepRef.current = stepTo;
+  }, [searchStepRef, stepTo]);
+
+  const appliedKeyword = useRef('');
+  useEffect(() => {
+    const keyword = filterKeyword.trim();
+    if (!keyword) {
+      appliedKeyword.current = '';
+      return;
+    }
+    if (appliedKeyword.current === keyword || data.length === 0) return;
+    appliedKeyword.current = keyword;
+    const row = data[0];
+    setActiveRow(row);
+    setShowDetail(true);
+    onActivate?.(row);
+    requestAnimationFrame(() => listRef.current?.scrollToItem(0));
+  }, [data, filterKeyword, onActivate]);
+
+  const reportedMatch = useRef({ index: -1, count: -1 });
+  useEffect(() => {
+    if (!onMatchState) return;
+    const keyword = filterKeyword.trim();
+    const current =
+      keyword && activeRow
+        ? data.findIndex((item) => item.id === activeRow.id)
+        : -1;
+    const next = {
+      count: keyword ? data.length : 0,
+      index: current < 0 ? 0 : current + 1,
+    };
+    if (
+      reportedMatch.current.index === next.index &&
+      reportedMatch.current.count === next.count
+    ) {
+      return;
+    }
+    reportedMatch.current = next;
+    onMatchState(next);
+  }, [activeRow, data, filterKeyword, onMatchState]);
 
   useEffect(() => {
     const handleScrollToEnd = () => {
@@ -427,7 +497,7 @@ export const NetworkTable = ({
   };
 
   return (
-    <div className="flex min-h-0 flex-1">
+    <div className="flex h-full min-h-0 flex-1">
       <div className="network-table flex min-h-0 min-w-0 flex-1 flex-col bg-background">
         {mode !== 'phone' && data.length > 0 && (
           <div
