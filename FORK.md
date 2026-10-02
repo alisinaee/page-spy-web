@@ -72,7 +72,7 @@ work.
 Validate every sync:
 
 ```bash
-rtk yarn install --frozen-lockfile --ignore-optional
+rtk yarn install --frozen-lockfile
 rtk yarn lint
 rtk yarn build:client
 ```
@@ -85,11 +85,11 @@ rtk git push origin main
 
 ## Build the local panel
 
-`Dockerfile.local` builds the web client and embeds it into the Go backend, so a
+`Dockerfile` builds the web client and embeds it into the Go backend, so a
 separate `rtk yarn build:client` step is not required for Docker builds.
 
 ```bash
-rtk docker build -f Dockerfile.local -t page-spy-fork:local .
+rtk docker build -t page-spy-fork:local .
 ```
 
 To replace an existing local test container while keeping its named volumes:

@@ -3,7 +3,7 @@ WORKDIR /src
 
 COPY package.json yarn.lock .npmrc ./
 COPY scripts/public-files.sh ./scripts/public-files.sh
-RUN yarn install --frozen-lockfile --ignore-optional
+RUN yarn install --frozen-lockfile
 
 ARG CACHEBUST=1
 COPY . .

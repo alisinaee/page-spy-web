@@ -14,7 +14,7 @@ Details live in [research.md](./research.md), [data-model.md](./data-model.md), 
 Install, then publish the SDK script (postinstall also runs this):
 
 ```bash
-yarn install --frozen-lockfile --ignore-optional
+yarn install --frozen-lockfile
 ```
 
 ## 1. Type check and production package
