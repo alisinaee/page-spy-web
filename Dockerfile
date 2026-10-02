@@ -5,8 +5,10 @@ COPY package.json yarn.lock .npmrc ./
 COPY scripts/public-files.sh ./scripts/public-files.sh
 RUN yarn install --frozen-lockfile --ignore-optional
 
+ARG CACHEBUST=1
 COPY . .
-RUN yarn build:client
+RUN node scripts/patch-sdk-network.mjs public/page-spy/index.min.js \
+  && yarn build:client
 
 FROM golang:1.23 AS backend
 WORKDIR /app
@@ -14,6 +16,7 @@ WORKDIR /app
 COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 COPY backend/main.go ./
+ARG CACHEBUST=1
 COPY --from=client /src/dist ./dist
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
 
@@ -21,3 +24,4 @@ FROM alpine:latest
 WORKDIR /app
 COPY --from=backend /app/main /app/main
 CMD ["/app/main"]
+
